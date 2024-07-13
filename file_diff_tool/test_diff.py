@@ -23,7 +23,7 @@ diff_in_a = pd.DataFrame(data_a)
 # 存储差异信息的列表
 diff_list_info = []
 diff_list = []
-
+  
 print(diff_in_b)
 print(diff_in_a)
 
