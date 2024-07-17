@@ -1,0 +1,990 @@
+/*
+*********************************************************************** 
+Purpose:       主题聚合层-加工快照表脚本
+Author:        Sunline
+Usage:         python $ETL_HOME/script/main.py yyyymmdd ${icl_schema}_s07_lp_cust_basic_info
+CreateDate:    2023-12-22 00:00:00
+FileType:      DML
+logs:
+       表英文名：S07_LP_CUST_BASIC_INFO
+       表中文名：法人客户基本信息聚合
+       创建日期：2023-12-22 00:00:00
+       主键字段：CUST_IN_CD,LP_ORG_NO
+       归属层次：聚合层
+       归属主题：客户
+       主要应用：法人客户基本信息
+       分析人员：王穆军
+       时间粒度：日
+       保留周期：13M
+       描述信息：取ecif内所有法人客户基本信息、扩展信息，大信贷取股东信息、eicc的一些关联人信息
+*************************************************************************/ 
+
+\timing 
+/*创建当日分区*/
+   call ${itl_schema}.partition_add('${icl_schema}.S07_LP_CUST_BASIC_INFO','pt_${batch_date}','${batch_date}'); 
+
+/*删除当前批次历史数据*/
+   call ${itl_schema}.partition_drop('${icl_schema}.S07_LP_CUST_BASIC_INFO','pt_${batch_date}'); 
+
+
+
+/*===================第1组====================*/
+
+DROP TABLE IF EXISTS ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_01;
+CREATE GLOBAL TEMPORARY TABLE ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_01 (
+ CUST_IN_CD  VARCHAR(100) -- 客户内码
+  ,MAIN_DOCTYP_CD  VARCHAR(30) -- 主证件类型代码
+  ,MAIN_DOC_NO  VARCHAR(100) -- 主证件号码
+  ,MAIN_DOC_MATU_DT  VARCHAR(10) -- 主证件到期日期
+  ,MAIN_DOC_ISSUE_ORG_CTRY_RGN_CD  VARCHAR(30) -- 主证件签发机关国家地区代码
+  ,NATION_TAX_REG_CERT_NO  VARCHAR(23) -- 国税登记证号码
+  ,LOCAL_TAX_REG_CERT_NO  VARCHAR(23) -- 地税登记证号码
+  ,ORG_CD  VARCHAR(23) -- 组织机构代码证号码
+  ,BIZ_LIC_NO  VARCHAR(23) -- 营业执照号码
+  ,BIZ_LIC_MATU_DT  VARCHAR(10) -- 营业执照到期日期
+)
+compress(5,5)
+DISTRIBUTED BY (  );
+
+INSERT INTO ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_01(
+  CUST_IN_CD -- 客户内码
+  ,MAIN_DOCTYP_CD -- 主证件类型代码
+  ,MAIN_DOC_NO -- 主证件号码
+  ,MAIN_DOC_MATU_DT -- 主证件到期日期
+  ,MAIN_DOC_ISSUE_ORG_CTRY_RGN_CD -- 主证件签发机关国家地区代码
+  ,NATION_TAX_REG_CERT_NO -- 国税登记证号码
+  ,LOCAL_TAX_REG_CERT_NO -- 地税登记证号码
+  ,ORG_CD -- 组织机构代码证号码
+  ,BIZ_LIC_NO -- 营业执照号码
+  ,BIZ_LIC_MATU_DT -- 营业执照到期日期
+)
+SELECT
+  P1.CUST_INCOD AS CUST_INCOD -- 客户内码
+  ,P2.ALT_TYPE AS ALT_TYPE -- 企业证件类型
+  ,P2.ALT_ID AS ALT_ID -- 企业证件号码
+  ,P2.END_DT AS END_DT -- 企业证件到期日期
+  ,P2.ISSUED_CTY_ID AS ISSUED_CTY_ID -- 企业证件签发国家或地区
+  ,P3.ALT_ID AS ALT_ID -- 国税登记证号码
+  ,P4.ALT_ID AS ALT_ID -- 地税登记证号码
+  ,P5.ALT_ID AS ALT_ID -- 组织机构代码
+  ,P6.ALT_ID AS ALT_ID -- 营业执照号
+  ,P6.END_DT AS END_DT -- 营业执照到期日期
+ FROM ${ods_ecif_schema}.T2_EN_CUST_BASE_INFO  T1 -- 对公客户基本信息 
+LEFT JOIN 	(
+	SELECT 
+		 P1.CUST_INCOD   	--客户内码
+		,P1.ALT_TYPE    	--主证件类型
+		,P1.ALT_ID      	--主证件号码
+		,P1.IS_MST_ID   	--主证件标志
+		,P1.VALID_FLAG  	--有效标志
+		,P1.END_DT      	--证件失效日期
+		,P1.ISSUED_CITY_ID  --证件签发国家或地区
+		,ROW_NUMBER()OVER(PARTITION BY P1.CUST_INCOD,P1.ALT_TYPE
+	ORDER BY P1.UPDATE_TIME DESC ) RN
+	FROM ${ods_ecif_schema}.T2_EN_CUST_ALT_INFO P1 --对公客户证件信息
+	WHERE 1=1
+		AND P1.VALID_FLAG = '1'
+		AND P1.IS_MST_ID = '1'
+		AND P1.PT_DT='${batch_date}' 
+		AND P1.DELETED='0'
+	)  T2 -- 对公客户证件信息 
+ ON T1.CUST_INCOD = T2.CUST_INCOD
+AND T2.RN = 1 
+LEFT JOIN 	(
+	SELECT 
+		 P2.CUST_INCOD   	--客户内码
+		,P2.ALT_TYPE    	--主证件类型
+		,P2.ALT_ID      	--主证件号码
+		,P2.END_DT      	--证件失效日期
+		,ROW_NUMBER()OVER(PARTITION BY P2.CUST_INCOD,P2.ALT_TYPE
+	ORDER BY P2.UPDATE_TIME DESC ) RN
+	FROM ${ods_ecif_schema}.T2_EN_CUST_ALT_INFO P2 --对公客户证件信息
+	WHERE 1=1
+		AND P2.ALT_TYPE = '401' --国税证件信息
+		AND P2.PT_DT='${batch_date}' 
+		AND P2.DELETED='0'
+	)  T3 -- 对公客户证件信息 
+ ON T1.CUST_INCOD=T3.CUST_INCOD 
+AND T3.RN = 1 
+LEFT JOIN 	(
+	SELECT 
+		 P3.CUST_INCOD   	--客户内码
+		,P3.ALT_TYPE    	--主证件类型
+		,P3.ALT_ID      	--主证件号码
+		,P3.END_DT      	--证件失效日期
+		,ROW_NUMBER()OVER(PARTITION BY P3.CUST_INCOD,P3.ALT_TYPE
+	ORDER BY P3.UPDATE_TIME DESC ) RN
+	FROM ${ods_ecif_schema}.T2_EN_CUST_ALT_INFO P3 --对公客户证件信息
+	WHERE 1=1
+		AND P3.ALT_TYPE = '402' --地税证件信息
+		AND P3.PT_DT='${batch_date}' 
+		AND P3.DELETED='0'
+	)  T4 -- 对公客户证件信息 
+ ON T1.CUST_INCOD=T4.CUST_INCOD 
+AND T4.RN = 1
+LEFT JOIN 	(
+	SELECT 
+		 P4.CUST_INCOD   	--客户内码
+		,P4.ALT_TYPE    	--主证件类型
+		,P4.ALT_ID      	--主证件号码
+		,P4.END_DT      	--证件失效日期
+		,ROW_NUMBER()OVER(PARTITION BY P4.CUST_INCOD,P4.ALT_TYPE
+	ORDER BY P4.UPDATE_TIME DESC ) RN
+	FROM ${ods_ecif_schema}.T2_EN_CUST_ALT_INFO P4 --对公客户证件信息
+	WHERE 1=1
+		AND P4.ALT_TYPE = '203' --组织机构代码信息
+		AND P4.PT_DT='${batch_date}' 
+		AND P4.DELETED='0'
+	)   T5 -- 对公客户证件信息 
+ ON T1.CUST_INCOD=T5.CUST_INCOD 
+AND  T5.RN = 1
+LEFT JOIN 	(
+	SELECT 
+		 P5.CUST_INCOD   	--客户内码
+		,P5.ALT_TYPE    	--主证件类型
+		,P5.ALT_ID      	--主证件号码
+		,P5.END_DT      	--证件失效日期
+		,ROW_NUMBER()OVER(PARTITION BY P5.CUST_INCOD,P5.ALT_TYPE
+	ORDER BY P5.UPDATE_TIME DESC ) RN
+	FROM ${ods_ecif_schema}.T2_EN_CUST_ALT_INFO P5 --对公客户证件信息
+	WHERE 1=1
+		AND P5.ALT_TYPE = '202' --营业执照信息
+		AND P5.PT_DT='${batch_date}' 
+		AND P5.DELETED='0'
+	)  T6 -- 对公客户证件信息 
+ ON T1.CUST_INCOD=T6.CUST_INCOD 
+AND  T6.RN = 1
+ WHERE 1=1 
+AND T1.MCIP_CST_TP IN ('2','3')
+AND T1.PT_DT='${batch_date}' 
+AND T1.DELETED='0'
+ 
+;
+
+
+/*添加表分析*/ 
+ANALYZE TABLE ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_01;
+
+
+/*===================第2组====================*/
+
+DROP TABLE IF EXISTS ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_02;
+CREATE GLOBAL TEMPORARY TABLE ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_02 (
+ CUST_IN_CD  VARCHAR(100) -- 客户内码
+  ,GENERAL_MGER_CUST_IN_CD  VARCHAR(100) -- 总经理客户内码
+  ,GENERAL_MGER_NAME  VARCHAR(200) -- 总经理名称
+  ,FIN_PRINC_CUST_IN_CD  VARCHAR(100) -- 财务负责人客户内码
+  ,FIN_PRINC_NAME  VARCHAR(200) -- 财务负责人名称
+  ,OTHER_CONT_CUST_IN_CD  VARCHAR(100) -- 其他联系人客户内码
+  ,OTHER_CONT_NAME  VARCHAR(200) -- 其他联系人名称
+  ,ACTL_OPER_PSN_CUST_IN_CD  VARCHAR(100) -- 实际经营人客户内码
+  ,ACTL_OPER_PSN_NAME  VARCHAR(200) -- 实际经营人名称
+  ,BOD_CHAIR_CUST_IN_CD  VARCHAR(100) -- 董事长客户内码
+  ,BOD_CHAIR_NAME  VARCHAR(200) -- 董事长名称
+  ,ACTL_CTRLER_CUST_IN_CD  VARCHAR(100) -- 实际控制人客户内码
+  ,ACTL_CTRLER_NAME  VARCHAR(200) -- 实际控制人姓名
+  ,LEGAL_REP_CUST_IN_CD  VARCHAR(100) -- 法定代表人客户内码
+  ,LEGAL_REP_CUST_TYPE_NO  CHARACTER(2) -- 法定代表人客户类型代码
+  ,LEGAL_REP_NAME  VARCHAR(200) -- 法定代表人名称
+  ,LEGAL_REP_DOCTYP_CD  CHARACTER(30) -- 法定代表人证件类型代码
+  ,LEGAL_REP_DOC_NO  CHARACTER(100) -- 法定代表人证件号码
+  ,LEGAL_REP_DOC_ISSUE_DT  VARCHAR(10) -- 法定代表人证件签发日期
+  ,LEGAL_REP_DOC_MATU_DT  VARCHAR(10) -- 法定代表人证件到期日期
+  ,AUTH_PROC_BIZ_PSN_CUST_IN_CD  VARCHAR(100) -- 授权办理业务人客户内码
+  ,AUTH_PROC_BIZ_PSN_NAME  VARCHAR(200) -- 授权办理业务人名称
+  ,AUTH_PROC_BIZ_PSN_DOCTYP_CD  VARCHAR(30) -- 授权办理业务人证件类型代码
+  ,AUTH_PROC_BIZ_PSN_DOC_NO  VARCHAR(100) -- 授权办理业务人证件号码
+  ,STOCKHOLDER_ISN  VARCHAR(100) -- 控股股东股东客户内码
+  ,INVEST_TYPE  CHAR(1) -- 控股股东出资方式
+  ,INVEST_CCY  VARCHAR(30) -- 控股股东出资币种
+  ,INVEST_AMOUNT  DECIMAL(28,2) -- 控股股东出资金额
+  ,INVEST_CAPITAL  DECIMAL(7,4) -- 控股股东出资占比
+  ,STOCK_HOLD_QUANTITY  BIGINT -- 控股股东持股数量
+  ,STOCK_HOLD_RATE  DECIMAL(7,4) -- 控股股东持股比例
+  ,HOLDING_SIGN  CHAR(1) -- 控股股东控股标志
+)
+compress(5,5)
+DISTRIBUTED BY (  );
+
+INSERT INTO ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_02(
+  CUST_IN_CD -- 客户内码
+  ,GENERAL_MGER_CUST_IN_CD -- 总经理客户内码
+  ,GENERAL_MGER_NAME -- 总经理名称
+  ,FIN_PRINC_CUST_IN_CD -- 财务负责人客户内码
+  ,FIN_PRINC_NAME -- 财务负责人名称
+  ,OTHER_CONT_CUST_IN_CD -- 其他联系人客户内码
+  ,OTHER_CONT_NAME -- 其他联系人名称
+  ,ACTL_OPER_PSN_CUST_IN_CD -- 实际经营人客户内码
+  ,ACTL_OPER_PSN_NAME -- 实际经营人名称
+  ,BOD_CHAIR_CUST_IN_CD -- 董事长客户内码
+  ,BOD_CHAIR_NAME -- 董事长名称
+  ,ACTL_CTRLER_CUST_IN_CD -- 实际控制人客户内码
+  ,ACTL_CTRLER_NAME -- 实际控制人姓名
+  ,LEGAL_REP_CUST_IN_CD -- 法定代表人客户内码
+  ,LEGAL_REP_CUST_TYPE_NO -- 法定代表人客户类型代码
+  ,LEGAL_REP_NAME -- 法定代表人名称
+  ,LEGAL_REP_DOCTYP_CD -- 法定代表人证件类型代码
+  ,LEGAL_REP_DOC_NO -- 法定代表人证件号码
+  ,LEGAL_REP_DOC_ISSUE_DT -- 法定代表人证件签发日期
+  ,LEGAL_REP_DOC_MATU_DT -- 法定代表人证件到期日期
+  ,AUTH_PROC_BIZ_PSN_CUST_IN_CD -- 授权办理业务人客户内码
+  ,AUTH_PROC_BIZ_PSN_NAME -- 授权办理业务人名称
+  ,AUTH_PROC_BIZ_PSN_DOCTYP_CD -- 授权办理业务人证件类型代码
+  ,AUTH_PROC_BIZ_PSN_DOC_NO -- 授权办理业务人证件号码
+  ,STOCKHOLDER_ISN -- 控股股东股东客户内码
+  ,INVEST_TYPE -- 控股股东出资方式
+  ,INVEST_CCY -- 控股股东出资币种
+  ,INVEST_AMOUNT -- 控股股东出资金额
+  ,INVEST_CAPITAL -- 控股股东出资占比
+  ,STOCK_HOLD_QUANTITY -- 控股股东持股数量
+  ,STOCK_HOLD_RATE -- 控股股东持股比例
+  ,HOLDING_SIGN -- 控股股东控股标志
+)
+SELECT
+  P1.CUST_INCOD AS CUST_INCOD -- 客户内码
+  ,COALESCE(T2.PER_CUST_INCOD,'') AS PER_CUST_INCOD -- 联系客户内码
+  ,COALESCE(T2.AFFLTD_PERS_NM,'') AS AFFLTD_PERS_NM -- 关联人姓名
+  ,COALESCE(T3.PER_CUST_INCOD,'') AS PER_CUST_INCOD -- 联系客户内码
+  ,COALESCE(T3.AFFLTD_PERS_NM,'') AS AFFLTD_PERS_NM -- 关联人姓名
+  ,COALESCE(T4.PER_CUST_INCOD,'') AS PER_CUST_INCOD -- 联系客户内码
+  ,COALESCE(T4.AFFLTD_PERS_NM,'') AS AFFLTD_PERS_NM -- 关联人姓名
+  ,COALESCE(T5.PER_CUST_INCOD,'') AS PER_CUST_INCOD -- 联系客户内码
+  ,COALESCE(T5.AFFLTD_PERS_NM,'') AS AFFLTD_PERS_NM -- 关联人姓名
+  ,COALESCE(T6.PER_CUST_INCOD,'') AS PER_CUST_INCOD -- 联系客户内码
+  ,COALESCE(T6.AFFLTD_PERS_NM,'') AS AFFLTD_PERS_NM -- 关联人姓名
+  ,COALESCE(T7.PER_CUST_INCOD,'') AS PER_CUST_INCOD -- 联系客户内码
+  ,COALESCE(T7.AFFLTD_PERS_NM,'') AS AFFLTD_PERS_NM -- 关联人姓名
+  ,COALESCE(T8.PER_CUST_INCOD,T9.CC01CSNO) AS PER_CUST_INCOD -- 法定代表人客户内码
+  ,COALESCE(T8.AFFLTD_PERS_TP,'') AS AFFLTD_PERS_TP -- 法定代表人客户类型编号
+  ,COALESCE(T8.AFFLTD_PERS_NM,T9.CC01FLNM) AS AFFLTD_PERS_NM -- 法定代表人姓名
+  ,COALESCE(T8.ID_TP,T9.CC01CFTP) AS ID_TP -- 法定代表人证件类型代码
+  ,COALESCE(T8.ID_NO,T9.CC01CFNO) AS ID_NO -- 法定代表人证件号码
+  ,T8.ISSUED_DT AS ISSUED_DT -- 法定代表人证件签发日期
+  ,T8.END_DT AS END_DT -- 法定代表人证件到期日期
+  ,T9.CC03CSNO AS CC03CSNO -- 授权办理业务人客户内码
+  ,T9.CC03FLNM AS CC03FLNM -- 授权办理业务人姓名
+  ,T9.CC03CFTP AS CC03CFTP -- 授权办理业务人证件类型代码
+  ,T9.CC03CFNO AS CC03CFNO -- 授权办理业务人证件号码
+  ,T10.STOCKHOLDER_ISN AS STOCKHOLDER_ISN -- 股东1内码
+  ,T10.INVEST_TYPE AS INVEST_TYPE -- 出资方式
+  ,T10.INVEST_CCY AS INVEST_CCY -- 出资币种
+  ,T10.INVEST_AMOUNT AS INVEST_AMOUNT -- 出资金额
+  ,T10.INVEST_CAPITAL AS INVEST_CAPITAL -- 出资占比
+  ,T10.STOCK_HOLD_QUANTITY AS STOCK_HOLD_QUANTITY -- 持股数量
+  ,T10.STOCK_HOLD_RATE AS STOCK_HOLD_RATE -- 持股比例
+  ,T10.HOLDING_SIGN AS HOLDING_SIGN -- 控股标志
+ FROM ${ods_ecif_schema}.T2_EN_CUST_BASE_INFO  T1 -- 对公客户基本信息 
+LEFT JOIN 	(
+	SELECT 
+	 P2.CUST_INCOD
+	,P2.PER_CUST_INCOD
+	,P2.AFFLTD_PERS_NM
+	,P2.AFFLTD_PERS_TP
+	,P2.BK_ID
+	,ROW_NUMBER()OVER(PARTITION BY P1.CUST_INCOD,
+	P1.AFFLTD_PERS_TP,P1.BK_ID
+ORDER BY
+	P1.END_TIME) RN 
+FROM ${ods_ecif_schema}.T2_EN_AFFLTD_PERS_INFO P2 
+WHERE 
+	1=1
+	AND P1.VALID_FLAG = '1' --有效数据
+	AND P1.AFFLTD_PERS_TP = '4' --总经理
+	AND P1.PT_DT='${batch_date}' 
+	AND P1.DELETED='0'
+	)  T2  -- 对公重要关联人信息 
+ ON T1.CUST_INCOD=  T2.CUST_INCOD 
+AND  T1.BK_ID=T2.BK_ID
+AND T2.RN =1 
+LEFT JOIN 	(
+	SELECT 
+	 P2.CUST_INCOD
+	,P2.PER_CUST_INCOD
+	,P2.AFFLTD_PERS_NM
+	,P2.AFFLTD_PERS_TP
+	,P2.BK_ID
+	,ROW_NUMBER()OVER(PARTITION BY P2.CUST_INCOD,
+	P2.AFFLTD_PERS_TP,P2.BK_ID
+ORDER BY
+	P2.END_TIME) RN 
+FROM ${ods_ecif_schema}.T2_EN_AFFLTD_PERS_INFO P2 
+WHERE 
+	1=1
+	AND P2.VALID_FLAG = '1' --有效数据
+	AND P2.AFFLTD_PERS_TP = '5' --财务负责人
+	AND P2.PT_DT='${batch_date}' 
+	AND P2.DELETED='0'
+	)  T3 -- 对公重要关联人信息 
+ ON T1.CUST_INCOD=  T3.CUST_INCOD 
+AND  T1.BK_ID=T3.BK_ID
+AND T3.RN = 1
+LEFT JOIN 	(
+	SELECT 
+	 P1.CUST_INCOD
+	,P1.PER_CUST_INCOD
+	,P1.AFFLTD_PERS_NM
+	,P1.AFFLTD_PERS_TP
+	,P1.BK_ID
+	,ROW_NUMBER()OVER(PARTITION BY P1.CUST_INCOD,
+	P1.AFFLTD_PERS_TP,P1.BK_ID
+ORDER BY
+	P1.END_TIME) RN 
+FROM ${ods_ecif_schema}.T2_EN_AFFLTD_PERS_INFO P2 
+WHERE 
+	1=1
+	AND P1.VALID_FLAG = '1' --有效数据
+	AND P1.AFFLTD_PERS_TP = '8' --其他联系人
+	AND P1.PT_DT='${batch_date}' 
+	AND P1.DELETED='0'
+	)  T4 -- 对公重要关联人信息 
+ ON T1.CUST_INCOD=  T4.CUST_INCOD 
+AND  T1.BK_ID=T4.BK_ID
+AND T4.RN =1
+LEFT JOIN 	(
+	SELECT 
+	 P1.CUST_INCOD
+	,P1.PER_CUST_INCOD
+	,P1.AFFLTD_PERS_NM
+	,P1.AFFLTD_PERS_TP
+	,P1.BK_ID
+	,ROW_NUMBER()OVER(PARTITION BY P1.CUST_INCOD,
+	P1.AFFLTD_PERS_TP,P1.BK_ID
+ORDER BY
+	P1.END_TIME) RN 
+FROM ${ods_ecif_schema}.T2_EN_AFFLTD_PERS_INFO P2 
+WHERE 
+	1=1
+	AND P1.VALID_FLAG = '1' --有效数据
+	AND P1.AFFLTD_PERS_TP = '2' --其他联系人
+	AND P1.PT_DT='${batch_date}' 
+	AND P1.DELETED='0'
+	)  T5 -- 对公重要关联人信息 
+ ON T1.CUST_INCOD=  T5.CUST_INCOD 
+AND  T1.BK_ID=T5.BK_ID
+AND T5.RN = 1
+LEFT JOIN 	(
+	SELECT 
+	 P1.CUST_INCOD
+	,P1.PER_CUST_INCOD
+	,P1.AFFLTD_PERS_NM
+	,P1.AFFLTD_PERS_TP
+	,P1.BK_ID
+	,ROW_NUMBER()OVER(PARTITION BY P1.CUST_INCOD,
+	P1.AFFLTD_PERS_TP,P1.BK_ID
+ORDER BY
+	P1.END_TIME) RN 
+FROM ${ods_ecif_schema}.T2_EN_AFFLTD_PERS_INFO P2 
+WHERE 
+	1=1
+	AND P1.VALID_FLAG = '1' --有效数据
+	AND P1.AFFLTD_PERS_TP = '3' --董事长
+	AND P1.PT_DT='${batch_date}' 
+	AND P1.DELETED='0'
+	)  T6 -- 对公重要关联人信息 
+ ON T1.CUST_INCOD=  T6.CUST_INCOD 
+AND  T1.BK_ID=T6.BK_ID
+AND T6.RN = 1
+LEFT JOIN 	(
+	SELECT 
+	 P1.CUST_INCOD
+	,P1.PER_CUST_INCOD
+	,P1.AFFLTD_PERS_NM
+	,P1.AFFLTD_PERS_TP
+	,P1.BK_ID
+	,ROW_NUMBER()OVER(PARTITION BY P1.CUST_INCOD,
+	P1.AFFLTD_PERS_TP,P1.BK_ID
+ORDER BY
+	P1.END_TIME) RN 
+FROM ${ods_ecif_schema}.T2_EN_AFFLTD_PERS_INFO P2 
+WHERE 
+	1=1
+	AND P1.VALID_FLAG = '1' --有效数据
+	AND P1.AFFLTD_PERS_TP = '7' --实际控制人
+	AND P1.PT_DT='${batch_date}' 
+	AND P1.DELETED='0'
+	)  T7 -- 对公重要关联人信息 
+ ON T1.CUST_INCOD=  T7.CUST_INCOD 
+AND  T1.BK_ID=T7.BK_ID
+AND T7.RN =1 
+LEFT JOIN (
+	SELECT 
+		 P1.CUST_INCOD
+	,p1.PER_CUST_INCOD
+	,p1.AFFLTD_PERS_TP
+	,p1.AFFLTD_PERS_NM
+	,p1.ID_TP
+	,p1.ID_NO
+	,p1.ISSUED_DT
+	,p1.END_DT
+	,p1.bk_id
+	,ROW_NUMBER()OVER(PARTITION BY P1.CUST_INCOD,P1.BK_ID,P1.AFFLTD_PERS_TP
+ORDER BY
+	P1.END_TIME) RN 
+FROM ${ods_ecif_schema}.T2_EN_LEGAL_REPRESENTATIVE_INFO P1 
+WHERE 
+	1=1
+	AND P1.VALID_FLAG = '1' --有效数据
+	AND P1.AFFLTD_PERS_TP = '1' --法定代表人
+	AND P1.PT_DT='${batch_date}' 
+	AND P1.DELETED='0'
+	)  T8 -- 企业法人信息 
+ ON T1.CUST_INCOD=  T8.CUST_INCOD 
+AND  T1.BK_ID=T8.BK_ID
+AND T8.RN =1
+LEFT JOIN ${ods_core_schema}.BCFMCCBI  T9 -- 客户辅助信息文件(对公） 
+ ON T1.CUST_INCOD=  T9.CINOCSNO 
+AND T9.CCBIBRNO=T1.BK_ID
+AND T9.PT_DT='${batch_date}' 
+AND T9.DELETED='0'
+LEFT JOIN 	(
+	SELECT 
+	 P1.CUST_ISN --客户内码
+	 P1.BEL_ORG --归属机构号
+	,P1.STOCKHOLDER_ISN --股东内码
+	,P1.INVEST_TYPE	--出资方式
+	,P1.INVEST_CCY	--出资币种
+	,P1.INVEST_AMOUNT --出资金额
+	,P1.INVEST_CAPITAL --出资占比
+	,P1.STOCK_HOLD_QUANTITY	--持股数量
+	,P1.STOCK_HOLD_RATE	--持股比例
+
+
+	,ROW_NUMBER()OVER(PARTITION BY P1.CUST_ISN,P1.BEL_ORG,P1.ADR_TYPE
+ORDER BY
+	P1.INVEST_AMOUNT,P1.INVEST_CAPITAL DESC ) RN 
+FROM ${ods_core_schema}.EN_RL_SH_INFO P1  --对公客户股东信息
+WHERE 
+	1=1
+	AND P1.PT_DT='${batch_date}' 
+	AND P1.DELETED='0'
+	AND holding_sign = '1' --是否持股
+	)  T10 -- 对公客户股东信息表 
+ ON T1.CUST_INCOD=  T2.CUST_ISN 
+AND  T10.BEL_ORG=T1.BK_ID 
+AND T10.RN = 1
+ WHERE 1=1 
+AND T1.MCIP_CST_TP IN ('2','3')
+AND T1.PT_DT='${batch_date}' 
+AND T1.DELETED='0'
+ 
+;
+
+
+/*添加表分析*/ 
+ANALYZE TABLE ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_02;
+
+
+/*===================第3组====================*/
+
+DROP TABLE IF EXISTS ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_03;
+CREATE GLOBAL TEMPORARY TABLE ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_03 (
+ CUST_IN_CD  VARCHAR(100) -- 客户内码
+  ,CORP_OFFICE_ADDR  VARCHAR(500) -- 经营地址
+  ,OFFICE_ADDR_DIST  VARCHAR(30) -- 经营地址行政区划
+  ,OFFICE_ADDR_ZIP_CD  VARCHAR(100) -- 经营地址邮政编码
+  ,CORP_REG_ADDR_  VARCHAR(500) -- 注册地址
+  ,REG_ADDR_DIST  VARCHAR(30) -- 注册地址行政区划
+  ,REG_ADDR_ZIP_CD  VARCHAR(100) -- 注册地址邮编
+)
+compress(5,5)
+DISTRIBUTED BY (  );
+
+INSERT INTO ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_03(
+  CUST_IN_CD -- 客户内码
+  ,CORP_OFFICE_ADDR -- 经营地址
+  ,OFFICE_ADDR_DIST -- 经营地址行政区划
+  ,OFFICE_ADDR_ZIP_CD -- 经营地址邮政编码
+  ,CORP_REG_ADDR_ -- 注册地址
+  ,REG_ADDR_DIST -- 注册地址行政区划
+  ,REG_ADDR_ZIP_CD -- 注册地址邮编
+)
+SELECT
+  P1.CUST_INCOD AS CUST_INCOD -- 客户内码
+  ,T2.ADR_INFO_DESC AS ADR_INFO_DESC -- 地址信息描述
+  ,T2.ADR_ADM_DIV AS ADR_ADM_DIV -- 地址行政区划
+  ,T2.POST_CODE AS POST_CODE -- 邮政编码
+  ,T3.ADR_INFO_DESC AS ADR_INFO_DESC -- 地址信息描述
+  ,T3.ADR_ADM_DIV AS ADR_ADM_DIV -- 地址行政区划
+  ,T3.POST_CODE AS POST_CODE -- 邮政编码
+ FROM ${ods_ecif_schema}.T2_EN_CUST_BASE_INFO  T1 -- 对公客户基本信息 
+LEFT JOIN 	(
+	SELECT 
+	 P1.CUST_INCOD
+	,p1.ADR_TYPE
+	,P1.ADR_INFO_DESC
+	,P1.ADR_ADM_DIV
+	,P1.POST_CODE
+	,p1.bk_id
+
+	,ROW_NUMBER()OVER(PARTITION BY P1.CUST_INCOD,P1.BK_ID,P1.ADR_TYPE
+ORDER BY
+	P1.ADR_NO,P1.UPDATE_TIME DESC ) RN 
+FROM ${ods_ecif_schema}.T2_EN_CUST_ADDR_INFO P1  --对公客户地址信息
+WHERE 
+	1=1
+	AND P1.VALID_FLAG = '1' --有效数据
+	AND P1.PT_DT='${batch_date}' 
+	AND P1.DELETED='0'
+	AND P1.ADR_TYPE IN ('6','4') --6 办公 4 注册
+	)  T2 -- 对公客户地址信息 
+ ON T1.CUST_INCOD= T2.CUST_INCOD 
+AND T1.BK_ID=T2.BK_ID 
+AND T2.ADR_TYPE='6'
+AND T2.RN = 1
+LEFT JOIN 	(
+	SELECT 
+	 P1.CUST_INCOD
+	,p1.ADR_TYPE
+	,P1.ADR_INFO_DESC
+	,P1.ADR_ADM_DIV
+	,P1.POST_CODE
+	,p1.bk_id
+
+	,ROW_NUMBER()OVER(PARTITION BY P1.CUST_INCOD,P1.BK_ID,P1.ADR_TYPE
+ORDER BY
+	P1.ADR_NO,P1.UPDATE_TIME DESC ) RN 
+FROM ${ods_ecif_schema}.T2_EN_CUST_ADDR_INFO P1  --对公客户地址信息
+WHERE 
+	1=1
+	AND P1.VALID_FLAG = '1' --有效数据
+	AND P1.PT_DT='${batch_date}' 
+	AND P1.DELETED='0'
+	AND P1.ADR_TYPE IN ('6','4') --6 办公 4 注册
+	)  T3 -- 对公客户地址信息 
+ ON T1.CUST_INCOD= T3.CUST_INCOD 
+AND T1.BK_ID=T3.BK_ID 
+AND T3.ADR_TYPE='4'
+AND T3.RN = 1
+ WHERE 1=1 
+AND T1.MCIP_CST_TP IN ('2','3')
+AND T1.PT_DT='${batch_date}' 
+AND T1.DELETED='0'
+ 
+;
+
+
+/*添加表分析*/ 
+ANALYZE TABLE ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_03;
+
+
+/*===================第4组====================*/
+
+DROP TABLE IF EXISTS ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_04;
+CREATE GLOBAL TEMPORARY TABLE ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_04 (
+ CUST_IN_CD  VARCHAR(100) -- 客户内码
+  ,LP_ORG_NO  VARCHAR(100) -- 法人机构编号
+  ,CUST_NAME  VARCHAR(200) -- 客户名称
+  ,CUST_ABB  VARCHAR(30) -- 客户简称
+  ,CUST_EN_NAME  VARCHAR(200) -- 客户英文名称
+  ,CUST_MCLS_CD  CHARACTER(1) -- 客户大类代码
+  ,CUST_NATION_CD  VARCHAR(30) -- 国籍代码
+  ,CUST_STATUS_CD  VARCHAR(30) -- 客户状态代码
+  ,CORP_REG_CAP  VARCHAR(200) -- 注册资金
+  ,REG_CAP_MNTY_CD  VARCHAR(30) -- 注册资金币种代码
+  ,CRDT_CUST_FLAG  CHARACTER(1) -- 信贷客户标志
+  ,OPER_SCOPE  VARCHAR(200) -- 经营范围
+  ,REG_INDUS_CD  CHARACTER(4) -- 注册行业类型代码
+  ,CORP_SCALE_CD  CHARACTER(1) -- 企业规模代码
+  ,CORP_EMPLY_NUM  INTEGER(4) -- 公司员工人数
+  ,CUST_OPEN_INCMAMT  DECIMAL(28,2) -- 营业收入金额
+  ,TOTAL_AST  DECIMAL(28,2) -- 资产总额
+  ,CRDT_CD  VARCHAR(30) -- 信用等级代码
+  ,FNC_GUAR_CORP  VARCHAR(10) -- 融资性担保公司标志
+  ,FIN_CUST_TYPE  CHARACTER(2) -- 金融客户类型代码
+  ,MICRO_LOAN_CORP_FLAG  VARCHAR(10) -- 小额贷款公司标志
+  ,CORP_FLAG  VARCHAR(10) -- 文创企业标志
+  ,SCI_TECH_CORP_FLAG  VARCHAR(10) -- 科技企业标志
+  ,FORGN_TRADE_CORP_FLAG  VARCHAR(10) -- 外贸企业标志
+  ,OPER_STATUS  CHARACTER(1) -- 经营状态代码
+  ,LEGAL_PROPTY_CLS  CHARACTER(1) -- 法律性质类标志
+  ,MEM_RELA_CLS  CHARACTER(1) -- 隶属关系类型代码
+  ,SOLVENCY_CAP_SRC_CLS  CHARACTER(1) -- 偿债资金来源类型代码
+  ,FIN_PLAT  VARCHAR(10) -- 融资平台标志
+  ,OPER_PLACE_OWNSHIP  CHARACTER(1) -- 经营场地所有权
+  ,OPER_PLACE_AREA  DECIMAL(28) -- 经营场地面积
+  ,STOCK_CD  CHARACTER(10) -- 股票代码
+  ,STOCK_NAME  VARCHAR(100) -- 股票名称
+  ,BUSS_TYPE  VARCHAR(30) -- 业务类型代码
+  ,SYSTEM_NO  CHARACTER(2) -- 归属系统编码
+  ,PROVE_FLG  VARCHAR(10) -- 自证声明标志
+  ,ORGAN_TYPE  CHARACTER(1) -- 机构类别代码
+  ,ORGAN_DWELLER_FLG  CHARACTER(1) -- 机构税收居民身份标志
+  ,UN_RESDNT_FLAG  VARCHAR(10) -- 非居民标志
+  ,CUST_CTRLER_NAME  VARCHAR(200) -- 客户控制人名称
+  ,CTRLER_SER_NO  VARCHAR(2) -- 控制人序号
+  ,TAXER_IDT_1  VARCHAR(40) -- 纳税人识别号1
+  ,TAXER_IDT_2  VARCHAR(40) -- 纳税人识别号2
+  ,TAXER_IDT_3  VARCHAR(40) -- 纳税人识别号3
+  ,NO_TAX_IDT_SPEC_RSN_DESC  VARCHAR(100) -- 无纳税识别号具体原因描述
+  ,NO_TAX_IDT_RSN_CD  VARCHAR(1) -- 无纳税识别号原因代码
+  ,CREATED_TIME  VARCHAR(100) -- 记录创建时间
+  ,CREATED_BY_EMPLOYEE  CHARACTER(7) -- 创建员工号
+  ,CREATED_BRNO  CHARACTER(6) -- 创建机构号
+  ,CREATED_SYSTEM  CHARACTER(2) -- 创建记录的系统
+  ,CREATED_CHANNEL  CHARACTER(2) -- 创建记录的渠道
+)
+compress(5,5)
+DISTRIBUTED BY (  );
+
+INSERT INTO ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_04(
+  CUST_IN_CD -- 客户内码
+  ,LP_ORG_NO -- 法人机构编号
+  ,CUST_NAME -- 客户名称
+  ,CUST_ABB -- 客户简称
+  ,CUST_EN_NAME -- 客户英文名称
+  ,CUST_MCLS_CD -- 客户大类代码
+  ,CUST_NATION_CD -- 国籍代码
+  ,CUST_STATUS_CD -- 客户状态代码
+  ,CORP_REG_CAP -- 注册资金
+  ,REG_CAP_MNTY_CD -- 注册资金币种代码
+  ,CRDT_CUST_FLAG -- 信贷客户标志
+  ,OPER_SCOPE -- 经营范围
+  ,REG_INDUS_CD -- 注册行业类型代码
+  ,CORP_SCALE_CD -- 企业规模代码
+  ,CORP_EMPLY_NUM -- 公司员工人数
+  ,CUST_OPEN_INCMAMT -- 营业收入金额
+  ,TOTAL_AST -- 资产总额
+  ,CRDT_CD -- 信用等级代码
+  ,FNC_GUAR_CORP -- 融资性担保公司标志
+  ,FIN_CUST_TYPE -- 金融客户类型代码
+  ,MICRO_LOAN_CORP_FLAG -- 小额贷款公司标志
+  ,CORP_FLAG -- 文创企业标志
+  ,SCI_TECH_CORP_FLAG -- 科技企业标志
+  ,FORGN_TRADE_CORP_FLAG -- 外贸企业标志
+  ,OPER_STATUS -- 经营状态代码
+  ,LEGAL_PROPTY_CLS -- 法律性质类标志
+  ,MEM_RELA_CLS -- 隶属关系类型代码
+  ,SOLVENCY_CAP_SRC_CLS -- 偿债资金来源类型代码
+  ,FIN_PLAT -- 融资平台标志
+  ,OPER_PLACE_OWNSHIP -- 经营场地所有权
+  ,OPER_PLACE_AREA -- 经营场地面积
+  ,STOCK_CD -- 股票代码
+  ,STOCK_NAME -- 股票名称
+  ,BUSS_TYPE -- 业务类型代码
+  ,SYSTEM_NO -- 归属系统编码
+  ,PROVE_FLG -- 自证声明标志
+  ,ORGAN_TYPE -- 机构类别代码
+  ,ORGAN_DWELLER_FLG -- 机构税收居民身份标志
+  ,UN_RESDNT_FLAG -- 非居民标志
+  ,CUST_CTRLER_NAME -- 客户控制人名称
+  ,CTRLER_SER_NO -- 控制人序号
+  ,TAXER_IDT_1 -- 纳税人识别号1
+  ,TAXER_IDT_2 -- 纳税人识别号2
+  ,TAXER_IDT_3 -- 纳税人识别号3
+  ,NO_TAX_IDT_SPEC_RSN_DESC -- 无纳税识别号具体原因描述
+  ,NO_TAX_IDT_RSN_CD -- 无纳税识别号原因代码
+  ,CREATED_TIME -- 记录创建时间
+  ,CREATED_BY_EMPLOYEE -- 创建员工号
+  ,CREATED_BRNO -- 创建机构号
+  ,CREATED_SYSTEM -- 创建记录的系统
+  ,CREATED_CHANNEL -- 创建记录的渠道
+)
+SELECT
+  T1.CUST_INCOD AS CUST_INCOD -- 客户内码
+  ,T2.BK_ID AS BK_ID -- 行社编号
+  ,T1.CUST_NAME AS CUST_NAME -- 客户名称
+  ,T1.CUST_SHRT_NM AS CUST_SHRT_NM -- 客户简称
+  ,T1.CUST_EN_NM AS CUST_EN_NM -- 客户英文名称
+  ,T1.MCIP_CST_TP AS MCIP_CST_TP -- 客户大类
+  ,T1.CUST_NATION AS CUST_NATION -- 客户国籍代码
+  ,T1.CUST_STAT AS CUST_STAT -- 客户状态代码
+  ,T1.REG_CAP AS REG_CAP -- 企业注册资金
+  ,T2.REG_CCY_ID AS REG_CCY_ID -- 注册资金货币代码
+  ,T3.CUST_FLG AS CUST_FLG -- 信贷客户标志
+  ,T1.OPER_SCOPE AS OPER_SCOPE -- 经营范围
+  ,T1.REG_INDS AS REG_INDS -- 行业代码
+  ,T2.ORG_SCALE AS ORG_SCALE -- 企业规模代码
+  ,T2.NBR_EMP AS NBR_EMP -- 公司员工人数
+  ,T2.OPERATING_RECEIPT AS OPERATING_RECEIPT -- 客户营业收入金额
+  ,T2.ASSETS_GENERAL AS ASSETS_GENERAL -- 资产总额
+  ,T4.CRD_GRD AS CRD_GRD -- 信用等级代码
+  ,T2.CREATED_TIME AS FINA_GUAR_CORP -- 是否融资性担保公司
+  ,T2.CREATED_BY_EMPLOYEE AS FIN_CUST_TP -- 金融客户类型
+  ,T2.CREATED_BRNO AS SMALL_LOAN_COMPANY -- 小额贷款公司标志
+  ,T2.CREATED_SYSTEM AS CULTURE_INNOVATE_COMPANY -- 文创企业标志
+  ,T2.CREATED_CHANNEL AS SCIENCE_TECHNOLOGY_COMPANY -- 科技企业标志
+  ,T2.CREATED_TIME AS FOREIGN_TRADE_COMPANY -- 外贸企业标志
+  ,T2.CREATED_BY_EMPLOYEE AS BUSINESS_STATUS -- 经营状态
+  ,T2.CREATED_BRNO AS LAW_NATURE -- 法律性质类
+  ,T2.CREATED_SYSTEM AS SUB_RELATION -- 隶属关系类
+  ,T2.CREATED_CHANNEL AS PAY_CASH_SRC -- 偿债资金来源类
+  ,T2.CREATED_TIME AS GOV_INVT_FLG -- 是否融资平台
+  ,T2.CREATED_BY_EMPLOYEE AS OWNER_FLG -- 经营场地所有权
+  ,T2.CREATED_BRNO AS LAND_AREA -- 经营场地面积
+  ,T2.CREATED_SYSTEM AS STOCK_CD -- 股票代码
+  ,T2.CREATED_CHANNEL AS STOCK_NM -- 股票名称
+  ,T5.BUSS_TYPE AS BUSS_TYPE -- 业务类型
+  ,T5.SYSTEM_NO AS SYSTEM_NO -- 归属系统
+  ,T5.PROVE_FLG AS PROVE_FLG -- 自证声明
+  ,T5.ORGAN_TYPE AS ORGAN_TYPE -- 机构类别
+  ,T5.ORGAN_DWELLER_FLG AS ORGAN_DWELLER_FLG -- 机构税收居民身份 
+
+  ,T6.DWELLER_FLG AS DWELLER_FLG -- 非居民标志 1-仅为中国税收居民 2-仅为非居民 3-即是中国税收居民又是其他国家（地区）税收居民
+  ,T6.CUST_NAME AS CUST_NAME -- 客户（控制人）名称
+  ,T6.ID AS ID -- 控制人序号
+  ,T6.TAX_IDENT_NO1 AS TAX_IDENT_NO1 -- 纳税人识别号1
+  ,T6.TAX_IDENT_NO2 AS TAX_IDENT_NO2 -- 纳税人识别号2
+  ,T6.TAX_IDENT_NO3 AS TAX_IDENT_NO3 -- 纳税人识别号3
+  ,T6.REASON_DESC AS REASON_DESC -- 无纳税识别号具体原因描述
+  ,T6.NO_TAX_IDENT_REASON AS NO_TAX_IDENT_REASON -- 无纳税识别号原因码
+  ,T2.CREATED_TIME AS CREATED_TIME -- 记录创建时间
+  ,T2.CREATED_BY_EMPLOYEE AS CREATED_BY_EMPLOYEE -- 创建员工号
+  ,T2.CREATED_BRNO AS CREATED_BRNO -- 创建机构号
+  ,T2.CREATED_SYSTEM AS CREATED_SYSTEM -- 创建记录的系统
+  ,T2.CREATED_CHANNEL AS CREATED_CHANNEL -- 创建记录的渠道
+ FROM ${ods_ecif_schema}.T2_EN_CUST_BASE_INFO  T1 -- 对公客户基本信息 
+LEFT JOIN ${ods_ecif_schema}.T2_EN_CUST_DETAIL_INFO  T2 -- 对公客户详细信息 
+ ON T1.CUST_INCOD=  T2.CUST_INCOD 
+AND  T1.BK_ID = T2.BK_ID
+AND T2.PT_DT='${batch_date}' 
+AND T2.DELETED='0'
+AND VALID_FLAG = '1' --有效标志
+LEFT JOIN ${ods_xdzx_schema}.PUB_CUST_BASE_INFO  T3 -- 客户公共基础信息表 
+ ON T1.CUST_INCOD=  T3.CUST_ISN
+AND T1.BK_ID = T3.BELONG_ORG
+AND T3.PT_DT='${batch_date}' 
+AND T3.DELETED='0'
+
+LEFT JOIN ${ods_xdzx_schema}.EN_CUST_EXPD_ECIF  T4 -- 对公客户扩展信息 
+ ON T1.CUST_INCOD=  T4.CUST_INCOD 
+AND  T4.BEL_ORG=T1.BK_ID
+AND T4.PT_DT='${batch_date}' 
+AND T4.DELETED='0'
+LEFT JOIN ${ods_ecif_schema}.T2_EN_UNDWELLER_FNC_ACCT_INFO  T5 -- 对公非居民金融账户信息表 
+ ON T1.CUST_INCOD=  T5.CUST_INCOD 
+AND T5.BK_ID=T1.BK_ID 
+AND T5.PT_DT='${batch_date}' 
+AND T5.DELETED='0'
+LEFT JOIN ${ods_ecif_schema}.T2_EN_UNDWELLER_MAGER_TAX_INFO  T6 -- 控制人涉税信息表 
+ ON T1.CUST_INCOD=  TT6.CUST_INCOD 
+AND T6.BK_ID=T1.BK_ID 
+AND T6.PT_DT='${batch_date}' 
+AND T6.DELETED='0'
+ WHERE 1=1 
+AND T1.MCIP_CST_TP IN ('2','3')
+AND T1.PT_DT='${batch_date}' 
+AND T1.DELETED='0'
+ 
+;
+
+
+/*添加表分析*/ 
+ANALYZE TABLE ${icl_schema}.TMP_S07_LP_CUST_BASIC_INFO_04;
+
+
+/*===================第5组====================*/
+
+INSERT INTO ${icl_schema}.S07_LP_CUST_BASIC_INFO(
+  CUST_IN_CD -- 客户内码
+  ,LP_ORG_NO -- 法人机构编号
+  ,CUST_NAME -- 客户名称
+  ,CUST_ABB -- 客户简称
+  ,CUST_EN_NAME -- 客户英文名称
+  ,CUST_MCLS_CD -- 客户大类代码
+  ,CUST_NATION_CD -- 国籍代码
+  ,MAIN_DOCTYP_CD -- 主证件类型代码
+  ,MAIN_DOC_NO -- 主证件号码
+  ,MAIN_DOC_MATU_DT -- 主证件到期日期
+  ,MAIN_DOC_ISSUE_ORG_CTRY_RGN_CD -- 主证件签发机关国家地区代码
+  ,CUST_STATUS_CD -- 客户状态代码
+  ,CORP_REG_CAP -- 注册资金
+  ,REG_CAP_MNTY_CD -- 注册资金币种代码
+  ,CRDT_CUST_FLAG -- 信贷客户标志
+  ,OPER_SCOPE -- 经营范围
+  ,NATION_TAX_REG_CERT_NO -- 国税登记证号码
+  ,LOCAL_TAX_REG_CERT_NO -- 地税登记证号码
+  ,ORG_CD -- 组织机构代码证号码
+  ,BIZ_LIC_NO -- 营业执照号码
+  ,BIZ_LIC_MATU_DT -- 营业执照到期日期
+  ,LEGAL_REP_CUST_IN_CD -- 法定代表人客户内码
+  ,LEGAL_REP_CUST_TYPE_NO -- 法定代表人客户类型代码
+  ,LEGAL_REP_NAME -- 法定代表人名称
+  ,LEGAL_REP_DOCTYP_CD -- 法定代表人证件类型代码
+  ,LEGAL_REP_DOC_NO -- 法定代表人证件号码
+  ,LEGAL_REP_DOC_ISSUE_DT -- 法定代表人证件签发日期
+  ,LEGAL_REP_DOC_MATU_DT -- 法定代表人证件到期日期
+  ,AUTH_PROC_BIZ_PSN_CUST_IN_CD -- 授权办理业务人客户内码
+  ,AUTH_PROC_BIZ_PSN_NAME -- 授权办理业务人名称
+  ,AUTH_PROC_BIZ_PSN_DOCTYP_CD -- 授权办理业务人证件类型代码
+  ,AUTH_PROC_BIZ_PSN_DOC_NO -- 授权办理业务人证件号码
+  ,REG_INDUS_CD -- 注册行业类型代码
+  ,CORP_SCALE_CD -- 企业规模代码
+  ,CORP_EMPLY_NUM -- 公司员工人数
+  ,CUST_OPEN_INCMAMT -- 营业收入金额
+  ,TOTAL_AST -- 资产总额
+  ,CRDT_CD -- 信用等级代码
+  ,CORP_OFFICE_ADDR -- 经营地址
+  ,OFFICE_ADDR_DIST -- 经营地址行政区划
+  ,OFFICE_ADDR_ZIP_CD -- 经营地址邮政编码
+  ,CORP_REG_ADDR_ -- 注册地址
+  ,REG_ADDR_DIST -- 注册地址行政区划
+  ,REG_ADDR_ZIP_CD -- 注册地址邮编
+  ,GENERAL_MGER_CUST_IN_CD -- 总经理客户内码
+  ,GENERAL_MGER_NAME -- 总经理名称
+  ,FIN_PRINC_CUST_IN_CD -- 财务负责人客户内码
+  ,FIN_PRINC_NAME -- 财务负责人名称
+  ,OTHER_CONT_CUST_IN_CD -- 其他联系人客户内码
+  ,OTHER_CONT_NAME -- 其他联系人名称
+  ,ACTL_OPER_PSN_CUST_IN_CD -- 实际经营人客户内码
+  ,ACTL_OPER_PSN_NAME -- 实际经营人名称
+  ,BOD_CHAIR_CUST_IN_CD -- 董事长客户内码
+  ,BOD_CHAIR_NAME -- 董事长名称
+  ,STOCKHOLDER_ISN -- 控股股东股东客户内码
+  ,INVEST_TYPE -- 控股股东出资方式
+  ,INVEST_CCY -- 控股股东出资币种
+  ,INVEST_AMOUNT -- 控股股东出资金额
+  ,INVEST_CAPITAL -- 控股股东出资占比
+  ,STOCK_HOLD_QUANTITY -- 控股股东持股数量
+  ,STOCK_HOLD_RATE -- 控股股东持股比例
+  ,HOLDING_SIGN -- 控股股东控股标志
+  ,ACTL_CTRLER_CUST_IN_CD -- 实际控制人客户内码
+  ,ACTL_CTRLER_NAME -- 实际控制人姓名
+  ,FNC_GUAR_CORP -- 融资性担保公司标志
+  ,FIN_CUST_TYPE -- 金融客户类型代码
+  ,MICRO_LOAN_CORP_FLAG -- 小额贷款公司标志
+  ,CORP_FLAG -- 文创企业标志
+  ,SCI_TECH_CORP_FLAG -- 科技企业标志
+  ,FORGN_TRADE_CORP_FLAG -- 外贸企业标志
+  ,OPER_STATUS -- 经营状态代码
+  ,LEGAL_PROPTY_CLS -- 法律性质类标志
+  ,MEM_RELA_CLS -- 隶属关系类型代码
+  ,SOLVENCY_CAP_SRC_CLS -- 偿债资金来源类型代码
+  ,FIN_PLAT -- 融资平台标志
+  ,OPER_PLACE_OWNSHIP -- 经营场地所有权
+  ,OPER_PLACE_AREA -- 经营场地面积
+  ,STOCK_CD -- 股票代码
+  ,STOCK_NAME -- 股票名称
+  ,BUSS_TYPE -- 业务类型代码
+  ,SYSTEM_NO -- 归属系统编码
+  ,PROVE_FLG -- 自证声明标志
+  ,ORGAN_TYPE -- 机构类别代码
+  ,ORGAN_DWELLER_FLG -- 机构税收居民身份标志
+  ,UN_RESDNT_FLAG -- 非居民标志
+  ,CUST_CTRLER_NAME -- 客户控制人名称
+  ,CTRLER_SER_NO -- 控制人序号
+  ,TAXER_IDT_1 -- 纳税人识别号1
+  ,TAXER_IDT_2 -- 纳税人识别号2
+  ,TAXER_IDT_3 -- 纳税人识别号3
+  ,NO_TAX_IDT_SPEC_RSN_DESC -- 无纳税识别号具体原因描述
+  ,NO_TAX_IDT_RSN_CD -- 无纳税识别号原因代码
+  ,CREATED_TIME -- 记录创建时间
+  ,CREATED_BY_EMPLOYEE -- 创建员工号
+  ,CREATED_BRNO -- 创建机构号
+  ,CREATED_SYSTEM -- 创建记录的系统
+  ,CREATED_CHANNEL -- 创建记录的渠道
+)
+SELECT 
+  T1.CUST_IN_CD AS CUST_INCOD -- 客户内码
+  ,T1.LP_ORG_NO AS BK_ID -- 行社编号
+  ,T1.CUST_NAME AS CUST_NAME -- 客户名称
+  ,T1.CUST_ABB AS CUST_SHRT_NM -- 客户简称
+  ,T1.CUST_EN_NAME AS CUST_EN_NM -- 客户英文名称
+  ,T1.CUST_MCLS_CD AS MCIP_CST_TP -- 客户大类
+  ,T1.CUST_NATION_CD AS CUST_NATION -- 客户国籍代码
+  ,T3.MAIN_DOCTYP_CD AS MAIN_DOCTYP_CD -- 企业证件类型
+  ,T3.MAIN_DOC_NO AS MAIN_DOC_NO -- 企业证件号码
+  ,T3.MAIN_DOC_MATU_DT AS MAIN_DOC_MATU_DT -- 企业证件到期日期
+  ,T3.MAIN_DOC_ISSUE_ORG_CTRY_RGN_CD AS MAIN_DOC_ISSUE_ORG_CTRY_RGN_CD -- 企业证件签发国家或地区
+  ,T1.CUST_STATUS_CD AS CUST_STAT -- 客户状态代码
+  ,T1.CORP_REG_CAP AS REG_CAP -- 企业注册资金
+  ,T1.REG_CAP_MNTY_CD AS REG_CCY_ID -- 注册资金货币代码
+  ,T1.CRDT_CUST_FLAG AS CUST_FLG -- 信贷客户标志
+  ,T1.OPER_SCOPE AS OPER_SCOPE -- 经营范围
+  ,T3.NATION_TAX_REG_CERT_NO AS NATION_TAX_REG_CERT_NO -- 国税登记证号码
+  ,T3.LOCAL_TAX_REG_CERT_NO AS LOCAL_TAX_REG_CERT_NO -- 地税登记证号码
+  ,T3.ORG_CD AS ORG_CD -- 组织机构代码
+  ,T3.BIZ_LIC_NO AS BIZ_LIC_NO -- 营业执照号
+  ,T3.BIZ_LIC_MATU_DT AS BIZ_LIC_MATU_DT -- 营业执照到期日期
+  ,T2.LEGAL_REP_CUST_IN_CD AS PER_CUST_INCOD -- 法定代表人客户内码
+  ,T2.LEGAL_REP_CUST_TYPE_NO AS AFFLTD_PERS_TP -- 法定代表人客户类型编号
+  ,T2.LEGAL_REP_NAME AS AFFLTD_PERS_NM -- 法定代表人姓名
+  ,T2.LEGAL_REP_DOCTYP_CD AS ID_TP -- 法定代表人证件类型代码
+  ,T2.LEGAL_REP_DOC_NO AS ID_NO -- 法定代表人证件号码
+  ,T2.LEGAL_REP_DOC_ISSUE_DT AS ISSUED_DT -- 法定代表人证件签发日期
+  ,T2.LEGAL_REP_DOC_MATU_DT AS END_DT -- 法定代表人证件到期日期
+  ,T2.AUTH_PROC_BIZ_PSN_CUST_IN_CD AS CC03CSNO -- 授权办理业务人客户内码
+  ,T2.AUTH_PROC_BIZ_PSN_NAME AS CC03FLNM -- 授权办理业务人姓名
+  ,T2.AUTH_PROC_BIZ_PSN_DOCTYP_CD AS CC03CFTP -- 授权办理业务人证件类型代码
+  ,T2.AUTH_PROC_BIZ_PSN_DOC_NO AS CC03CFNO -- 授权办理业务人证件号码
+  ,T1.REG_INDUS_CD AS REG_INDS -- 行业代码
+  ,T1.CORP_SCALE_CD AS ORG_SCALE -- 企业规模代码
+  ,T1.CORP_EMPLY_NUM AS NBR_EMP -- 公司员工人数
+  ,T1.CUST_OPEN_INCMAMT AS OPERATING_RECEIPT -- 客户营业收入金额
+  ,T1.TOTAL_AST AS ASSETS_GENERAL -- 资产总额
+  ,T1.CRDT_CD AS CRD_GRD -- 信用等级代码
+  ,T4.CORP_OFFICE_ADDR AS CORP_OFFICE_ADDR -- 企业办公地址（是不是经营地址）
+  ,T4.OFFICE_ADDR_DIST AS OFFICE_ADDR_DIST -- 办公地址行政区划
+  ,T4.OFFICE_ADDR_ZIP_CD AS OFFICE_ADDR_ZIP_CD -- 办公地址邮编
+  ,T4.CORP_REG_ADDR_ AS CORP_REG_ADDR_ -- 企业注册地址
+  ,T4.REG_ADDR_DIST AS REG_ADDR_DIST -- 注册地址行政区划
+  ,T4.REG_ADDR_ZIP_CD AS REG_ADDR_ZIP_CD -- 注册地址邮编
+  ,T2.GENERAL_MGER_CUST_IN_CD AS GENERAL_MGER_CUST_IN_CD -- 总经理客户内码
+  ,T2.GENERAL_MGER_NAME AS GENERAL_MGER_NAME -- 总经理姓名
+  ,T2.FIN_PRINC_CUST_IN_CD AS FIN_PRINC_CUST_IN_CD -- 财务负责人客户内码
+  ,T2.FIN_PRINC_NAME AS FIN_PRINC_NAME -- 财务负责人姓名
+  ,T2.OTHER_CONT_CUST_IN_CD AS OTHER_CONT_CUST_IN_CD -- 其他联系人客户内码
+  ,T2.OTHER_CONT_NAME AS OTHER_CONT_NAME -- 其他联系人姓名
+  ,T2.ACTL_OPER_PSN_CUST_IN_CD AS ACTL_OPER_PSN_CUST_IN_CD -- 实际经营人客户内码
+  ,T2.ACTL_OPER_PSN_NAME AS ACTL_OPER_PSN_NAME -- 实际经营人姓名
+  ,T2.BOD_CHAIR_CUST_IN_CD AS BOD_CHAIR_CUST_IN_CD -- 董事长客户内码
+  ,T2.BOD_CHAIR_NAME AS BOD_CHAIR_NAME -- 董事长姓名
+  ,T2.STOCKHOLDER_ISN AS STOCKHOLDER_ISN -- 股东1内码
+  ,T2.INVEST_TYPE AS INVEST_TYPE -- 出资方式
+  ,T2.INVEST_CCY AS INVEST_CCY -- 出资币种
+  ,T2.INVEST_AMOUNT AS INVEST_AMOUNT -- 出资金额
+  ,T2.INVEST_CAPITAL AS INVEST_CAPITAL -- 出资占比
+  ,T2.STOCK_HOLD_QUANTITY AS STOCK_HOLD_QUANTITY -- 持股数量
+  ,T2.STOCK_HOLD_RATE AS STOCK_HOLD_RATE -- 持股比例
+  ,T2.HOLDING_SIGN AS HOLDING_SIGN -- 控股标志
+  ,T2.ACTL_CTRLER_CUST_IN_CD AS PER_CUST_INCOD -- 实际控制人客户内码
+  ,T2.ACTL_CTRLER_NAME AS AFFLTD_PERS_NM -- 实际控制人姓名
+  ,T1.FNC_GUAR_CORP AS FINA_GUAR_CORP -- 是否融资性担保公司
+  ,T1.FIN_CUST_TYPE AS FIN_CUST_TP -- 金融客户类型
+  ,T1.MICRO_LOAN_CORP_FLAG AS SMALL_LOAN_COMPANY -- 小额贷款公司标志
+  ,T1.CORP_FLAG AS CULTURE_INNOVATE_COMPANY -- 文创企业标志
+  ,T1.SCI_TECH_CORP_FLAG AS SCIENCE_TECHNOLOGY_COMPANY -- 科技企业标志
+  ,T1.FORGN_TRADE_CORP_FLAG AS FOREIGN_TRADE_COMPANY -- 外贸企业标志
+  ,T1.OPER_STATUS AS BUSINESS_STATUS -- 经营状态
+  ,T1.LEGAL_PROPTY_CLS AS LAW_NATURE -- 法律性质类
+  ,T1.MEM_RELA_CLS AS SUB_RELATION -- 隶属关系类
+  ,T1.SOLVENCY_CAP_SRC_CLS AS PAY_CASH_SRC -- 偿债资金来源类
+  ,T1.FIN_PLAT AS GOV_INVT_FLG -- 是否融资平台
+  ,T1.OPER_PLACE_OWNSHIP AS OWNER_FLG -- 经营场地所有权
+  ,T1.OPER_PLACE_AREA AS LAND_AREA -- 经营场地面积
+  ,T1.STOCK_CD AS STOCK_CD -- 股票代码
+  ,T1.STOCK_NAME AS STOCK_NM -- 股票名称
+  ,T1.BUSS_TYPE AS BUSS_TYPE -- 业务类型
+  ,T1.SYSTEM_NO AS SYSTEM_NO -- 归属系统
+  ,T1.PROVE_FLG AS PROVE_FLG -- 自证声明
+  ,T1.ORGAN_TYPE AS ORGAN_TYPE -- 机构类别
+  ,T1.ORGAN_DWELLER_FLG AS ORGAN_DWELLER_FLG -- 机构税收居民身份 
+
+  ,T1.UN_RESDNT_FLAG AS DWELLER_FLG -- 非居民标志 1-仅为中国税收居民 2-仅为非居民 3-即是中国税收居民又是其他国家（地区）税收居民
+  ,T1.CUST_CTRLER_NAME AS CUST_NAME -- 客户（控制人）名称
+  ,T1.CTRLER_SER_NO AS ID -- 控制人序号
+  ,T1.TAXER_IDT_1 AS TAX_IDENT_NO1 -- 纳税人识别号1
+  ,T1.TAXER_IDT_2 AS TAX_IDENT_NO2 -- 纳税人识别号2
+  ,T1.TAXER_IDT_3 AS TAX_IDENT_NO3 -- 纳税人识别号3
+  ,T1.NO_TAX_IDT_SPEC_RSN_DESC AS REASON_DESC -- 无纳税识别号具体原因描述
+  ,T1.NO_TAX_IDT_RSN_CD AS NO_TAX_IDENT_REASON -- 无纳税识别号原因码
+  ,T1.CREATED_TIME AS CREATED_TIME -- 记录创建时间
+  ,T1.CREATED_BY_EMPLOYEE AS CREATED_BY_EMPLOYEE -- 创建员工号
+  ,T1.CREATED_BRNO AS CREATED_BRNO -- 创建机构号
+  ,T1.CREATED_SYSTEM AS CREATED_SYSTEM -- 创建记录的系统
+  ,T1.CREATED_CHANNEL AS CREATED_CHANNEL -- 创建记录的渠道 
+ FROM TMP_S07_LP_CUST_BASIC_INFO_04  T1 -- 对公客户基本信息 
+LEFT JOIN TMP_S07_LP_CUST_BASIC_INFO_02  T2 -- 对公客户地址信息 
+ ON T1.CUST_INCOD = T3.CUST_INCOD
+LEFT JOIN TMP_S07_LP_CUST_BASIC_INFO_01  T3 -- 对公客户证件信息 
+ ON T1.CUST_INCOD = T3.CUST_INCOD
+LEFT JOIN TMP_S07_LP_CUST_BASIC_INFO_03  T4 -- 对公重要关联人信息 
+ ON T1.CUST_INCOD = T3.CUST_INCOD
+   
+ 
+;
+
+
+
+/*添加目标表分析*/ 
+\echo "4.analyze table" 
+ANALYZE TABLE ${icl_schema}.S07_LP_CUST_BASIC_INFO;
