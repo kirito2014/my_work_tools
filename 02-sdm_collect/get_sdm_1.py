@@ -1,7 +1,10 @@
-import pandas as pd
+import tkinter as tk
+from tkinter import filedialog, messagebox
 import os
+import pandas as pd
 import xlwings as xw
 
+# 上面的代码封装成一个函数
 def copy_sheets_and_metadata(source_file, target_file):
     # 初始化错误列表
     error_list = []
@@ -26,7 +29,11 @@ def copy_sheets_and_metadata(source_file, target_file):
 
         # 计算标记为 Y 的数量
         y_count = filtered_index.shape[0]
-        print(f"Number of sheets marked as 'Y': {y_count}")
+        log_message(f"Number of sheets marked as 'Y': {y_count}")
+
+        # 生成并打印 table_name_list
+        table_name_list = [f"{i+1}、{row['table_name']}" for i, row in filtered_index.iterrows()]
+        log_message(f"Table names list: {', '.join(table_name_list)}")
 
         for _, row in filtered_index.iterrows():
             table_id = row['table_id']
@@ -112,8 +119,87 @@ def copy_sheets_and_metadata(source_file, target_file):
     # 返回错误列表
     return error_list
 
-# 使用示例
-source_file = 'source.xlsx'
-target_file = 'target.xlsx'
-errors = copy_sheets_and_metadata(source_file, target_file)
-print(f"Errors: {errors}")
+# 日志信息处理
+def log_message(message):
+    log_text.config(state=tk.NORMAL)
+    log_text.insert(tk.END, message + '\n')
+    log_text.config(state=tk.DISABLED)
+    log_text.yview(tk.END)
+
+# 选择源文件
+def select_source_file():
+    global source_file
+    source_file = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")])
+    if source_file:
+        source_label.config(text=os.path.basename(source_file), fg='black')
+    else:
+        source_label.config(text="请选择合并文件", fg='red')
+
+# 选择目标文件
+def select_target_file():
+    global target_file
+    target_file = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")])
+    if target_file:
+        target_label.config(text=os.path.basename(target_file), fg='black')
+    else:
+        target_label.config(text="请选择目标文件", fg='red')
+
+# 确认合并
+def confirm_merge():
+    if not source_file or not target_file:
+        messagebox.showerror("错误", "请选择源文件和目标文件")
+        return
+
+    log_message("开始合并...")
+    errors = copy_sheets_and_metadata(source_file, target_file)
+    if errors:
+        log_message(f"Errors: {errors}")
+    else:
+        log_message("合并完成")
+        
+# 清除日志信息
+def clear_log():
+    log_text.config(state=tk.NORMAL)
+    log_text.delete(1.0, tk.END)
+    log_text.config(state=tk.DISABLED)
+
+# 主窗口
+root = tk.Tk()
+root.title("Excel合并工具")
+
+# 文件选择行
+frame_files = tk.Frame(root)
+frame_files.pack(pady=10)
+
+source_button = tk.Button(frame_files, text="选择要合并的文件", command=select_source_file, width=25)
+source_button.pack(side=tk.LEFT, padx=5)
+
+source_label = tk.Label(frame_files, text="请选择合并文件", fg='red', width=30)
+source_label.pack(side=tk.LEFT, padx=5)
+
+target_button = tk.Button(frame_files, text="选择目标文件", command=select_target_file, width=25)
+target_button.pack(side=tk.LEFT, padx=5)
+
+target_label = tk.Label(frame_files, text="请选择目标文件", fg='red', width=30)
+target_label.pack(side=tk.LEFT, padx=5)
+
+# 确认合并和清除日志行
+frame_actions = tk.Frame(root)
+frame_actions.pack(pady=10)
+
+confirm_button = tk.Button(frame_actions, text="确认合并", command=confirm_merge, width=30)
+confirm_button.pack(side=tk.LEFT, padx=5)
+
+clear_button = tk.Button(frame_actions, text="清除日志信息", command=clear_log, width=10)
+clear_button.pack(side=tk.LEFT, padx=5)
+
+# 日志信息显示
+log_text = tk.Text(root, state=tk.DISABLED, height=15, width=80)
+log_text.pack(pady=10)
+
+# 初始化文件路径
+source_file = ""
+target_file = ""
+
+# 运行主循环
+root.mainloop()
