@@ -131,7 +131,7 @@ def select_source_file():
     global source_file
     source_file = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")])
     if source_file:
-        source_label.config(text=os.path.basename(source_file), fg='black')
+        source_label.config(text=os.path.basename(source_file), fg='green')
     else:
         source_label.config(text="请选择合并文件", fg='red')
 
@@ -140,7 +140,7 @@ def select_target_file():
     global target_file
     target_file = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")])
     if target_file:
-        target_label.config(text=os.path.basename(target_file), fg='black')
+        target_label.config(text=os.path.basename(target_file), fg='green')
     else:
         target_label.config(text="请选择目标文件", fg='red')
 
@@ -174,13 +174,17 @@ frame_files.pack(pady=10)
 source_button = tk.Button(frame_files, text="选择要合并的文件", command=select_source_file, width=25)
 source_button.pack(side=tk.LEFT, padx=5)
 
-source_label = tk.Label(frame_files, text="请选择合并文件", fg='red', width=30)
-source_label.pack(side=tk.LEFT, padx=5)
-
 target_button = tk.Button(frame_files, text="选择目标文件", command=select_target_file, width=25)
 target_button.pack(side=tk.LEFT, padx=5)
 
-target_label = tk.Label(frame_files, text="请选择目标文件", fg='red', width=30)
+# 选中文件名显示行
+frame_files_selected = tk.Frame(root)
+frame_files_selected.pack(pady=5)
+
+source_label = tk.Label(frame_files_selected, text="请选择合并文件", fg='red', width=25)
+source_label.pack(side=tk.LEFT, padx=5)
+
+target_label = tk.Label(frame_files_selected, text="请选择目标文件", fg='red', width=25)
 target_label.pack(side=tk.LEFT, padx=5)
 
 # 确认合并和清除日志行
