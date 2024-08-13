@@ -28,7 +28,6 @@ def run_script():
         return
 
     try:
-        # Replace 'python_script.py' with the name of your script
         process = subprocess.Popen(
             ['python', 'test.py', folder_path, target_file_path]
         )
