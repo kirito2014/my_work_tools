@@ -191,11 +191,11 @@ def format_case_classify_data(case_data):
             for index, row in fddd.iterrows():
                 row_dict = {}
                 if index > 13:
-                    case_category = row[0]
-                    case_name = row[7]
+                    case_category = row.iloc[0]
+                    case_name = row.iloc[7]
                 else:
-                    case_category = row[1]
-                    case_name = row[7]
+                    case_category = row.iloc[1]
+                    case_name = row.iloc[7]
                 if pd.isna(case_name):
                     case_name = "/"
                 if isinstance(case_category, str) and case_category.startswith("数据架构咨询规划"):
