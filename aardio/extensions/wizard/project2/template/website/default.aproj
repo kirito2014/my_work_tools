@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project ver="10" name="网站程序" libEmbed="true" icon="..." ui="console" output="aardio-cgi.exe" CompanyName="aardio" FileDescription="网站程序" LegalCopyright="Copyright (C) aardio 2016" ProductName="aardio-website" InternalName="aardio-website.exe" FileVersion="0.0.1.08" ProductVersion="0.0.1.08" publishDir="/dist/" dstrip="false" local="false" ignored="false">
+	<file name="main" path="main.aardio" comment="启动程序代码"/>
+	<folder name="资源文件" path="res" embed="true" local="false" ignored="false">
+		<folder name="css" path="res\css" comment="res\css">
+			<file name="index.css" path="res\css\index.css" comment="res\css\index.css"/>
+		</folder>
+		<folder name="images" path="res\images" comment="res\images">
+			<file name="loading.gif" path="res\images\loading.gif" comment="res\images\loading.gif"/>
+		</folder>
+		<folder name="js" path="res\js" comment="res\js">
+			<file name="htmx.js" path="res\js\htmx.js" comment="res\js\htmx.js"/>
+		</folder>
+	</folder>
+	<folder name="api" path="api" embed="true" comment="目录" local="false" ignored="false">
+		<file name="help.aardio" path="api\help.aardio" comment="api\help.aardio"/>
+	</folder>
+	<folder name="server" path="server" embed="true" comment="目录" local="false" ignored="false">
+		<file name="httpServer.aardio" path="server\httpServer.aardio" comment="server\httpServer.aardio"/>
+	</folder>
+</project>

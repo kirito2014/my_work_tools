@@ -1,0 +1,130 @@
+//无边框窗口
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="Edge 浏览器控件 - web.view";right=759;bottom=469;bgcolor=16777215;border="none")
+winform.add()
+/*}}*/
+
+import web.view;
+var wb = web.view(winform);
+ 
+//导出为 Javascript 中的 aardio 对象
+wb.external = { 
+	close = function(){
+    	winform.close();
+    };
+    hitCaption = function(){
+    	winform.hitCaption();
+    };
+    hitMin = function(){
+    	winform.hitMin();
+    };
+	hitMax = function(){
+    	return winform.hitMax();
+    };
+}
+
+// wb.go("/res/index.html"); //直接打开资源目录下的文件
+wb.html = /**
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+	<style type="text/css">
+	html {
+    	margin: 0px;
+    	padding: 0px; 
+		background-color: #202020; 
+	}
+	
+	#title-bar {
+		height: 32px;	
+		padding: 0px;
+    	margin: 0px;
+	}
+	
+	#title-bar .caption {
+		position: fixed;
+		top: 0px;
+		left: 0px;	
+		width: 100%;
+		padding-left: 10px;
+		color: #ADADAD;
+		line-height: 32px;
+		font-size: 14px;
+		cursor: default;
+		user-select:none;
+	}
+	
+	#title-bar .buttons {
+		position: fixed;
+		top: 1px;
+		right: 1px;	
+	}
+	
+	#title-bar button {
+		font: 14px Marlett ;
+		color: #F5F5F5;
+		background-color: transparent;
+		border: none;
+		height: 28px;
+		width: 28px;  
+	}
+	 
+	#title-bar button:hover {
+		background-color: #FF4500;
+	}
+	
+	#title-bar button:active {
+		background-color: #B0451E;
+		color: #C5C5C5;
+	}
+	
+	#main {
+		padding: 12px;	
+		color: #C0C0C0;
+	}
+	 
+    </style>
+    <script type="text/javascript">  
+    
+    </script>
+</head>
+  <body>
+    <div id="title-bar" >
+      <div class="caption" onmousedown="aardio.hitCaption()">按住这里调用 aardio.hitCaption() 拖动窗口 </div>
+      <div class="buttons">
+        <button id="min-btn" onclick="aardio.hitMin()">0</button>
+        <button id="max-btn"  onclick="aardio.hitMax()">1</button>
+        <button id="close-btn" onclick="aardio.close()">r</button>
+      </div>
+    </div>
+    <div id="main">
+  	  1、请指定窗体「边框」属性为 none ，创建无边框窗口。<br />
+  	  2、调用 win.ui.shadow(winform) 创建阴影边框<br />
+    </div>
+    <script src="default.js"></script>
+  </body>
+</html>
+**/ 
+
+//添加阴影边框
+import win.ui.shadow;
+win.ui.shadow(winform);
+
+//设置窗口缩放范围
+import win.ui.minmax;
+win.ui.minmax(winform);
+
+//切换最大化、还原按钮
+winform.adjust = function( cx,cy,wParam ) {
+	if( wParam == 0x2/*_SIZE_MAXIMIZED*/ ){ 
+		wb.doScript(`document.getElementById("max-btn").innerText="2";`)
+	}
+	elseif( wParam == 0x0/*_SIZE_RESTORED*/ ){
+		wb.doScript(`document.getElementById("max-btn").innerText="1";`)
+	} 
+};
+			
+winform.show();
+win.loopMessage();

@@ -1,0 +1,135 @@
+//COM 常量查看工具
+import win.ui;
+import win.ui.menu;
+import com.picture;
+/*DSG{{*/
+var winform = win.form(text="COM 常量与枚举查看工具";right=552;bottom=610;parent=...)
+winform.add(
+btnExport={cls="button";text="查看常量与枚举值";left=384;top=6;right=529;bottom=34;dr=1;dt=1;z=1};
+static={cls="static";text="ProgID 或 tlb 类型库路径：";left=8;top=11;right=183;bottom=31;align="right";dl=1;dt=1;transparent=1;z=3};
+static2={cls="static";text="COM 对象的常量名字对也可在代码中使用『 COM对象.常量名字 』获取值。
+COM 对象枚举值对通常也是常量名值对，因此也可通过『 COM对象.枚举名字 』获取值。";left=9;top=570;right=521;bottom=610;db=1;dl=1;dr=1;transparent=1;z=5};
+tab={cls="tab";left=11;top=36;right=541;bottom=558;db=1;dl=1;dr=1;dt=1;edge=1;z=4};
+txtProgID={cls="edit";text="CDO.Message";left=185;top=7;right=378;bottom=32;dl=1;dr=1;dt=1;edge=1;z=2}
+)
+/*}}*/
+
+//定义第一个选项卡页
+var formConst = winform.tab.add(  text="常量";right=535;bottom=520 )
+formConst.add(
+txtResult={ vscroll=1;left=1;multiline=1;top=1;right=532;bottom=520;hscroll=1;dl=1;dt=1;dr=1;db=1;edge=1;cls="richedit" }
+) 
+formConst.txtResult.text = /**
+/*
+在 aardio 代码中可用COM 常量名或枚举名
+作为 COM 对象的成员名字获取值。例如:
+*/
+import com;
+import console.int;
+
+var cdoMessage = com.CreateObject("CDO.Message")
+console.dump( cdoMessage.cdoWestCentralAfrica )
+
+/*
+可使用 console.dump() 列出指定枚举类型可用的名值对。例如：
+*/
+import com;
+import console.int;
+
+var cdoMessage = com.CreateObject("CDO.Message")
+console.dump(cdoMessage,"CdoSendUsing")
+**/
+
+//定义第二个选项卡页
+var formEnum = winform.tab.add(  text="枚举";right=535;bottom=520 )
+formEnum.add(
+txtResult={ vscroll=1;left=1;multiline=1;top=1;right=532;bottom=520;hscroll=1;dl=1;dt=1;dr=1;db=1;edge=1;cls="richedit" }
+)  
+
+var formDefine = winform.tab.add(  text="智能提示";right=535;bottom=520 )
+formDefine.add(
+txtResult={ vscroll=1;left=1;multiline=1;top=1;right=532;bottom=520;hscroll=1;dl=1;dt=1;dr=1;db=1;edge=1;cls="richedit" }
+) 
+
+winform.btnExport.oncommand = function(id,event){
+	
+	winform.btnExport.disabledText = {"✶";"✸";"✹";"✺";"✹";"✷"}
+	
+	thread.invoke( 
+		function(winform,formEnum,formConst,formDefine){
+			formEnum.txtResult.text = "";
+			formConst.txtResult.text = "";
+			formDefine.txtResult.TEXT = "";
+			
+			sleep(100);
+			
+			import util.table;
+			var getString = function( tab ){ 
+				var strResult = ..util.table.stringify(tab,"");  
+				strResult = string.trim(strResult,"{}");//去掉首尾的构造符
+				return strResult;
+			}
+
+			import com;
+			var typelib;
+			if(..io.exist(winform.txtProgID.text)){ 
+				typelib = ..com.LoadTypeLibrary(winform.txtProgID.text);
+			}
+			else {
+				var obj = com.GetOrCreateObject(winform.txtProgID.text );
+				if(!obj){
+					winform.btnExport.disabledText = null;
+					winform.msgboxErr("创建 COM 对象失败");
+					return; 
+				} 
+				
+				var typeinfo = com.GetTypeInfo(obj)
+				typelib = typeinfo ? typeinfo.GetTypeLib()
+			} 
+			
+		
+			if(typelib){
+				var enums = typelib.ExportEnumerations() 
+				formEnum.txtResult.text = "//枚举定义开始 " 
+				+ winform.txtProgID.text +';\r\n' 
+				+ getString(enums) 
+				+ "//枚举定义结束 " 
+				+ winform.txtProgID.text 
+				+';' 
+				
+				var const = {}
+				typelib.ExportConstants(const) 
+				formConst.txtResult.text = "//常量定义开始 " 
+					+ winform.txtProgID.text +';\r\n' 
+					+ getString(const) 
+					+ "//常量定义结束 " 
+					+ winform.txtProgID.text 
+					+';' 
+				
+				var list = {"/*****intellisense()"};
+				for k,v in ..table.eachName(const){
+					..table.push(list,"_"+k +"=@" + v + "/*_"+ k +'*/');
+				}   
+				..table.push(list,"end intellisense*****/"); 
+				
+				formDefine.txtResult.text = ..string.join(list,'\r\n');
+				
+				sleep(10)	
+			}
+			else {
+				winform.txtProgID.showWarningTip("没有获取到有效的 COM 类型库。");
+			}
+			
+		
+			winform.btnExport.disabledText = null;
+		},winform,formEnum,formConst,formDefine
+	)
+	 
+}
+
+winform.onDropFiles = function(files){
+	winform.txtProgID.text = files[1]
+}
+
+winform.show(true);
+win.loopMessage();

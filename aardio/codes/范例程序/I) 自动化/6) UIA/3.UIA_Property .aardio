@@ -1,0 +1,31 @@
+//属性
+//此功能调用 .NET 组件，相关范例：调用其他语言 > dotNet
+//探测工具 loadcodex("~\tools\6) 探测器\2.inspect.aardio")
+import console.int;
+import System.Windows.Automation;
+
+Automation = System.Windows.Automation; 
+AutomationElement = Automation.AutomationElement;
+
+var focusElement = AutomationElement.RootElement.FocusedElement;
+if(focusElement){ 
+	
+	//获取 UIA 元素当前属性，参数 @2 为 true 忽略默认属性
+	//https://learn.microsoft.com/en-us/dotnet/api/system.windows.automation.automationelement.getcurrentpropertyvalue?view=netframework-4.0
+	var hwnd = focusElement.GetCurrentPropertyValue(AutomationElement.NativeWindowHandleProperty, true);
+	if(hwnd == AutomationElement.NotSupported){
+		console.log("获取焦点窗口句柄失败")
+	}
+	else {
+		console.log("焦点输口句柄",hwnd)
+	}
+	
+	//窗口句柄的默认属性为 0，所以上面的代码可以简化为
+	var hwnd = focusElement.GetCurrentPropertyValue(AutomationElement.NativeWindowHandleProperty);
+	if(hwnd) console.log("焦点输口句柄",hwnd);
+	
+	//也可以通过 Current 对象直接访问当前属性（支持默认属性）
+	//https://learn.microsoft.com/en-us/dotnet/api/system.windows.automation.automationelement.current?view=netframework-4.0
+	var hwnd = focusElement.Current.NativeWindowHandle;
+	if(hwnd) console.log("焦点输口句柄",hwnd);
+}

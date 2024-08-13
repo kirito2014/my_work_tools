@@ -1,0 +1,79 @@
+//入门
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="aardio echarts";right=808;bottom=492)
+winform.add()
+/*}}*/
+
+import web.form;
+var wb = web.form( winform );
+
+wb.external = {
+    getOption = function( num ){
+        var data = {
+            calculable = true;
+            legend = {
+                data = { "直接访问"; "邮件营销"; "联盟广告"; "视频广告"; "搜索引擎" };
+                orient = "vertical";
+                x = "left"
+            };
+            series = {
+                {
+                    center = { "50%"; "60%" };
+                    data = {
+                        { name = "直接访问"; value = 335 };
+                        { name = "邮件营销"; value = 310 };
+                        { name = "联盟广告"; value = 234 };
+                        { name = "视频广告"; value = 135 };
+                        { name = "搜索引擎"; value = 1548 }
+                    };
+                    name = "访问来源"; radius = "55%"; type = "pie"
+                }
+            };
+            title = { subtext = "纯属虚构"; text = "某站点用户访问来源"; x = "center"         };
+            toolbox = {
+                show = false
+            };
+            tooltip = { formatter = "{a} <br/>{b} : {c} ({d}%)"; trigger = "item" }
+        }
+         
+        return wb.jsObject(data) )
+    }
+}
+ 
+
+wb.html = /**
+<!doctype html>
+<html>
+<head>
+	<meta charset="UTF-8"> 
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" /> 
+    <style type="text/css">
+    html,body{ height:100%; margin:0; } 
+    </style>
+</head>
+<body>
+    <div id="main" style="height:100%;"></div>
+    <script src="https://lib.baomitu.com/echarts/5.2.0/echarts.min.js"></script>
+    <script>
+    
+    	/*
+		ECharts 5 不支持 IE8、
+		如果需要在 Win7/IE8 环境运行，建议降低版本到 ECharts 4 。
+		Win10/11 自带 IE11， Win7 已逐渐退出市场一般没必要再考虑。
+		*/
+   		
+   		//更多图表范例: https://echarts.apache.org/examples/zh/index.html
+        var myChart = echarts.init(document.getElementById('main'));
+        myChart.setOption( external.getOption() );
+        
+        //图表自适应窗口大小
+        window.addEventListener('resize', myChart.resize);
+    </script>
+</body>
+</html>
+**/
+
+
+winform.show();
+win.loopMessage();

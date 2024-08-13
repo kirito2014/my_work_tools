@@ -1,0 +1,53 @@
+/*
+此触发器在生成EXE以后执行。
+如果不希望编译 *.py 为 *.pyc 文件。
+请直接清空此文件。
+*/
+import ide;
+import fsys; 
+
+var pythonLib = "py3";
+var mainPath = ide.getProjectMainFile()
+if(mainPath){
+	var code = string.load(mainPath);
+	pythonLib = ..string.match(code,"import\s+(py3[\.\d]*)");
+	if(!#pythonLib){
+		pythonLib = "py3";
+	}
+}
+global.import(pythonLib);
+
+import console;
+console.log("当前 Python 扩展库：",pythonLib);
+
+console.showLoading("正在编译 Python 源码，请耐心等待");
+
+//新版 py3 扩展库支持此函数
+py3.import("compileall").$compile_dir (
+	legacy = true, 
+	force = true;
+	quiet = 1;
+	ide.getPublisDir(),
+);
+
+console.showLoading("正在清除发布目录 __pycache__ 目录，请耐心等待")
+
+fsys.enum( ide.getPublisDir(), "__pycache__",
+	function(dir,filename,fullpath,findData){ 
+		if(!filename){ 
+			fsys.delete(fullpath);
+		} 
+	}  
+);
+
+console.showLoading("正在清除发布目录 *.py 源码，请耐心等待")
+
+fsys.enum( ide.getPublisDir(), "*.py",
+	function(dir,filename,fullpath,findData){ 
+		if(filename){ 
+			fsys.delete(fullpath);
+		} 
+	}  
+);
+
+console.close();

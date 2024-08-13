@@ -1,0 +1,63 @@
+import win.ui;
+import io;
+
+// 创建窗口
+var form = win.form(text="Python Script Runner", width=600, height=400);
+
+// 添加标签
+form.addLabel(text="选择文件夹:", left=10, top=20);
+form.addLabel(text="选择目标文件:", left=10, top=60);
+
+// 添加文本框
+var folderTextbox = form.addTextBox(left=100, top=20, width=400);
+var targetFileTextbox = form.addTextBox(left=100, top=60, width=400);
+
+// 添加按钮
+var folderButton = form.addButton(text="选择文件夹", left=510, top=20, width=70, height=25);
+var targetFileButton = form.addButton(text="选择目标文件", left=510, top=60, width=70, height=25);
+var confirmButton = form.addButton(text="确认", left=250, top=100, width=100, height=30);
+
+// 添加日志输出框
+var logTextbox = form.addTextBox(left=10, top=150, width=570, height=200, multiLine=true, readOnly=true);
+
+// 选择文件夹事件
+folderButton.onClick = function() {
+    var folder = dialog.selectFolder("请选择文件夹:");
+    if (folder) {
+        folderTextbox.text = folder;
+    }
+}
+
+// 选择目标文件事件
+targetFileButton.onClick = function() {
+    var targetFile = dialog.openFile("请选择目标文件", "Excel 文件(*.xlsx;*.xls;*.xlsm)\0*.xlsx;*.xls;*.xlsm\0");
+    if (targetFile) {
+        targetFileTextbox.text = targetFile;
+    }
+}
+
+// 确认按钮点击事件
+confirmButton.onClick = function() {
+    var folderPath = folderTextbox.text;
+    var targetFilePath = targetFileTextbox.text;
+
+    if (folderPath == "" || targetFilePath == "") {
+        logTextbox.text += "[ERROR] 请先选择文件夹和目标文件！\r\n";
+        return;
+    }
+
+    logTextbox.text += "[INFO] 开始执行 Python 脚本...\r\n";
+
+    // 调用 Python 脚本
+    //var pythonPath = "python.exe";  // Python 路径
+    //var scriptPath = "your_script.py";  // 替换为你的脚本路径
+
+    //var command = `cmd /c ${pythonPath} ${scriptPath} "${folderPath}" "${targetFilePath}"`;
+    //var output = io.run(command, "", 0x1000);  // 运行命令并获取输出
+
+    logTextbox.text += output + "\r\n";
+    logTextbox.text += "[INFO] Python 脚本执行完成。\r\n";
+}
+
+// 显示窗体
+form.show();

@@ -1,0 +1,39 @@
+//自动化
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="自动化 / CDP 协议";right=759;bottom=469;bgcolor=16777215)
+winform.add()
+/*}}*/
+
+import web.view;
+var wb = web.view(winform); 
+winform.show();
+
+//添加网页默认加载脚本，禁止弹出新窗口
+wb.preloadScript("window.open =  function(url){ window.location.href = url; } ")
+
+wb.go("http://www.baidu.com");
+ 
+//CDP:使用 CSS 选择器查询节点
+var searchInput = wb.cdpWaitQuery("#kw")
+
+//CDP:设置为输入焦点
+//CDP 文档： https://chromedevtools.github.io/devtools-protocol
+wb.cdp("DOM.focus",{
+	nodeId = searchInput.nodeId;
+});
+
+//CDP:模拟输入文本
+wb.cdp("Input.insertText",{text="aardio 百家号"})
+
+//CDP:模拟按键
+wb.cdp("Input.dispatchKeyEvent",{
+	type="keyUp";
+	windowsVirtualKeyCode=0xD/*_VK_ENTER*/
+})
+
+//点击按钮
+wb.waitEle("#su","this.click()");
+ 
+winform.show();
+win.loopMessage();

@@ -1,0 +1,35 @@
+import win.clip.html;
+import string.xml;
+import ide;
+
+onIdeCopyCodeAsHtml = function(html){
+	var ctrl = ::User32.GetAsyncKeyState(0x11/*_VK_CTRL*/);
+	var shift = ::User32.GetAsyncKeyState(0x10/*_VK_SHIFT*/);
+	 
+	if(!ctrl){
+		html = string.replace(html,"(\<pre\s+[^>]+\>)",function(pre){
+			return string.replace(pre,"@white-space:pre-wrap;","white-space:pre;");
+		},1); 
+	}
+
+	if(shift){ 
+		var rshift = ::User32.GetAsyncKeyState(0xA1/*_VK_RSHIFT*/);
+		if(rshift){
+			html = string.replace(html,"\<pre\s+[^>]+\>",`<pre class="code aardio javascript">`,1); 
+			
+			win.clip.write(html); 
+			ide.showStatus(ctrl?"已复制为 HTML 纯代码（启用自动换行，pre 外框无样式）":"已复制为 HTML 纯代码（pre 外框无样式）");	
+		}
+		else {
+			
+			win.clip.write(html); 
+			ide.showStatus(ctrl?"已复制为 HTML 代码（启用自动换行）":"已复制为 HTML 代码");
+		} 
+	}
+	else {
+		var cb = win.clip.html();
+		cb.write(html);	
+		
+		ide.showStatus(ctrl?"已复制到 HTML 格式（启用自动换行）":"已复制到 HTML 格式（同时按住 Ctrl 启用自动换行，按住 Shift 复制为 HTML 纯代码）");
+	} 
+}

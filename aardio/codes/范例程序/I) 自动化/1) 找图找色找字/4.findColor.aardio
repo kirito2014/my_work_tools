@@ -1,0 +1,22 @@
+﻿//屏幕找色
+import gdi;
+import win;
+import mouse;
+import soImage;
+import winex;
+
+//查找窗口
+var hwndParent = winex.find("Afx\:\x+\:\x+\:\x+\:\x+\:\x+"," 副本");
+var hwnd = winex.findEx(hwndParent,,"Afx\:RibbonBar\:\x+\:\x+\:\x+\:\x+","aardio ");
+mouse.moveToWindow(0,0,hwnd);
+
+//抓屏
+var imgScreen = soImage();
+imgScreen.captureWindow(hwnd); 
+
+//在图像上搜索指定颜色的点,
+//第一个参数是一个表示查找颜色的数值,更多参数用法请查看智能提示
+var x,y = imgScreen.findColor( gdi.RGB(48,171,53) );
+
+//移动鼠标到指定位置，显示鼠标轨迹
+mouse.moveToWindow(x,y,hwnd,8);

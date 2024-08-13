@@ -1,0 +1,16 @@
+//光标位置
+import mouse;
+import winex.caret;
+
+var caretRect = winex.caret.get();
+if(caretRect){
+	mouse.moveTo(caretRect);
+}
+
+/*
+以下库的用法请参考开源软件 ImTip ：
+https://imtip.aardio.com/
+
+winex.caret 获取光标位置。
+key.ime.stateBar 获取输入法状态。
+*/

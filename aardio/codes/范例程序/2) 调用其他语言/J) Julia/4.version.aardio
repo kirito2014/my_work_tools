@@ -1,0 +1,16 @@
+﻿//自定义版本
+import console.int;  
+
+/*
+导入 julia 以前可以自定义 Julia 版本（必须是 3 组数值）。
+支持 Julia 1.6 到 1.9.x，暂不支持 1.10 （1.10 的接口目前有 bug ）。
+*/
+string.setenv("JULIA_VERSION","1.6.1");
+
+import julia; 
+ 
+//获取版本
+var ver = julia.eval("string(VERSION)");
+
+//输出版本
+console.log(ver) 

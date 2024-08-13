@@ -1,0 +1,59 @@
+//Lottie 动画
+import fonts.fontAwesome;
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="Lottie 动画演示";right=759;bottom=469;bgcolor=16777215)
+winform.add(
+bnPause={cls="plus";text="播放";left=480;top=384;right=609;bottom=434;align="left";font=LOGFONT(h=-24);iconStyle={align="left";font=LOGFONT(h=-21;name='FontAwesome');padding={top=5}};iconText='\uF04B ';notify=1;textPadding={left=27};z=2};
+static={cls="static";left=42;top=41;right=451;bottom=272;bgcolor=16777215;z=1}
+)
+/*}}*/
+
+import web.view;
+var wb = web.view(winform.static);
+
+wb.html = /**
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8"> 
+    <style type="text/css">
+    html,body{ height:100%; margin:0; overflow:hidden } 
+    </style> 
+    <script src="https://lib.baomitu.com/lottie-web/5.10.0/lottie.min.js"></script> 
+</head>
+<body>
+<script>
+	var lottieSample = lottie.loadAnimation({
+  		container: document.body,
+  		renderer: 'svg',
+  		loop: true,
+  		autoplay: true,
+  		path: "https://download.aardio.com/demo/lottie/1.json"
+	});
+    </script>
+</body>
+</html>
+**/
+
+winform.bnPause.skin({
+	color={
+		active=0xFF00FF00;
+		default=0xFF000000;
+		disabled=0xEE666666;
+		hover=0xFFFF0000
+	};
+	checked={
+		iconText='\uF04C';
+		text="暂停";
+	}
+})
+winform.bnPause.checked = true;
+
+winform.bnPause.oncommand = function(id,event){
+	if(owner.checked) wb.xcall("lottieSample.play");
+	else wb.xcall("lottieSample.pause"); 
+}
+
+winform.show();
+win.loopMessage();

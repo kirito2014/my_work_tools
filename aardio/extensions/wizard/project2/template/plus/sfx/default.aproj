@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project ver="10" name="7z自解压" libEmbed="true" icon="..." ui="win" output="sfx.exe" CompanyName="单位名称" FileDescription="附加说明......" LegalCopyright="Copyright (C) 作者 2011" ProductName="7z自解压" InternalName="7z自解压" FileVersion="0.0.1.10" ProductVersion="0.0.1.10" publishDir="\dist\" dstrip="false">
+	<file name="main.aardio" path="main.aardio"/>
+	<folder name="资源文件" path="res" embed="true" local="false" ignored="false">
+		<file name="pie.png" path="res\pie.png" comment="res\pie.png"/>
+		<file name="pie-bg.png" path="res\pie-bg.png" comment="res\pie-bg.png"/>
+		<file name="bg.jpg" path="res\bg.jpg" comment="res\bg.jpg"/>
+	</folder>
+	<folder name="打包文件放这里" path="sfx" embed="true" comment="目录" local="false" ignored="true"/>
+</project>

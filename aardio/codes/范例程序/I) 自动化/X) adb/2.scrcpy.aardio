@@ -1,0 +1,139 @@
+//安卓投屏
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="安卓手机无线投屏";right=564;bottom=554;bgcolor=16777215)
+winform.add(
+edit={cls="edit";left=19;top=21;right=544;bottom=535;db=1;dl=1;dr=1;edge=1;hscroll=1;multiline=1;vscroll=1;z=1}
+)
+/*}}*/
+
+//自定义手机按键，左侧为电脑键名，右侧为手机按键函数名
+var KEYMAP = {
+	down = { ["ESC"] = "keyBack" };
+} 
+
+//自定义手机按键
+import key.hook;
+winform.startKeyHook = function(hwndScrpy){
+ 	if(winform.keyHook)return;
+	
+	//创建键盘钩子	 
+	winform.keyHook = key.hook(); 
+
+	//按键回调函数
+	winform.keyHook.mapKey(KEYMAP,process.adb,hwndScrpy); 
+}
+
+import process.adb.connecter;
+
+//自动连接安卓手机
+if process.adb.connecter(){ 
+	
+		winform.show();
+		
+		import process.scrcpy; 
+		var scrcpy = process.scrcpy();
+ 		
+		//指定启动参数
+		//https://github.com/Genymobile/scrcpy/wiki/README.zh-Hans
+		scrcpy.arguments = { 
+			
+			//支持小驼峰参数名（自动转换为连字符风格）
+			powerOffOnClose = true;
+			
+			//也可以这样写参数
+			"--always-on-top","--stay-awake";
+			
+			//或者这样写
+			"--window-title":"标题：我的设备";
+		}
+		
+		//启动 scrcpy
+		var prcs,err = scrcpy.open(); 
+		prcs.logResponse(winform.edit);
+		//prcs.killOnExit(); //退出主进程时自动退出 scrcpy 。 
+		//prcs.close();//可选关闭进程管道，不会退出 scrcpy 。
+		
+		//发送快捷键，支持的快捷键列表：
+		//https://github.com/Genymobile/scrcpy/wiki/README.zh-Hans#%E5%BF%AB%E6%8D%B7%E9%94%AE
+		scrcpy.modKey("SHIFT","O"); //第一个 MOD（ALT）键不用写，后面每个参数指定一个键名
+		
+		
+		//最小化
+		winform.show(6/*_SW_MINIMIZE*/);
+		
+		//自定义手机键盘
+		winform.startKeyHook(scrcpy.hwnd); 
+		
+		//用于转换手机设备坐标
+		var xPos,yPos; 
+		var maxPosX,maxPosY = process.adb.getMaxPos();
+		var cxScreen,cyScreen = process.adb.getScreen();
+		
+		//录制手机触屏与按键操作，并生成自动化代码
+		var prcs = process.adb.getEvent("-l"); 
+		for device,eventType,eventCode,value in prcs.lines("([^:]+)\:\s+(\S+)\s+(\S+)\s+(\S+)",true){
+			var comment = "";
+			if(eventType == "EV_SYN"){
+				if(eventCode=="SYN_REPORT" && !tonumber(value,16) ){ 
+					 //"事件已完成" 
+					 if(xPos!==null && yPos!==null ){
+					 	winform.edit.printf("process.adb.tap(%d,%d)",xPos,yPos);
+					 	
+					 	xPos = null;
+						yPos = null;
+					 	continue;
+					 }
+					 
+					 continue;
+				}  
+			}
+			elseif(eventType == "EV_ABS"){
+				 //报告触摸屏或类似设备的绝对位置
+				 if(eventCode = "ABS_MT_POSITION_X" ){
+				 	xPos = math.round( (tonumber(value,16) / maxPosX) * cxScreen )
+				 	value = xPos;
+				 	continue;
+				 }
+				 elseif(eventCode = "ABS_MT_POSITION_Y" ){
+				 	yPos = math.round(  (tonumber(value,16) / maxPosY) * cyScreen )
+				 	value = yPos;
+				 	continue;
+				 }
+				 elseif(eventCode = "ABS_MT_TRACKING_ID"  ){
+				 	if(value="ffffffff"){
+				 		comment = "手指离开屏幕"
+				 	}
+				 	else {
+				 		comment = "手指触摸屏幕"
+				 	} 
+				 	
+				 	continue;
+				 }
+				  
+			}
+			elseif(eventType = "EV_KEY"){ 
+				 if(..string.startWith(eventCode,"KEY_",true) ){
+				 	if(value==="DOWN"){
+				 		winform.edit.printf(`process.adb.key("%s")`,eventCode);
+				 	}
+				 	continue;
+				 }
+				 else {
+				 	comment = "触屏"
+				 } 
+			} 
+			elseif(eventType = "EV_FF"){
+				continue;
+			}
+			
+			
+			winform.edit.print( eventType,eventCode,value,comment ); 
+		}  
+}
+else {
+	winform.edit.print("未连接手机");
+}
+ 
+winform.show();
+win.loopMessage();

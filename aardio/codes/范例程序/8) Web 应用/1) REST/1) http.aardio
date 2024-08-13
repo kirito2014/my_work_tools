@@ -1,0 +1,34 @@
+//HTTP 客户端
+import console;
+import web.rest.jsonClient;
+console.showLoading("正在连接服务器")
+ 
+//创建 HTTP 客户端
+var http = web.rest.jsonClient();
+
+//发送 GET 请求
+var ret = http.get("http://httpbin.org/anything",{
+    name = "用户名";
+    data = "其他数据";
+})
+console.dumpJson(ret);
+
+//发送 POST 请求
+var ret = http.post("http://httpbin.org/anything",{
+    name = "用户名";
+    data = "其他数据";
+})
+
+//示例 JSON
+var json = /*
+{
+    "data":"其他数据",
+    "name":"用户名"
+}
+*/
+
+//如果提交数据是字符串，则不作任何转换直接发送
+var ret = http.post("http://httpbin.org/anything",json)
+
+console.dumpJson(ret);
+console.pause();

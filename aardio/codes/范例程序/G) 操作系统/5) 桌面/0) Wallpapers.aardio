@@ -1,0 +1,324 @@
+//壁纸切换工具
+import fonts.fontAwesome;
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="壁纸切换工具";right=1110;bottom=649;bgcolor=16777215;border="none")
+winform.add(
+bk={cls="bk";left=-10;top=-4;right=1113;bottom=39;bgcolor=16777215;dl=1;dr=1;dt=1;forecolor=12632256;linearGradient=0;z=2};
+btnBingToday={cls="plus";text="当前图像简介";left=52;top=614;right=244;bottom=644;border={color=-4144960;radius=8;width=1};color=3947580;db=1;dl=1;font=LOGFONT(h=-13);hide=1;notify=1;z=20};
+btnExplorer={cls="plus";text="在资源管理器中查看";left=415;top=614;right=607;bottom=644;align="left";color=3947580;db=1;dr=1;font=LOGFONT(h=-13);iconStyle={align="left";font=LOGFONT(h=-13;name='FontAwesome');padding={left=8}};iconText='\uF0C9';notify=1;textPadding={left=25};z=14};
+btnFullScreen={cls="plus";text="全屏查看图像";left=613;top=614;right=742;bottom=644;align="left";color=3947580;db=1;dr=1;font=LOGFONT(h=-13);iconStyle={align="left";font=LOGFONT(h=-13;name='FontAwesome');padding={left=8}};iconText='\uF109';notify=1;textPadding={left=25};z=11};
+btnOpen={cls="plus";text="选择新图像";left=509;top=10;right=621;bottom=40;align="left";color=3947580;dl=1;dt=1;font=LOGFONT(h=-13);iconStyle={align="left";font=LOGFONT(h=-13;name='FontAwesome');padding={left=8}};iconText='\uF115';notify=1;textPadding={left=25};z=13};
+btnSetCurrent={cls="plus";text="设为桌面";left=622;top=10;right=733;bottom=40;align="left";color=3947580;dl=1;dt=1;font=LOGFONT(h=-13);iconStyle={align="left";font=LOGFONT(h=-13;name='FontAwesome');padding={left=8}};iconText='\uF108';notify=1;textPadding={left=25};z=10};
+btnSetting={cls="plus";text="系统设置";left=934;top=614;right=1046;bottom=644;align="left";color=3947580;db=1;dr=1;font=LOGFONT(h=-13);iconStyle={align="left";font=LOGFONT(h=-13;name='FontAwesome');padding={left=8}};iconText='\uF013';notify=1;textPadding={left=25};z=15};
+btnView={cls="plus";text="打开图像";left=748;top=614;right=860;bottom=644;align="left";color=3947580;db=1;dr=1;font=LOGFONT(h=-13);iconStyle={align="left";font=LOGFONT(h=-13;name='FontAwesome');padding={left=8}};iconText='\uF045';notify=1;textPadding={left=25};z=12};
+editPath={cls="plus";left=14;top=9;right=506;bottom=35;align="right";border={bottom=1;color=-6908266};dl=1;dt=1;editable=1;font=LOGFONT(h=-13);textPadding={top=6;bottom=2};z=9};
+imgHistory1={cls="plus";left=930;top=94;right=1081;bottom=176;dr=1;dt=1;edge=1;notify=1;z=4};
+imgHistory2={cls="plus";left=930;top=193;right=1081;bottom=275;dr=1;dt=1;edge=1;z=5};
+imgHistory3={cls="plus";left=930;top=291;right=1081;bottom=373;dr=1;dt=1;edge=1;z=6};
+imgHistory4={cls="plus";left=930;top=390;right=1081;bottom=472;dr=1;dt=1;edge=1;z=7};
+imgHistory5={cls="plus";left=930;top=488;right=1081;bottom=570;dr=1;dt=1;edge=1;z=8};
+imgWallpaper={cls="custom";left=11;top=46;right=903;bottom=609;bgcolor=16777215;db=1;dl=1;dr=1;dt=1;repeat="stretch";z=3};
+navBing={cls="plus";text="网络壁纸";left=995;top=47;right=1072;bottom=70;bgcolor=16777215;border={bottom=1;color=-16744448};dr=1;dt=1;font=LOGFONT(name='FontAwesome');z=17};
+navHistory={cls="plus";text="历史记录";left=918;top=47;right=995;bottom=70;bgcolor=16777215;border={bottom=1;color=-16744448};dr=1;dt=1;font=LOGFONT(name='FontAwesome');z=16};
+pageDown={cls="plus";text='\uF0D7';left=990;top=574;right=1018;bottom=589;color=32768;db=1;dr=1;font=LOGFONT(h=-24;name='FontAwesome');hide=1;notify=1;z=19};
+pageUp={cls="plus";text='\uF0D8';left=987;top=75;right=1015;bottom=90;color=32768;disabled=1;dr=1;dt=1;font=LOGFONT(h=-24;name='FontAwesome');hide=1;notify=1;z=18};
+plus3={cls="plus";left=918;top=69;right=1096;bottom=594;border={color=-16744448;width=1};clipBk=false;db=1;dr=1;dt=1;z=1}
+)
+/*}}*/
+
+import win.ui.simpleWindow;
+win.ui.simpleWindow(winform);
+winform.show();
+
+var styles = {
+	button = {
+		color={
+			active=0xFF00FF00;
+			default=0xFF3C3C3C;
+			disabled=0xFF6D6D6D;
+			hover=0xFFFF0000
+		}
+	}
+	history = {
+		foreground={ 
+			default=0x00FFA07A;
+			active=0xAAFFA07A;
+			hover=0x66FFA07A
+		}
+	}
+	pageUpDown={
+		color={
+			active=0xFF00FF00;
+			default=0xFF008000;
+			disabled=0xFF6D6D6D;
+			hover=0xFFFF0000
+		}
+	}
+}
+
+for(name,ctrl in winform.eachControl("plus","^btn\w+") ){
+	ctrl.skin(styles.button)
+}
+
+for(name,ctrl in winform.eachControl("plus","^imgHistory\w+") ){
+	ctrl.skin(styles.history)
+}
+
+import win.ui.tabs;
+var tbs = win.ui.tabs(winform.navHistory,winform.navBing);
+ 
+//选项卡样式	
+tbs.skin({
+	foreground={
+		active=0xFFFFFFFF;
+		default=0x00FFFFFF;
+		hover=0xFFCCCCCC; 
+	};
+	border = { 
+		default = {bottom=1;color=0xFF008000} 
+		disabled = {bottom=1;color=0xFF008000} 
+	};
+	checked={
+		foreground={ 
+			default=0x00FFFFFF; 
+		};
+		border = { 
+			default = {left=1;right=1;top=1;color=0xFF008000} 
+			disabled = {left=1;right=1;top=1;color=0xFF008000} 
+		}; 
+	}
+}); 
+
+tbs.selIndex = 1;
+
+import web.rest.jsonLiteClient;
+var http = web.rest.jsonLiteClient();
+var bingImage = http.api("https://cn.bing.com/HPImageArchive.aspx?format=js&mkt=zh-CN","GET");
+
+var reloadBing = function(){
+	winform.navBing.disabledText = {'\uF254';'\uF251';'\uF252';'\uF253';'\uF250';text=''} 
+	winform.navHistory.disabled = true;
+	winform.pageUp.disabled = true;
+	winform.pageDown.disabled = true;
+	
+	var data = bingImage(idx=winform.binWallpaperIndex,n=5);
+	if(data && data.images){
+		for(i=1;5;1){
+			var img = data.images[i];
+			if(img){ 
+				winform["imgHistory"+i].backgroundTodayPath = img.copyrightlink
+					+ "&filters=HpDate:%22"+string.replace(img.fullstartdate,"^"+img.startdate,img.startdate+"_")+"%22";
+					
+				winform["imgHistory"+i].backgroundUhdPath = "https://cn.bing.com" + img.urlbase + "_UHD.jpg";
+				winform["imgHistory"+i].backgroundPath = "https://cn.bing.com" + img.urlbase + "_1920x1080.jpg";
+				winform["imgHistory"+i].background = "https://cn.bing.com" + img.urlbase + "_1366x768.jpg";
+				winform["imgHistory"+i].tooltip = img.copyright;
+				winform["imgHistory"+i].tooltipTitle = img.title
+			} 
+		}
+	}
+	
+	winform.navBing.disabledText = null;
+	winform.navHistory.disabled = false;
+
+	if(winform.binWallpaperIndex > 0){
+		winform.pageUp.disabled = false;
+	}
+	
+	if(winform.binWallpaperIndex < 7){
+		winform.pageDown.disabled = false;
+	}
+}
+winform.binWallpaperIndex = 0;
+
+import sys.wallpaper;
+var reloadHistory = function(init){
+	var history = sys.wallpaper.getHistory();
+	
+	for(i=1;5;1){
+		winform["imgHistory"+i].backgroundUhdPath = null;
+		if(!#history[i]) {
+			winform["imgHistory"+i].background = null;
+			winform["imgHistory"+i].backgroundPath = null;
+		}
+		else {
+			winform["imgHistory"+i].background = history[i];
+			winform["imgHistory"+i].backgroundPath = history[i]	
+			
+			if(i==1 && init){ 
+				winform.imgWallpaper.image = history[1]; 
+				winform.imgWallpaper.redrawBackground();	
+			}	
+		} 
+	}
+}
+
+reloadHistory(true);
+
+tbs.onSelchange = function(idx,strip,form){
+	if(idx==1){
+		winform.pageUp.hide = true;
+		winform.pageDown.hide = true;
+		winform.btnBingToday.hide = true;
+		
+		reloadHistory();
+	}
+	else {
+		winform.pageUp.hide = false;
+		winform.pageDown.hide = false;
+		
+		reloadBing();
+	} 
+}
+
+import fsys.dlg;
+winform.btnOpen.oncommand = function(id,event){
+	var path = fsys.dlg.open("*.jpg|*.jpg","请选择图像");
+	if(path){
+		winform.editPath.text = path;
+		winform.imgWallpaper.image = path;
+		winform.imgWallpaper.redrawBackground();
+	}
+}
+
+import win.ui.tooltip;
+var tooltipCtrl = win.ui.tooltip.balloon(winform);
+var tooltipInfo = tooltipCtrl.addTool(winform.btnBingToday);
+for(name,ctrl in winform.eachControl("plus","^imgHistory\w+") ){
+	ctrl.oncommand = function(id,event){
+		winform.editPath.text = ctrl.backgroundUhdPath || ctrl.backgroundPath;
+		winform.imgWallpaper.image = ctrl.backgroundPath;
+		winform.imgWallpaper.backgroundTodayPath = ctrl.backgroundTodayPath;
+		
+		winform.imgWallpaper.redrawBackground(); 
+		tooltipInfo.setText(ctrl.tooltip:"");
+		tooltipCtrl.setTitle(ctrl.tooltipTitle:"");
+		
+		winform.btnBingToday.hide = !ctrl.backgroundUhdPath;
+	}
+}
+
+winform.btnSetCurrent.oncommand = function(id,event){
+	var path = winform.editPath.text;
+	if(!#path) return winform.msgboxErr("请选择图像");
+
+	winform.btnSetCurrent.disabledText = {'\uF254';'\uF251';'\uF252';'\uF253';'\uF250'}
+	thread.invokeEx( 
+		function(winform,path){
+			import sys.wallpaper;
+			import inet.http;
+			
+			if(string.startWith(path,"http",true)){ 
+				var filename = string.match(path,"\w+.jpg");
+				if(!filename) {
+					winform.btnSetCurrent.disabledText = null;
+					return winform.msgboxErr("文件名错误");
+				} 
+				
+				var imgPath = io.appData("/aardio/wallpaper/" + filename);
+				if(!io.exist(imgPath)){
+					var data = inet.http.get(path);
+					if(!data) {
+						winform.btnSetCurrent.disabledText = null;
+						return winform.msgboxErr("下载图像失败");
+					}
+					string.save(imgPath,data); 
+				} 
+				
+				path = imgPath;
+			} 
+			
+			if(io.exist(path)){
+				sys.wallpaper.setCurrent(path);
+				winform.reloadHistory()
+				thread.delay(500);
+			}
+			else {
+				winform.editPath.editBox.showWarningTip("请指定正确的图像图像");
+			}	
+
+		},winform,path
+	)
+	
+	winform.btnSetCurrent.disabledText = null;
+}
+
+winform.reloadHistory = function(){
+	if(tbs.selIndex==1){
+		winform.setTimeout( 
+			function(){
+				reloadHistory();
+			},500
+		)				
+	}  	
+}
+
+import process;
+winform.btnExplorer.oncommand = function(id,event){
+	var path = winform.editPath.text;
+	if(!#path) return winform.msgboxErr("请选择图像");
+	
+	if(string.startWith(path,"http",true)){
+		process.execute(path);
+	}
+	else {
+		process.exploreSelect(path)
+	} 
+}
+
+import process.imageView;
+winform.btnView.oncommand = function(id,event){
+	process.imageView(winform.editPath.text);
+}
+
+winform.btnFullScreen.oncommand = function(id,event){
+	//用 custom 控件显示图像,custom 控件自带全屏功能
+	winform.imgWallpaper.fullscreen(true);
+}
+
+import process.wow64;
+winform.btnSetting.oncommand = function(id,event){
+	process.wow64.explore("shell:::{ED834ED6-4B5A-4bfe-8F11-A626DCB6A921} -Microsoft.Personalization\pageWallpaper");
+}
+
+winform.pageUp.skin(styles.pageUpDown)
+winform.pageUp.oncommand = function(id,event){
+ 
+	winform.binWallpaperIndex = winform.binWallpaperIndex - 1;
+	reloadBing();
+}
+
+winform.pageDown.skin(styles.pageUpDown)
+winform.pageDown.oncommand = function(id,event){
+	winform.binWallpaperIndex = winform.binWallpaperIndex + 1;
+	winform.pageUp.disabled = false;
+
+	reloadBing(); 
+}
+
+winform.btnBingToday.skin(styles.button)
+winform.btnBingToday.oncommand = function(id,event){
+
+	if(winform.imgWallpaper.backgroundTodayPath){
+		thread.invoke( 
+			function(winform,url){
+				winform.btnBingToday.disabledText = {"✶";"✸";"✹";"✺";"✹";"✷"};
+				
+				import web.rest.htmlClient;
+				var htmlDoc = web.rest.htmlClient.get(url);
+				winform.btnBingToday.disabledText = null;
+		
+				if(htmlDoc){
+					var str = htmlDoc.getEle("ency_desc_full").innerText()
+					winform.msgbox(str)
+				}
+				
+				
+			},winform,winform.imgWallpaper.backgroundTodayPath
+		)
+		
+	} 
+}
+
+win.loopMessage();

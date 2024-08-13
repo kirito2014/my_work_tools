@@ -1,0 +1,5 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project ver="10" name="控制台工程向导" libEmbed="true" icon="..." ui="console" output="console.exe" CompanyName="单位名称" FileDescription="附加说明......" LegalCopyright="Copyright (C) 作者 2011" ProductName="aardio工程14" InternalName="aardio工程14" FileVersion="0.0.1.001" ProductVersion="0.0.1.001" publishDir="/dist/">
+	<file name="main.aardio" path="main.aardio"  comment="启动程序代码"/>
+	<folder name="资源文件" path="res" embed="true"/>
+</project>

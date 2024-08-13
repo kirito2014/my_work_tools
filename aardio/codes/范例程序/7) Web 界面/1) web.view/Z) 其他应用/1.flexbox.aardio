@@ -1,0 +1,118 @@
+//弹性盒布局
+import fonts.fontAwesome;
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="CSS 弹性盒布局工具";right=992;bottom=623;bgcolor=16777215)
+winform.add(
+custom={cls="~\codes\范例程序\7) Web 界面\7) HTMLayout\flex.aardio";left=0;top=0;right=991;bottom=570;db=1;dl=1;dr=1;dt=1;hide=1;transparent=1;z=3};
+nav0={cls="plus";text="教程";left=463;top=573;right=550;bottom=603;border={top=1;color=-16744448};db=1;dr=1;font=LOGFONT(name='FontAwesome');z=5};
+nav1={cls="plus";text="语法速览";left=549;top=573;right=636;bottom=605;border={top=1;color=-16744448};db=1;dr=1;font=LOGFONT(name='FontAwesome');z=6};
+nav2={cls="plus";text="Flexo";left=636;top=573;right=735;bottom=605;border={top=1;color=-16744448};db=1;dr=1;font=LOGFONT(name='FontAwesome');z=7};
+nav3={cls="plus";text="Flexy boxes";left=735;top=573;right=834;bottom=605;border={top=1;color=-16744448};db=1;dr=1;font=LOGFONT(name='FontAwesome');z=8};
+nav4={cls="plus";text="HTMLayout / Sciter";left=834;top=573;right=978;bottom=605;border={top=1;color=-16744448};db=1;dr=1;font=LOGFONT(name='FontAwesome');z=9};
+navBegin={cls="plus";left=203;top=573;right=463;bottom=574;bgcolor=32768;border={color=-16744448};db=1;dl=1;dr=1;forecolor=16777215;linearGradient=180;z=1};
+navEnd={cls="plus";left=978;top=573;right=988;bottom=605;border={top=1;color=-16744448};db=1;dr=1;z=2};
+static={cls="static";left=0;top=0;right=991;bottom=570;db=1;dl=1;dr=1;dt=1;transparent=1;z=4}
+)
+/*}}*/
+
+import win.ui.tabs;
+var tbs = win.ui.tabs(winform.nav0,winform.nav1,winform.nav2,winform.nav3,winform.nav4)
+tbs.margin = 0;
+
+tbs.skin({
+	foreground={
+		active=0xFFFFFFFF;
+		default=0x00FFFFFF;
+		hover=0xFFCCCCCC;
+	};
+	checked={
+		foreground={ 
+			default=0x00FFFFFF; 
+		};
+		border = { 
+			default = {left=1;right=1;bottom=1;color=0xFF008000} 
+			disabled = {left=1;right=1;bottom=1;color=0xFF008000} 
+		}; 
+	}
+});
+
+import web.view;
+var wb = web.view(winform.static);
+
+wb.onDocumentInit = function(url){ 
+	if(url=="https://the-echoplex.net/flexyboxes/"){
+		 
+		wb.waitEle("a.help[data-markdown-tooltip]",` 
+			setTimeout(function(){
+				var cnTitles = {
+    				"direction of the flex container\u0027s main axis":"指定了内部元素是如何在 flex 容器中布局的，定义了主轴的方向 (正方向或反方向)",
+    				"controls whether the flex container is single-line or multi-line, and the direction of the cross axis":"指定 flex 元素单行显示还是多行显示。如果允许换行，这个属性允许你控制行的堆叠方向",
+    				"align flex items along the main axis of the current line of the flex container":"定义了浏览器之间，如何分配顺着弹性容器主轴 (或者网格行轴) 的元素之间及其周围的空间",
+    				"align flex items along the cross axis of the current line of the flex container":"控制在交叉轴上项目的对齐方式",
+    				"align a flex container\u0027s lines within the flex container when there is extra space in the cross axis, similar to how *justify-content* aligns individual items within the main axis.\n\nNote, this property has no effect when the flexbox has only a single line":"设置沿着弹性盒子的交叉轴方向如何对齐内容项并分配剩余空间（功能类似的 *justify-content* 则是沿着主轴方向排列项目），该属性对单行弹性盒子模型无效。（即：带有 flex-wrap: nowrap）",
+    				"controls the order in which flex items appear within their flex container":"规定了弹性容器中的可伸缩项目在布局时的顺序。元素按照 order 属性的值的增序进行布局。拥有相同 order 属性值的元素按照它们在源代码中出现的顺序进行布局",
+    				"specifies the components of a flexible length: the *flex grow* factor and *flex shrink* factor, and the *flex basis*.\n\n1. **flex-grow**\n  *Number* which determines how much the flex item will *grow* relative to the rest of the flex items in the flex container when positive free space is distributed.\n2. **flex-shrink**\n  *Number* which determines how much the flex item will *shrink* relative to the rest of the flex items in the flex container when negative free space is distributed.\n3. **flex-basis**\n  The initial *width or height* (depending on main axis) of the flex item, before free space is distributed according to the flex factors.":"此属性是 flex-grow flex-shrink flex-basis 等三个属性的简写，可以指定一个，两个或三个值。\n\n1. **flex-grow**\n 用一个数值规定项目在 flex 容器中的主轴方向分配剩余空间的相对比例，剩余空间是 flex 容器的大小减去所有 flex 项的大小加起来的大小。如果所有的兄弟项目都有相同的 flex-grow 系数，那么所有的项目将剩余空间按相同比例分配，否则将根据不同的 flex-grow 定义的比例进行分配。\n2. **flex-shrink**\n 用一个数值指定了 flex 元素在主轴方向的收缩规则。flex 元素仅在默认大小之和大于容器的时候(主轴方向)才会发生收缩。\n3. **flex-basis**\n  指定了 flex 元素在主轴方向上的初始大小。如果不使用 box-sizing 改变盒模型的话，那么这个属性就决定了 flex 元素的内容盒（content-box）的尺寸。",
+    				"allows the alignment to be overridden for individual flex items":"指定当前项在交叉轴上的对齐方向，覆盖父节点 CSS 的 align-items 值",
+				}
+				
+				var links = document.querySelectorAll("a.help[data-markdown-tooltip]");
+				var tooltips = []
+				for(var i=0; i < links.length; i++){
+					var lnk = links[i]
+					var title = cnTitles[lnk.title];
+					if(title) lnk.title = title; 
+				}
+			},1000) 
+			
+			setInterval(function(){
+				if(document.getElementById("ajax-loader")){ 
+					return;
+				}
+				
+				var edit = document.querySelector("#flex-style, textarea.output-css") 
+				var txt = document.querySelector('.vanilla-css').value; 
+				txt = txt.replace(/\s+}/mg,"\n}"); 
+				edit.value = txt; 
+			},1000)
+		`)
+	}
+	elseif(url=="https://www.flexo.icu/"){
+		wb.waitEle(".onboarding__bottombar-next-button",`
+			for(var i=0; i < 3; i++){
+				document.querySelector(".onboarding__bottombar-next-button").click()
+			}
+		`)
+	}
+	
+}
+
+var urls = {
+	"https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_Flexible_Box_Layout/Basic_Concepts_of_Flexbox";
+	"https://quickref.me/css#css-flexbox";
+	"https://www.flexo.icu/";
+	"https://the-echoplex.net/flexyboxes/"; 
+}
+
+tbs.onSelchange = function(idx,strip,form){
+	var url = urls[idx]
+	if(url){ 
+		winform.custom.show(false);
+		winform.static.show(true)
+		
+		strip.disabledText = {'\uF254';'\uF251';'\uF252';'\uF253';'\uF250'}
+		wb.go(url);
+		
+		win.delay(500);
+		strip.disabledText = null;
+	}
+	else {
+		winform.custom.show(true);
+		winform.static.show(false)
+	}
+}
+	
+tbs.selIndex = 4;
+
+winform.show(3/*_SW_MAXIMIZE*/);
+win.loopMessage();

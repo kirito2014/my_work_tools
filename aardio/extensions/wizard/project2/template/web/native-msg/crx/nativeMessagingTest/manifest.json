@@ -1,0 +1,15 @@
+{
+    "manifest_version": 3,
+    "name": "Native Messaging Test",
+    "description": "Native Messaging",
+    "version": "1.0",
+    "permissions": [
+        "nativeMessaging",
+        "https://*/*",
+        "http://*/*"
+    ],
+    "action": {
+        "default_icon": "app.ico",
+        "default_popup": "popup.html"
+    }
+}

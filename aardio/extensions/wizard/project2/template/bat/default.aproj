@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project ver="10" name="aardio工程10" libEmbed="true" icon="..." ui="win" output="aardio工程10.exe" CompanyName="单位名称" FileDescription="aardio工程10" LegalCopyright="Copyright (C) 作者 2021" ProductName="aardio工程10" InternalName="aardio工程10" FileVersion="0.0.0.1" ProductVersion="0.0.0.1" publishDir="/dist/" dstrip="false" local="false" ignored="false">
+	<file name="main.aardio" path="main.aardio" comment="main.aardio"/>
+	<folder name="资源文件" path="res" embed="true" local="false" ignored="false"/>
+	<folder name="批处理" path="bat" embed="true" comment="目录" local="false" ignored="false">
+		<file name="bat.aardio" path="bat\bat.aardio" comment="bat\bat.aardio"/>
+		<file name="bat2.aardio" path="bat\bat2.aardio" comment="bat\bat2.aardio"/>
+	</folder>
+</project>

@@ -1,0 +1,20 @@
+{
+  "presets": [
+    ["@babel/env", {
+      "spec": true,
+      "useBuiltIns": false
+    }],
+    "@babel/react"
+  ],
+  "plugins": [
+    ["module-resolver", {
+      "root": ["."],
+      "alias": {
+        "react": "nervjs",
+        "react-dom": "nervjs"
+      }
+    }],
+    "@babel/transform-member-expression-literals",
+    "@babel/transform-property-literals"
+  ]
+}

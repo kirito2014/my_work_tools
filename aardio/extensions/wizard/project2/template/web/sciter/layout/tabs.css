@@ -1,0 +1,123 @@
+﻿.tabs {
+  behavior: tabs;/*指定这是一个选项卡控件*/
+  flow: horizontal;/*修改默认的垂直布局为横向布局,这样strip就跑左侧去了*/
+  height: 100%%;
+  width: 100%%;
+  font: system;
+  margin: 0;
+  padding: 0;
+}
+
+/* 选项卡按钮列表 */
+.tabs>ul.strip {
+  flow: vertical;/*选项卡按钮改成垂直布局*/
+  list-style:none;
+  margin-bottom: 12dip;
+  padding: 10dip 0dip 2dip 0dip;
+  width: 190dip;
+  height: 100%%;
+  margin-top: 90dip;
+}
+
+/* 选项卡按钮默认样式 */
+.tabs>.strip>[panel]{
+  color: #fff;
+  font-size: 14dip;
+  margin: 0;
+  height: 28dip;
+  width: *;
+  list-style-image: none;
+  padding: 10dip 0dip 0dip 50dip;
+  position: relative;
+}
+
+.tabs>.strip>[panel] img {
+  vertical-align: middle;
+  margin-right: 15dip;
+  width: 16dip;
+  height: 16dip;
+}
+
+.tabs>.strip>[panel]:hover
+
+/* 鼠标悬停选项卡样式*/
+{
+  background-color: #FFFFFF44;
+  transition:blend;
+}
+
+.tabs>.strip>[panel]:current
+
+/*当前选项卡样式*/
+{
+  background-color: rgb(251, 189, 98) rgb(239, 159, 42) rgb(239, 159, 42) rgb(251, 189, 98);
+  position: relative;
+}
+
+.tabs>.strip>[panel]:current:hover
+
+/*点击当前选项卡的样式*/
+{
+  transition: none;
+}
+
+.tabs>.strip>[panel]:current:first-child,
+.tabs>.strip>[panel]:current:hover:first-child {}
+
+.tabs:focus .strip [panel]:current {}
+
+/* 选项卡页面 - 默认全部隐藏 */
+.tabs>[name] {
+  display: none;
+}
+
+/* 选项卡页面 - 当前选定：展开状态(expanded) */
+.tabs>[name]:expanded {
+  background: #FFF;
+  background-repeat: stretch;
+  padding: 20dip;
+  margin: 0;
+  display: block;
+  height: 100%%;
+  width: 100%%;
+  /*框架必须指定宽度  */
+}
+
+/* 框架页正在打开 */
+.tabs>iframe[name]:busy {
+  /* foreground-image:url(images/loading.png); */
+  foreground-repeat: no-repeat;
+  foreground-position: 2dip 2dip;
+}
+
+
+/* 下面指定关闭按钮的样式 */
+.tabs>.strip>[panel] .close-panel {
+  position: absolute;
+  display: none;
+}
+
+.tabs>.strip>[panel]:hover .close-panel {
+  display: block;
+  top: 7dip;
+  right: 3dip;
+  width: 14dip;
+  height: 14dip;
+  line-height: 14dip;
+  border-radius: 14dip;
+  font-size: 14dip;
+  font-family: "Marlett";
+  color: #7e8c8d;
+  content: "r";
+}
+
+.tabs>.strip>[panel]:hover .close-panel:hover {
+  background: #999;
+  color: #FFF;
+}
+
+.tabs>.strip>[panel]:hover .close-panel:active {
+  background: red;
+  color: #FFF;
+}
+

@@ -1,0 +1,22 @@
+//Word
+//以下代码兼容 WPS JS
+import console.int;
+import com.doc;
+
+var doc = com.doc( "/vba.docm" )
+doc.Visible = true;
+
+/*
+在 Word 或 WPS 中按 ALT + F11 打开代码窗口
+在 VBA 里收到的是二维数组，不是交错数组（数组的数组） 
+
+自由调用 VBA / JSA 函数，不需要确认启用宏。
+*/
+doc.vba.CreateTableWithStyle({
+	{"标题1","标题2","标题3"},
+	{"文字1","文字2","文字3"},
+	{"文字5","文字5","文字6"},
+})
+
+//退出
+//doc.Quit();

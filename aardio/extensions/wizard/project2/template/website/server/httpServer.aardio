@@ -1,0 +1,36 @@
+/*
+创建一个兼容FastCGI接口的简单Web服务器，如果已经在Web服务器环境下这段可以省略。
+*/
+import fsys.log;
+import wsock.tcp.simpleHttpServer;
+import process;
+import console;
+
+/*捕获错误信息{{*/
+global.onError = function( err,over,app ){ 
+    if(!over){
+        import debug;
+        var stack = debug.traceback(,"调用栈",3);
+        err =  ..string.concat(err,'\n',stack);
+    }
+    
+    if(!app){
+    	//CGI进程错误信息请查看"CGI.EXE目录/config"下面生成的日志文件
+    	import fsys.log;
+    	fsys.log.print( ..string.replace(err,"![\r\n]\n",'\r\n')  );
+    }
+    
+    //500错误错误服务器上本地打开网页可以看到,
+    return err;
+} 
+/*}}*/ 
+
+var server = wsock.tcp.simpleHttpServer("127.0.0.1",/*8081*/);
+console.setTitle("web服务器已启动 " + server.getUrl() ); 
+	process.execute( server.getUrl()  )
+
+server.run(
+	function(response,request,session){ 
+		response.loadcode( request.path ); //参数可以省略
+	} 	
+);

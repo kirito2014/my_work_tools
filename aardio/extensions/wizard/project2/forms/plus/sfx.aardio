@@ -1,0 +1,47 @@
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="aardio + bat";right=759;bottom=469;parent=...)
+winform.add()
+/*}}*/
+
+import web.form;
+var wb = web.form( winform,5/*_UIFLAG_DIALOG*/|4/*_UIFLAG_NO3DBORDER*/ | 8/*_UIFLAG_SCROLL_NO*/,,,true);
+wb.noScriptErr = true;
+
+wb.html = /** 
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />  
+    <title>批处理</title> 
+	<style>body { font-family: "Segoe UI", sans-serif;  }</style>
+</head>
+<body style="white-space:pre;font-size:12pt;word-wrap: break-word;word-break: normal;overflow:hidden">7zip 自解压程序开发步骤：
+
+1、创建自解压工程。
+2、将需要打包的文件放在工程目录 /sfx 下面（不需要同步工程目录）。
+3、根据需要适当修改 main.aardio 。
+4、按 F5 运行工程，以安装相关扩展库。
+5、按 F7 发布为 EXE，发布时会自动调用 7zip 压缩文件到 EXE 文件内。
+
+安装自解压相关的库或函数：
+
+解压 sevenZip.decoder2
+压缩 sevenZip.cmd 
+创建快捷方式 fsys.lnk,fsys.shortcut
+注册表操作 win.reg, sys.reg
+COM 控件注册 com.activeX
+特殊目录 io.getSpecial() fsys.knownFolder
+权限 fsys.acl,sys.acl
+自启动 sys.run,sys.runAsTask
+自删除 process.temp
+**/
+
+winform.getTemplatePath = function(){
+	return io.fullpath("/template/plus/sfx/") 
+}
+
+winform.show(true);
+win.loopMessage();
+return winform;

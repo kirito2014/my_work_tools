@@ -1,0 +1,72 @@
+import win.ui;
+import win.ui.menu;
+import win.ui.toolbar;
+/*DSG{{*/
+var winform = win.form(text="aardio form";right=540;bottom=330;parent=...)
+winform.add(
+edit={cls="edit";text='请右键点窗体设计器，\r\n然后点『九宫格缩放布局』以固定文本框四侧边距。\r\n\r\n窗体中的每一小块都可以用 custom 控件加载另一个子窗口，\r\n在子窗口里又可以继续做九宫格布局，这样就可以分而冶之，化繁为简。';left=0;top=22;right=541;bottom=308;db=1;dl=1;dr=1;dt=1;edge=1;multiline=1;vscroll=1;z=1}
+)
+/*}}*/
+
+//菜单
+var popmenu = win.ui.popmenu(winform);//创建弹出菜单
+var idFileNew = popmenu.add(
+	'新建',function(id){ win.msgbox("新建"); }
+);
+popmenu.add();//分隔线
+popmenu.add('&exit',function(id){ winform.close() })
+win.ui.menu(winform).add('file',popmenu)
+
+//工具条，建议改用高级选项卡（ win.ui.tabs ）
+var toolbar = win.ui.toolbar(winform);
+toolbar.create( style = 0x1000/*_TBSTYLE_LIST*/ ); // 创建工具条
+toolbar.showLabel = true; //在按钮上显示文字
+
+//toolbar.sendMessage(0x200C,0,0); //关闭 DPI 自动缩放，在指定图像列表前调用
+
+//已经自动支持 DPI 缩放，改高高级选项卡（win.ui.tabs) + 图标字体效果更好。
+toolbar.imageList = win.imageList( 16, 16 ).add($"\res\toolbar.gif",0xFF00FF/*透明色*/) ; 
+
+//让工具条显示在窗口底部
+//toolbar.modifyStyle(1/*_CCS_TOP*/,3/*_CCS_BOTTOM*/)
+
+toolbar.add();// 添加分隔条
+toolbar.add( "新建", , 1,idFileNew/*重用现有命令ID*/ );
+toolbar.add(
+	"禁用", 
+	function (id) { 
+		toolbar.getButton(3).disabled = false; 
+		toolbar.getButtonById(id).disabled = true;
+	}, 2
+); 
+
+//点击工具栏按钮
+//toolbar.buttons[2].click();
+
+import win.ui.statusbar;
+statusbar = win.ui.statusbar( winform );
+statusbar.setText("这是状态栏");
+
+/*
+工具栏和状态栏属于系统控件，比较特别的是默认已做好 DPI 缩放。
+如果需要自行计算高度，那么先应当调用 winform.enableDpiScaling("init")。
+这样大家的坐标位置才是一致的。
+*/
+winform.enableDpiScaling("init");
+
+/*
+工具栏与状态栏在不同 DPI 缩放下大小基本是一致的
+一般不用再计算位置，但如果想追求一点完美，可以下面这样写：
+*/
+winform.edit.top = winform.toolbar.bottom;
+winform.edit.bottom = winform.statusbar.top;
+/*
+请参考：范例程序 > Windows 窗口 > 基础知识 > 高分屏自适应
+
+其实在 aardio 中使用这种系统提供的工具栏和状态栏是不必要的。
+aardio 提供了更好用的高级选项卡（win.ui.tabs），更美观，定制样式更方便，用法也更简单。
+状态栏其实用一个简单的 static 就可以了，大多时候那些复杂而浪费时间的功能根本就没用。
+*/
+
+winform.show(true); 
+win.loopMessage(); 

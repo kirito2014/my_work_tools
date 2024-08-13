@@ -1,0 +1,40 @@
+//PDF
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="PDF 演示";right=759;bottom=469;bgcolor=16777215)
+winform.add()
+/*}}*/
+
+import web.view;
+var wb = web.view(winform);
+
+//全屏，支持 pdf.js 全屏，WebView2 内置 PDF 有 bug 暂不可用。
+wb.onFullScreen = lambda(enabled) owner.fullscreen(enabled);
+
+//可以用 #page=n 直接导航到指定页码
+//wb.go("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf#page=1&zoom=50");
+
+//隐藏 PDF 工具栏，在 URL 后面加 scrollbars=0&toolbar=0&statusbar=0 
+//wb.go("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf#page=1&scrollbars=0&toolbar=0&statusbar=0");
+
+//缩放 50%
+//wb.go("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf#page=1&zoom=50");
+
+//视图自适应，支持参数：Fit, FitH, FitV
+wb.go("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf#view=FitV");
+
+//调用 pdf.js
+wb.go("https://mozilla.github.io/pdf.js/web/viewer.html")
+
+//打印普通网页到 PDF 
+/*
+var result = wb.cdp("Page.printToPDF",{})
+if(result[["data"]]){
+	import crypt;
+	var data = crypt.decodeBin(result[["data"]]);
+	string.save("/test.pdf",data)
+}
+*/
+
+winform.show();
+win.loopMessage();

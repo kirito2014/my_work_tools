@@ -1,0 +1,32 @@
+import win.ui;
+import win.dlg.message;
+/*DSG{{*/
+var winform = win.form(text="htmx form";right=759;bottom=469;bgcolor=16777215)
+winform.add()
+/*}}*/
+
+import web.form;
+var wb  = web.form(winform); 
+
+//导出 aardio 函数
+import process;
+import fsys.dlg;
+wb.external = {
+	getFile = function(){
+		return fsys.dlg.open();
+	};
+	openUrl = function(url){
+		process.openUrl(url);
+	};
+}
+
+//多线程后端
+import wsock.tcp.simpleHttpServer;
+wsock.tcp.simpleHttpServer.documentBase = "\web"
+var indexUrl  = wsock.tcp.simpleHttpServer.startUrl("\index.html")
+ 
+wb.go(indexUrl);
+ 
+winform.show();
+win.loopMessage();
+return winform;

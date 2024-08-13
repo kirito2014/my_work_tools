@@ -1,0 +1,40 @@
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="浏览器本地消息主机";right=759;bottom=469;parent=...)
+winform.add()
+/*}}*/
+
+import web.form;
+var wb = web.form( winform,5/*_UIFLAG_DIALOG*/,,,true);
+wb.noScriptErr = true;
+
+import process;
+
+wb.html = /** 
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />  
+    <title></title>
+</head>
+<body style="overflow:hidden;white-space:pre;font-size:	10pt;word-wrap: break-word;word-break: normal;margin:5px"><pre style="margin:0">浏览器本地扩展分为两部分：
+1、aardio 实现的消息服务端可多线程收发消息，且实现了简洁的单线程异步开发接口。
+2、浏览器里用 JS,HTML 编写的扩展程序，实现 Native messaging 客户端。
+
+发布步骤：
+1、运行发布后的 EXE 自动安装消息服务端。注意要配置允许调用此 EXE 的浏览器扩展 ID。 
+安装未打包扩展会动态生成扩展 ID，可直接指定扩展目录并自动计算 ID。示例：
+<pre class="code aardio javascript" style="overflow-x:auto;text-align:left;box-shadow: rgba(216, 216, 216, 0.5) 0px 0px 0px 1px inset;padding:10px;border-radius:3px;background:#1e1e1e;color:#d4d4d4;white-space:pre;word-break:break-all;display:block;font-size:14px;font-style:normal;font-variant-ligatures:normal;font-variant-caps: normal;font-family: &quot;Consolas&quot;, Consolas, &quot;Liberation Mono&quot;, Menlo, Courier, monospace"><code><span>web.nativeMessaging.install(<br>&nbsp;&nbsp;&nbsp;&nbsp;allowed_origins&nbsp;=&nbsp;{</span><span style="color:#ce9178">"\crx\nativeMessagingTest"</span><span style="color:#d4d4d4">}&nbsp;<br>)</span></code></pre>2、在浏览器扩展管理页面启用开发者模式可安装未打包的扩展（包含 manifest.json 文件的目录 ）。
+
+manifest.json 要如下启用 nativeMessaging 权限。
+<pre class="code aardio javascript" style="overflow-x:auto;text-align:left;box-shadow: rgba(216, 216, 216, 0.5) 0px 0px 0px 1px inset;padding:10px;border-radius:3px;background:#1e1e1e;color:#d4d4d4;white-space:pre;word-break:break-all;display:block;font-size:14px;font-style:normal;font-variant-ligatures:normal;font-variant-caps: normal;font-family: &quot;Consolas&quot;, Consolas, &quot;Liberation Mono&quot;, Menlo, Courier, monospace"><code><span>{<br>&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color:#ce9178">"manifest_version"</span><span style="color:#d4d4d4">:&nbsp;3,&nbsp;<br>&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color:#ce9178">"permissions"</span><span style="color:#d4d4d4">:&nbsp;[<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color:#ce9178">"nativeMessaging"</span><span style="color:#d4d4d4">,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color:#ce9178">"https://*/*"</span><span style="color:#d4d4d4">&nbsp;<br>&nbsp;&nbsp;&nbsp;&nbsp;]&nbsp;<br>}</span></code></pre></pre></body>标准库 fsys.crx 实现了 crx 扩展打包、解包、签名等功能。</html>
+**/
+
+winform.getTemplatePath = function(){
+	return io.fullpath("/template/web/native-msg/") 
+}
+
+winform.show(true);
+win.loopMessage();
+return winform;

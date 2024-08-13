@@ -1,0 +1,15 @@
+'SOLIDWORKS Macro
+Dim swApp As Object 
+
+Sub main()
+
+    Set swApp = Application.SldWorks
+
+    Dim dispObject,num
+    
+    Set dispObject = CreateObject("${COLIBRARY_PATH}.${COCLASS_NAME}") 
+    num = dispObject.Add(1,3) 
+
+    swApp.SendMsgToUser (num)
+ 
+End Sub

@@ -1,0 +1,10 @@
+//将网页转换为图片
+import web.form.snap;
+web.form.snap("https://www.aardio.com","/websnap.png");
+
+//SVG 转 PNG，参数 @4,@5 指定图像大小
+//web.form.snap("https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/whatwg.svg","/websnap.png",,32,32 );
+
+//浏览图像
+import process.imageView;
+process.imageView("/websnap.png");

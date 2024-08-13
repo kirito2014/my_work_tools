@@ -1,0 +1,28 @@
+//声明数组类型
+import console.int;
+
+/*
+aardio 中表和数组是同一数据类型，
+而类似 JSON 需要区分空表（ object ）与空数组（ array ）。
+
+在 aardio 中可以使用 table.array() 创建 JSON 兼容的空数组。
+table.array() 返回的空数组对象会加上元属性 @{_type="array"}用于声明数组类型。
+*/
+
+var array = table.array();
+
+//下面会显示 [] 而不是 {}
+console.dumpJson(array);
+
+/*
+table.isArray() 的检测规则为：
+如果参数不是 table 类型返回 false ；
+参数的 _type 元属性为 "object" 返回 false ；
+参数的 _type 元属性为 "array" 返回 true ；
+参数指定了 length 元属性或 length 属性返回 true ；
+参数对象包含数组成员返回 true ；
+其他情况返回 false 。
+*/
+if(table.isArray(array)){
+	console.log("array 是一个数组")
+}

@@ -1,0 +1,73 @@
+﻿import win.ui;
+/*DSG{{*/
+var winform = win.form(text="${PROJECTNAME}";right=759;bottom=469)
+winform.add(
+edit={cls="edit";left=24;top=15;right=726;bottom=428;edge=1;multiline=1;z=1}
+)
+/*}}*/
+
+//创建浏览器本地消息主机
+import web.nativeMessaging;
+var host = web.nativeMessaging();
+
+//如果不是在浏览器中启动 host 返回 null
+if( !host ){
+    
+	//安装浏览器本地消息主机
+	import web.nativeMessaging.install;
+	
+	//自动生成配置文件,并在注册表中写入此应用
+	var json = web.nativeMessaging.install(
+	
+		//本地应用名,命名规则与变量命名规则类似，只能使用字母数字，可用圆点分隔名称
+		name = "com.my_company.my_application";
+		
+		//这个是描述，其实没什么用
+		description = "My Application";
+		
+		//允许他调用此消息主机的浏览器扩展 ID 数组
+		allowed_origins = {
+			"agnhjnpjidnjcppanhimaidodnbnhhbp";//可以指定扩展 ID
+			"\crx\nativeMessagingTest";//也可以指定解压的扩展目录路径，自动转换为扩展 ID
+			"\crx\nativeMessagingTest.pem";//也可以指定私钥文件，自动转换为扩展 ID
+		}
+	)
+	
+	winform.edit.print("本地应用服务端已注册成功")
+	winform.edit.print(json); 
+}
+else{
+    
+    //在Native Messaging管道中启动,客户端已连交接触发此事件
+	host.onOpen = function(extension,parentWindow){
+		
+    	winform.edit.print("客户端已连接：",extension)
+   
+     	//不能使用 win.setParent()把chrome搞成父窗口，这样chrome会崩溃
+		win.setOwner(winform.hwnd,parentWindow);
+	}
+	
+	//客户端关闭时触发此事件
+	host.onClose = function(){
+		winform.edit.print("客户端已断开，即将退出")
+		win.quitMessage();//必须及时退出
+	}
+	
+	//客户端发了JSON对象过来，注意data是一个经过JSON解析得到的对象，不是JSON字符串
+	host.onMessage = function(data){
+		winform.edit.print("收到数据",data);
+		host.send("这是来自aardio的数据");
+	}
+	
+	//遇到错误了
+	host.onError = function(err){
+		winform.edit.print(err);
+	}
+	
+	//运行消息主机,这个函数只是启动监听线程，不会阻塞
+	host.run();
+}
+
+winform.show() 
+win.loopMessage();
+

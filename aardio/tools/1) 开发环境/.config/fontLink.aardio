@@ -1,0 +1,65 @@
+import win.ui;
+import win.ui.atom;
+/*DSG{{*/
+var winform = win.form(text="配置链接字体";right=759;bottom=492;mode="popup")
+winform.add(
+btnUpdate={cls="button";text="更新链接字体";left=475;top=427;right=698;bottom=487;color=14120960;db=1;dr=1;font=LOGFONT(h=-14);note="注销并重新登录系统后生效";z=5};
+editFontLink={cls="richedit";left=18;top=76;right=743;bottom=399;db=1;dl=1;dr=1;dt=1;edge=1;multiline=1;z=1};
+editFontName={cls="edit";left=146;top=9;right=319;bottom=34;dl=1;dt=1;edge=1;readonly=1;z=4};
+static={cls="static";text="英文字体可在下面指定链接字体（每行一个字体）以设置显示中文的字体：";left=18;top=46;right=601;bottom=70;dl=1;dr=1;dt=1;transparent=1;z=2};
+static2={cls="static";text="当前选定字体：";left=18;top=13;right=146;bottom=28;align="right";dl=1;dt=1;transparent=1;z=3};
+static3={cls="static";text="以上配置中的链接字体文件名必须是『为所有用户安装』（字体文件右键菜单项）的系统字体。";left=19;top=408;right=610;bottom=439;transparent=1;z=6}
+)
+/*}}*/
+
+var atom,hwnd = winform.atom("7CD75897-E664-47BF-9DBD-153A891624C7");
+if(!atom){ 
+	win.quitMessage();	
+	return;
+}
+
+win.setOwner(winform.hwnd,_IDE_FONTLINK_PARENT_HWND);
+if(!#_IDE_FONTLINK_NAME) return win.msgboxErr("请先指定字体名");
+winform.editFontName.text = _IDE_FONTLINK_NAME;
+
+import win.reg;
+var getFontLink = function(fontName){
+	return ..win.reg.query("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontLink\SystemLink",fontName);
+}
+
+var setFontLink = function(fontName,v){
+	
+	var r = ..win.reg("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontLink\SystemLink")
+	if(!#v){
+   		r.delValue(fontName)
+	}
+	else {
+   		if(type.isString(v)){
+   			v = ..string.splitEx(v);
+   		}
+   		
+   		r.setMultiSzValue(fontName,v);
+	}
+	
+	r.close();
+}
+
+var ftLinks = getFontLink(winform.editFontName.text) || { 
+	"MSYH.TTC,Microsoft YaHei UI,128,96";
+	"MSYH.TTC,Microsoft YaHei UI"; 
+} 
+winform.editFontLink.text = string.join(ftLinks,'\n');
+
+
+winform.btnUpdate.oncommand = function(id,event){
+	var fontName = winform.editFontName.text;
+    if(!#fontName) return winform.msgboxErr("请先指定字体名");
+
+    setFontLink(fontName,winform.editFontLink.text);
+    setFontLink(_IDE_FONTLINK_FULLNAME,winform.editFontLink.text);
+    
+    winform.msgbox("已更新链接字体，注销并重新登录系统后生效。");
+}
+
+winform.show();
+win.loopMessage();

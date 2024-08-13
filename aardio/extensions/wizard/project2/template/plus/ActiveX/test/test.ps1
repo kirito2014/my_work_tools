@@ -1,0 +1,1 @@
+(New-Object -ComObject ${COLIBRARY_PATH}.${COCLASS_NAME}).Add(12,3)

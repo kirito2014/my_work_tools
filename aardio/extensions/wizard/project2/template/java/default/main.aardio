@@ -1,0 +1,33 @@
+import win.ui;
+/*DSG{{*/
+mainForm = win.form(text="${PROJECTNAME}";right=959;bottom=591)
+mainForm.add()
+/*}}*/
+
+import java; 
+
+//自定义 JRE 路径
+//java.path.setJreHome("/Java/JRE")
+
+//可导入 java.jre 目录下的库配置 JRE 版本 
+//import java.jre.v8; //调用 OpenJDK JRE v8，找不到会自动安装。
+
+/*
+调用 64位 Java 请改用 java.popenProcess() ，
+注意 64位 Java 不能将 JRE 打包到独立 EXE 内 。
+如果实际不需要 64 位，盲目追求 64位 是无意义的。
+*/
+var jvm = java();
+
+//加载 Java 类
+var HelloworldApp = jvm.import("aardio.sample.HelloworldApp");
+
+//用 Java 类创建 Java 对象
+var helloworld = HelloworldApp();
+
+//直接调用 Java 对象的方法 
+var result = helloworld.test(3); 
+mainForm.msgbox( result,"Java 函数返回值" );
+
+mainForm.show();
+return win.loopMessage();

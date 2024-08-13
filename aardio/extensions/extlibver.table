@@ -1,0 +1,9 @@
+{
+["py3.lib.matplotlib"]={version="3.5.1.3"};
+["py3.lib.tkinter"]={version="3.8.10.1"};
+["py3.lib.PIL"]={version="9.0.1.1"};
+["py3.lib.numpy"]={version="1.22.2.1"};
+["py3.10"]={version="3.10.1.21"};
+py3={version="3.8.10.21"};
+["win.ui.glass"]={version="1.0.0.5"}
+}

@@ -1,0 +1,33 @@
+//截图
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="请在打开网页，请稍候 ……";right=759;bottom=469;bgcolor=16777215)
+winform.add()
+/*}}*/
+
+import web.view;
+var wb = web.view(winform); 
+winform.show();
+ 
+//调用 DevTools 方法，并等待返回结果，失败返回 null
+wb.cdp("Page.navigate", {
+	url = "https://chromedevtools.github.io/devtools-protocol"
+});
+
+wb.wait("chromedevtools");
+winform.text = "web.view - 调用 Chrome DevTools Protocol 方法"
+
+//调用 DevTools 方法，并等待返回结果，失败返回 null
+var result  = wb.cdp("Page.captureScreenshot");
+
+if(result[["data"]]){
+	import crypt;
+	var bin = crypt.decodeBin(result[["data"]]);
+    string.save("/screenshot.png",bin )
+       
+    import process.imageView;
+    process.imageView("/screenshot.png"); 
+}
+
+winform.show();
+win.loopMessage();

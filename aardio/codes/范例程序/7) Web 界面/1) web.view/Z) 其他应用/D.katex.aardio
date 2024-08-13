@@ -1,0 +1,33 @@
+//KaTeX 公式
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="KaTex")
+winform.add()
+/*}}*/
+
+/*
+KaTeX 支持 web.view,web.sysView,web.form(Win10/Win11),web.kit
+*/
+import web.view; 
+var wb = web.view(winform);
+
+wb.html = /**
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" /> 
+	<link rel="stylesheet" href="https://lib.baomitu.com/KaTeX/latest/katex.min.css">
+	<script src="https://lib.baomitu.com/KaTeX/latest/katex.min.js"></script>
+</head>
+<body>  
+
+<script> 
+katex.render("c = \\pm\\sqrt{a^2 + b^2}", document.body, {
+    throwOnError: false
+});
+</script> 
+</body> 
+**/
+
+winform.show();
+win.loopMessage();

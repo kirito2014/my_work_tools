@@ -1,0 +1,51 @@
+import win.ui;
+import win.ui.glass;
+import win.ui.css;
+import win.ui.simpleWindow;
+import win.ui.shadow;
+import win.dlg.message;
+/*DSG{{*/
+
+
+var winform = win.form(text="aardio form";right=319;bottom=301;bgcolor=15793151;border="none";max=false;min=false)
+winform.add(
+plus={cls="plus";left=103;top=56;right=301;bottom=85;font=LOGFONT(h=-16);z=2};
+plus2={cls="plus";left=103;top=110;right=301;bottom=139;font=LOGFONT(h=-16);z=4};
+plus3={cls="plus";text="登录";left=52;top=210;right=144;bottom=244;font=LOGFONT(h=-16);notify=1;z=5};
+plus4={cls="plus";text="取消";left=184;top=210;right=276;bottom=244;font=LOGFONT(h=-16);notify=1;z=6};
+static={cls="static";text="用户名：";left=14;top=56;right=93;bottom=79;align="right";color=16777215;font=LOGFONT(h=-16);transparent=1;z=1};
+static2={cls="static";text="密码：";left=14;top=110;right=93;bottom=133;align="right";color=16777215;font=LOGFONT(h=-16);transparent=1;z=3}
+)
+/*}}*/
+
+css = win.ui.css()
+css.textbox(winform.plus)
+css.textbox(winform.plus2)
+
+winform.plus3.skin(css.success)
+winform.plus4.skin(css.danger)
+
+//无边框玻璃窗口
+
+winform.plus4.oncommand = function(id,event){
+    winform.close()
+}
+
+winform.plus3.oncommand = function(id,event){
+    var user = winform.plus.text
+    var pass = winform.plus2.text
+    if (user = "admin" and pass = "123456") {
+        winform.msgSmile("登录成功！")
+    }
+    else {
+        winform.msgErr("用户名或密码错误!")
+    }
+
+}
+
+win.ui.glass(winform)
+win.ui.simpleWindow(winform)
+win.ui.shadow(winform).transparent(0.1)
+
+winform.show();
+win.loopMessage(); 

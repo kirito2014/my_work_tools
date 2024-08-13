@@ -1,0 +1,37 @@
+//自动完成1
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="自动完成( 调用百度接口 )";right=600;bottom=400)
+winform.add(
+combobox={cls="combobox";left=176;top=136;right=384;bottom=160;edge=1;items={};mode="dropdown";z=1}
+)
+/*}}*/
+
+import win.debounce;
+import web.rest.jsonLiteClient;
+var http = web.rest.jsonLiteClient();
+var suggestion = http.api("http://suggestion.baidu.com/su?cb=&wd={0}") //{0}会替换为请求关键字并以UTF8编码
+
+//编辑文本时触发
+winform.combobox.onEditChange  = win.debounce(function(){
+    var result = suggestion[ winform.combobox.text ].get();
+    winform.combobox.autoComplete(result.s,1) //更新下拉列表	
+},300)
+
+//在下拉列表上用方向键移动选项，或单击回车确认同时变更选项触发
+winform.combobox.onListChange = function(){ 
+	
+}
+
+//用在下拉列表上单击、回车触认选项时触发（即使选项没有变更）
+winform.combobox.onOk = function(){ 
+	
+}
+
+//取消选择，例如直接点击其他控件，或直接按ESC键，直接关闭窗口等等
+winform.combobox.onCancel = function(){ 
+ 
+}
+
+winform.show() 
+win.loopMessage();

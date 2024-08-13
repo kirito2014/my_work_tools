@@ -1,0 +1,207 @@
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="aardio + bat";right=759;bottom=469;parent=...)
+winform.add()
+/*}}*/
+
+import web.form;
+var wb = web.form( winform,5/*_UIFLAG_DIALOG*/|4/*_UIFLAG_NO3DBORDER*/ | 8/*_UIFLAG_SCROLL_NO*/);
+wb.noScriptErr = true;
+
+wb.html = /** 
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />  
+    <title>批处理</title> 
+	<style>body { font-family: "Segoe UI", sans-serif;  }</style>
+</head>
+<body style="white-space:pre;font-size:12pt;word-wrap: break-word;word-break: normal;overflow:hidden">
+ActiveX EXE 用于创建进程外 COM 控件。
+可在其他支持 COM 控件的编程环境嵌入、调用 aardio 编写的 ActiveX 控件。
+
+请在下面输入 COM 控件类名（ProgID）：
+<input type="text" value="aardioTestControl.Sample" size="50" id="progId">
+
+COM 控件类库：
+<span id="libPath">/lib/aardioTestControl/Sample.aardio</span>
+
+只要在 aardio 用户类库 <span id="libName">aardioTestControl.Sample</span> 中
+简单地添加接口函数就可以，没有任何复杂步骤。
+
+使用向导生成的默认 COM 类型库（typelib）就可以。
+不需要学习复杂的 ODL 语法。
+
+双击运行发布后的 EXE 可自动注册、卸载 COM 控件。
+<script> 
+	if(typeof String.prototype.trim !== 'function') {
+  		String.prototype.trim = function() {
+    		return this.replace(/^\s+|\s+$/g, ''); 
+  		}
+	}
+	
+ 	window.onload = function() {
+            var input = document.getElementById('progId');
+            var libPath = document.getElementById('libPath');
+            var libName = document.getElementById('libName');
+
+            var onInputChange = function() {
+                var value = input.value.trim();
+                var isValid = validateInput(value);
+                
+                if (isValid) {
+                    libPath.innerHTML = value;
+                    libPath.style.textDecoration = 'none';
+                    libPath.style.color = 'green';
+                    libName.innerHTML = value.substring(value.lastIndexOf('.') + 1);
+                    libName.style.textDecoration = 'none';
+                    libName.style.color = 'green';
+                } else {
+                    libPath.innerHTML = value + "<br>只能包含字母与数字，并以 . 号分隔库名与类名";
+                    libPath.style.textDecoration = 'line-through';
+                    libPath.style.color = 'red';
+                    libName.innerHTML = '';
+                }
+            };
+
+            if (input.attachEvent) {    
+                input.attachEvent('onkeyup', onInputChange);    
+            } else {    
+                input.addEventListener('input', onInputChange, false);      
+            }
+
+            function validateInput(value) {
+                // 正则表达式验证格式：只能包含字母、数字以及一个 "."，且必须以字母或数字开头
+                var regex = /^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)+$/;
+                return regex.test(value);
+            }
+        }
+    </script>
+**/
+ 
+winform.getTemplatePath = function(){
+	return io.fullpath("/template/plus/ActiveX/") 
+}
+
+import win.guid;
+winform.onProjectCreated = function(projectDir,pathMain){
+	var progId = wb.getEle("progId").value;
+	var libName,className = string.match(progId,"(\w+)\.(\w+)");
+	if(!libName) libName = "aardioTestControl";
+	if(!className) className = "aardioTestControl";
+	
+	var idl = /******************************
+?>import "aardio.idl";
+
+[
+uuid(<? = tostring(win.guid.create()) ?>),
+version(1.0)
+]
+library <? = owner.libName ?> {
+
+	importlib("stdole32.tlb"); 
+	
+	
+	[ uuid(<? = tostring(win.guid.create()) ?>) ]
+	dispinterface  IDispatchExecutableWithEvent  { 
+	
+		properties:
+		methods: 
+			/*
+			VB 不支持后期绑定事件接口，
+			可将下面的 IDispatchExecutableEvent 换为 IDispatchExecutableWithEvent 。
+			并在下面明确添加接口函数。
+			
+			如果不会写，可将 IDispatchExecutableWithEvent 发给 ChatGPT 或 Copilot 写，
+			详细说明要添加的函数参数类型就可以。
+			
+			注意下面的 id（DISPID） 不要小于等于 0 也不要大于 10000。
+			*/
+			[ id(10) ]
+			void onHello( [in] BSTR str );
+	
+	};
+	
+	[ uuid(<? = tostring(win.guid.create()) ?>) ]
+	dispinterface IDispatch<? = owner.className ?>Sample { 
+		properties:
+		methods:  
+			/*
+			输出参数必须是声明为 [in,out] VARIANT * paramName，
+			并在实现接口的 aardio 函数的返回值列表中增加对应的输出参数。 
+			*/
+			[ id(10) ]
+			void TestOutParams( [in] BSTR str,[in,out] VARIANT *out1,[in,out] VARIANT *out2);
+
+			//dispinterface 接口不能继承，有需要可以到 /.build/aardio.idl 中复制 IDispatchExecutable 的定义。
+	
+	};
+	
+	[ uuid(<? = tostring(win.guid.create()) ?>),control ]
+	coclass <? = owner.className ?> {
+		
+		//默认接口
+		[default] dispinterface IDispatchExecutable;
+		
+		//默认事件源接口
+		[default,source] dispinterface IDispatchExecutableEvent;
+	}; 
+};
+******************************/
+
+	var idl = string.loadcode(idl,{
+		libName = libName;
+		className = className
+	})
+	
+	string.save(io.joinpath(projectDir,"/typelib/typelib.odl"),..string.crlf(idl) );
+	
+	var path = io.joinpath(projectDir,"\lib\aardioTestControl\Sample.aardio");
+	fsys.replace(path,"@${COLIBRARY_PATH}",libName);
+	fsys.replace(path,"@${COCLASS_NAME}",className);
+	fsys.rename(path,fsys.path.replaceFile(path,className + ".aardio"));
+	
+	var path = io.joinpath(projectDir,"\lib\aardioTestControl\SampleForm.aardio");
+	fsys.replace(path,"@${COLIBRARY_PATH}",libName);
+	fsys.replace(path,"@${COCLASS_NAME}",className);
+	fsys.rename(path,fsys.path.replaceFile(path,className + "Form.aardio"));
+	
+	var path = io.joinpath(projectDir,"\lib\aardioTestControl");
+	fsys.rename(path,fsys.path.replaceFile(path,libName));
+	
+	var path = io.joinpath(projectDir,"\test\test.aardio");
+	fsys.replace(path,"@${COLIBRARY_PATH}",libName);
+	fsys.replace(path,"@${COCLASS_NAME}",className);
+	
+	var path = io.joinpath(projectDir,"\test\test.vbs");
+	fsys.replace(path,"@${COLIBRARY_PATH}",libName);
+	fsys.replace(path,"@${COCLASS_NAME}",className);
+	
+	var path = io.joinpath(projectDir,"\test\test.ps1");
+	fsys.replace(path,"@${COLIBRARY_PATH}",libName);
+	fsys.replace(path,"@${COCLASS_NAME}",className);
+	
+	var path = io.joinpath(projectDir,"\test\test.lsp");
+	fsys.replace(path,"@${COLIBRARY_PATH}",libName);
+	fsys.replace(path,"@${COCLASS_NAME}",className);
+
+	var path = io.joinpath(projectDir,"\test\net.aardio");
+	fsys.replace(path,"@${COLIBRARY_PATH}",libName);
+	fsys.replace(path,"@${COCLASS_NAME}",className);
+	
+	var path = io.joinpath(projectDir,"\test\vba.swb");
+	fsys.replace(path,"@${COLIBRARY_PATH}",libName);
+	fsys.replace(path,"@${COCLASS_NAME}",className);
+
+	var path = io.joinpath(projectDir,"\test\matlab.m");
+	fsys.replace(path,"@${COLIBRARY_PATH}",libName);
+	fsys.replace(path,"@${COCLASS_NAME}",className);
+	
+	fsys.replace(pathMain,"@${COLIBRARY_PATH}",libName);
+	fsys.replace(pathMain,"@${COCLASS_NAME}",className);
+}
+
+winform.show(true);
+win.loopMessage();
+return winform;

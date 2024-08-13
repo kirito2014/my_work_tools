@@ -1,0 +1,6 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project ver="10" name="nativeMessaging" libEmbed="true" icon="..." ui="win" output="nativeMessaging.exe" CompanyName="aardio" FileDescription="nativeMessaging" LegalCopyright="Copyright (C) aardio 2024" ProductName="nativeMessaging" InternalName="nativeMessaging" FileVersion="0.0.0.0" ProductVersion="0.0.0.0" publishDir="\dist\" dstrip="false" local="false" ignored="false">
+	<file name="main.aardio" path="main.aardio" comment="启动程序代码"/>
+	<folder name="资源文件" path="res" embed="true"/>
+	<folder name="浏览器扩展" path="crx" embed="false" comment="目录" local="true" ignored="false"/>
+</project>

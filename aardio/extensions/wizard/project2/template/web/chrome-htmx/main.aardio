@@ -1,0 +1,12 @@
+import chrome.app;
+var theApp  = chrome.app(); 
+
+import fsys.dlg;
+theApp.external = {
+	getFile = function(){
+		return fsys.dlg.open();
+	} 
+}
+ 
+theApp.start("\web\index.html"); 
+win.loopMessage();

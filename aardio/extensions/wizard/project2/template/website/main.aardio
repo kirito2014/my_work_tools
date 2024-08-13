@@ -1,0 +1,56 @@
+
+if( !request ){  
+	loadcodex("\server\httpServer.aardio"); 
+	return;
+}
+
+?>
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />  
+    <title>Web服务器 wsock.tcp.simpleHttpServer</title>
+    <script src="/res/js/htmx.js"></script>
+    <link rel="stylesheet" href="/res/css/index.css">
+</head>
+<body style="font-size:14px;word-wrap: break-word;word-break: normal;">
+<br>
+<button hx-get="/api/help.aardio" 
+    hx-swap="innerHTML" 
+    hx-trigger="click" 
+    hx-target="#htmx-info .content"  
+    hx-vals='javascript:{q: "\
+    有以下几种方法指定请求参数：\
+    1、在这里直接指定 JSON 作为请求参数。\
+    2、使用 javascript: 返回一个 JS 对象作为请求参数。\
+    3、如果当前节点是 input，则 name 指定参数名。\
+    4、如果当前节点是 form ，则表单内部所有控件的数据作为请求参数。"}'  
+    hx-indicator="#htmx-info" style="text-align:left" >点这里调用 
+    <a href="https://mp.weixin.qq.com/s/UTiu5gXJ7j-hKnewhhF5sA" target="_blank" style="color:#fff">htmx</a> 
+    向服务端 API<br> "/api/help.aardio" 发送 GET 请求。<br>
+获取并显示《 aardio 模板语法 》
+</button><br>
+<!-- 
+    上面的 hx-indicator="#htmx-info" 用 CSS 选择器指定了提交时显示进度的节点，
+    在提交时 html 会自动为 hx-indicator 加上 "htmx-request" 的 CSS 类名。 
+    至于怎么显示内容或进度条，请可以在 CSS 里自由控制了。
+    
+    注意 aardio 后端是多线程的，执行耗时操作不会阻塞网页前端。
+-->
+
+<div id="htmx-info">
+<img class="indicator" src="/res/images/loading.gif"/>
+<div class="content">
+	<a href='http://bbs.aardio.com/forum.php?mod=viewthread&tid=13210&from=portal' target="_blank">aardio 网站开发、FastCGI 开发入门教程</a> 
+	<br><br>
+	在 aardio 中调用 wsock.tcp.simpleHttpServer 或 wsock.tcp.asynHttpServer <br>
+	用几句代码就可以创建一个Web 服务器，并且网站编程接口与 FastCGI 应用完全兼容。<br>
+	<br>
+	
+	同一套 aardio 网站代码可以跑在 aardio 自带 HTTP 服务器里，<br>
+	也可以运行于 IIS 这样的 Web 服务器环境。<br>
+</div>
+</div> 
+</body>
+</html>

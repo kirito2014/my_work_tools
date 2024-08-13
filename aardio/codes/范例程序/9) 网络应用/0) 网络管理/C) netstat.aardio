@@ -1,0 +1,9 @@
+//端口状态
+import console.int;
+import inet.stat;
+
+//列出 UDP 连接
+console.dump(inet.stat().udp)
+
+//列出 80 端口的 TCP 连接
+console.dump(inet.stat(80).tcp)

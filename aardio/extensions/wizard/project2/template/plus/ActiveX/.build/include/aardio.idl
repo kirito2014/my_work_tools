@@ -1,0 +1,42 @@
+import "oaidl.idl";
+import "ocidl.idl";
+
+[ 
+    uuid(D093780C-940E-444B-98BC-650229665F1B) 
+]
+dispinterface IDispatchExecutableEvent {
+    properties:  
+    methods:  
+}
+
+[ 
+  uuid(63DE8232-0FFB-4907-A9BD-10D76F74451E)  
+]
+dispinterface  IDispatchExecutable  { 
+
+    properties:
+    methods: 
+        [id(DISPID_VALUE), propget]
+        VARIANT Item([in] VARIANT key);
+
+        [id(DISPID_VALUE), propput]
+        void Item([in] VARIANT key,[in] VARIANT value);
+
+        [ id(10) ]
+        void Quit( void );
+    
+        [id(11)]
+        VARIANT Invoke( [in] BSTR methodName,[in, optional] VARIANT arg1,[in, optional] VARIANT arg2,[in, optional] VARIANT arg3,[in, optional] VARIANT arg4,[in, optional] VARIANT arg5,[in, optional] VARIANT arg6,[in, optional] VARIANT arg7,[in, optional] VARIANT arg8,[in, optional] VARIANT arg9,[in, optional] VARIANT arg10,[in, optional] VARIANT arg11,[in, optional] VARIANT arg12,[in, optional] VARIANT arg13,[in, optional] VARIANT arg14,[in, optional] VARIANT arg15,[in, optional] VARIANT arg16,[in, optional] VARIANT arg17,[in, optional] VARIANT arg18,[in, optional] VARIANT arg19,[in, optional] VARIANT arg20,[in, optional] VARIANT arg21,[in, optional] VARIANT arg22,[in, optional] VARIANT arg23,[in, optional] VARIANT arg24,[in, optional] VARIANT arg25,[in, optional] VARIANT arg26,[in, optional] VARIANT arg27,[in, optional] VARIANT arg28,[in, optional] VARIANT arg29,[in, optional] VARIANT arg30 );
+    
+        [id(12)]
+        VARIANT GetAttr(  [in] BSTR attributeName );
+    
+        [id(13)]
+        void SetAttr(  [in] BSTR attributeName,   [in] VARIANT value  );
+    
+        [id(14)]
+        VARIANT GetItem(  [in] VARIANT index );
+    
+        [id(15)]
+        void SetItem(   [in] VARIANT index,  [in] VARIANT value  );
+};

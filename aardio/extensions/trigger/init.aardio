@@ -1,0 +1,80 @@
+//IDE初始化触发器
+/*
+- 不得修改此触发器。
+- 禁止利用 aardio.exe 运行来源不明的第三方代码。
+
+- 非法修改此触发器如果导致任何严重后果责任自负。
+- 修改此触发器会导致所有 IDE 接口与插件失效。
+- aardio 后续版本将移除此触发器。
+
+- 修改此触发器是不必要的，所有 IDE 接口都是跨进程通信。
+- 修改此触发器是多余的，aardio 可以完美支持进程外插件。
+- 一个漂亮的浮动工具条更好用，自由度也更大。
+*/
+
+import win;
+import ide;
+import ide.command;
+
+ide.command.join( ide.processGroup() );
+var command = ide.command();
+command.dispatchIdeCommand = function( method,...) {
+	return ide[method](...);
+}
+
+thread.invoke( 
+	function(){
+		import win.version;
+		import web.rest.jsonClient;	
+		import ide;
+		import ide.command;
+		ide.command.join( ide.processGroup() );
+		
+		sleep(500);
+		
+		import fsys;
+		fsys.enum( "~/", "*.dll",
+			function(dir,filename,fullpath,findData){ 
+				if(filename){ 
+					import win;
+					import winex;
+					var hIde = ide.getMainHwnd();
+					
+					//篡改 aardio 开发环境并在网络上传播者一切后果自负。
+					win.msgboxErr('aardio 根目录检测到非法的第三方 DLL 文件。IDE 即将退出！',,hIde);
+					winex.close(hIde);
+				}
+			},false
+		);
+
+		sleep(1000);
+		
+		var cfgVersion = ide.getConfig("version");
+		var http = web.rest.jsonClient("aardio/v" + _AARDIO_VERSION + "(IDE "  + cfgVersion + "," + win.version.name + ")");
+		var versionInfo = http.get("http://api.aardio.com/v10.update/");
+		if( ! versionInfo ) return;
+		
+		if(  ( cfgVersion != versionInfo.version )  && ( ide.getConfig("ignore_update") != versionInfo.version)  ){  
+			import fsys.version;
+			if( fsys.version(cfgVersion ) >= fsys.version( versionInfo.version ) ){
+				return;
+			}
+		
+			ide.startpage();
+			import thread.event;
+			var event = thread.event( ide.processGroup(".startPage") ) 
+			if( !event.conflict ){
+				event.waitOne();
+			}
+		
+			ide.command.post("onUpdateAvailable",versionInfo.version );
+		} 
+	}
+)
+
+import win.reg;
+var reg = win.reg("HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\aardio.exe");
+reg.setSzValue("",..io._exepath);
+reg.close();
+
+win.loopMessage();

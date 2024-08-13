@@ -1,0 +1,19 @@
+//获取选区文本
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="当前焦点窗口选区文本";left=-2;right=448;bottom=354)
+winform.add(
+edit={cls="richedit";left=11;top=11;right=436;bottom=340;db=1;dl=1;dr=1;dt=1;edge=1;multiline=1;z=1}
+)
+/*}}*/
+
+import winex.selection;
+winform.setInterval( 
+	function(){
+		winform.edit.text = winex.selection.get(true);
+	},900
+)
+
+winform.transparent(188);
+win.setTopmost(winform.hwnd); 
+win.loopMessage();

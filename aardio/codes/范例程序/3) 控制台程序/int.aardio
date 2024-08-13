@@ -1,0 +1,17 @@
+//拦截 Ctrl + C
+import console.int;
+
+//拦截 Ctrl + C 等中断信号
+var ctrlHandle = console.int();
+
+ctrlHandle.run(
+	function(){
+		sleep(1000);
+		console.log(time(),"按 Ctrl + C 退出！")
+	}	
+)
+
+/*
+导入 console.int 以后，
+线程退出时，如果控制台已打开会自动调用 console.pause()
+*/

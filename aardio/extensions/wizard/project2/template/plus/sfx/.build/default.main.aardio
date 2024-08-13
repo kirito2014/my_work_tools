@@ -1,0 +1,23 @@
+import fsys.dlg.dir;
+import sevenZip.cmd; 
+
+import ide;
+import ide.upx;
+ide.upx.compress( ide.getPublishPath() ); //首先调用upx压缩EXE
+
+/*
+var dir = fsys.dlg.dir(,ide.getMainHwnd(),"请选择要压缩到EXE中的目录");
+if(!dir){
+	return;
+}
+*/
+var dir = io.joinpath( ide.getProjectDir(),"/sfx/");
+ 
+import console;
+console.showLoading(" 正在压缩，请耐心等待。");
+sevenZip.cmd.compress(
+	dir
+    ,ide.getPublishPath() , console.log
+    ) 
+   
+console.log("压缩完成") 

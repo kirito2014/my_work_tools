@@ -1,0 +1,39 @@
+﻿import dotNet.v4;
+var compiler = dotNet.createCompiler("C#");
+compiler.Reference(
+	"System.Core.dll","Microsoft.CSharp.dll"
+);
+
+compiler.Source = /****** 
+using System; 
+using System.Dynamic;
+
+namespace CSharpLibrary  
+{    
+    public class Util  
+    {    
+        public static object Test(){
+            
+            var typeSample = Type.GetTypeFromProgID("${COLIBRARY_PATH}.${COCLASS_NAME}");
+            
+            dynamic obj = Activator.CreateInstance(typeSample);
+			
+			int c = obj.Add(12,3);
+			
+			obj.Quit();
+			
+			return c;
+        } 
+    }   
+} 
+******/
+
+//自程序集导入名字空间  
+compiler.import("CSharpLibrary");  
+ 
+//调用实时编译的 C# 函数
+var ret = CSharpLibrary.Util.Test();
+ 
+import console; 
+console.dumpJson( ret );
+console.pause();

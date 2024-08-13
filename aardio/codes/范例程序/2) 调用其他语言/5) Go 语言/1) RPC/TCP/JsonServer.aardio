@@ -1,0 +1,43 @@
+//服务端
+import golang;
+var go = golang();//创建 Go 编译器（ 仅仅调用编译后的 EXE 不需要 ）
+ 
+//Go 与 aardio 一样，源码与字符串默认为 UTF-8 编码
+go.main = /********** 
+package main
+
+import (
+	"net/rpc" 
+	"aardio/jsonrpc/tcp" //源码："~\lib\golang\.res\aardio\jsonrpc\tcp\tcp.go"
+)
+
+type Args struct {
+    X, Y int
+}
+
+type Calculator struct{}
+
+func (t *Calculator) Add(args *Args, reply *int) error {
+    *reply = args.X + args.Y
+    return nil
+}
+
+func (t *Calculator) Exit(args *int, reply *int) error { 
+    return nil
+}
+
+func main() {
+	server := rpc.NewServer() 
+    server.Register( new(Calculator) )  
+
+	//运行 RPC 服务端
+    jsonrpc.Run(server)
+}
+**********/
+
+//上面的 go.main 会自动保存到文件，然后编译 Go 源码生成同名 EXE 文件
+go.build("/goRpc.go");
+
+//判断是否单独运行此示例
+if(...) console.close();
+else console.pause();

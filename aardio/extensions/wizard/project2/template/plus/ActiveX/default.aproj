@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project ver="10" name="创建 ActiveX EXE" libEmbed="true" icon="..." CompanyName="单位名称" FileDescription="aardioCOM" LegalCopyright="Copyright (C) 作者 2011" ProductName="aardioCOM" InternalName="aardioCOM" FileVersion="0.0.1.23" ProductVersion="0.0.1.23" publishDir="/dist/" ui="win" output="ActiveX.exe" dstrip="false" local="false">
+	<file name="main.aardio" path="main.aardio"/>
+	<folder name="测试代码" path="test" embed="false" local="false" ignored="true">
+		<file name="aardio" path="test\test.aardio" comment="test\test.aardio"/>
+		<file name="C#" path="test\net.aardio" comment="test\net.aardio"/>
+		<file name="AutoLisp" path="test\test.lsp" comment="test\test.lsp"/>
+		<file name="PowerShell" path="test\test.ps1" comment="test\test.ps1"/>
+		<file name="VBScript" path="test\test.vbs" comment="test\test.vbs"/>
+		<file name="SOLIDWORKS(VBA)" path="test\vba.swb" comment="test\vba.swb"/>
+		<file name="MATLAB" path="test\matlab.m" comment="test\matlab.m"/>
+	</folder>
+	<folder name="COM 类型库" path="typelib" embed="true" local="false" ignored="false">
+		<file name="语法说明" path="typelib\ODL 语法说明.html" comment="ODL 语法说明"/>
+		<file name="类型声明" path="typelib\typelib.odl" comment="ODL 接口描述文件"/>
+		<file name="类型库" path="typelib\typelib.tlb" comment="发布时自动编译的 TLB 类型库"/>
+	</folder>
+</project>

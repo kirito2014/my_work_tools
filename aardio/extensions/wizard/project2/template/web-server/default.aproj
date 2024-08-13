@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project ver="10" name="请修改工程名称" libEmbed="true" icon="..." ui="win" output="请修改文件名.exe" CompanyName="单位名称" FileDescription="附加说明......" LegalCopyright="Copyright (C) 作者 2011" ProductName="产品名称" InternalName="内部名称" FileVersion="0.0.1.001" ProductVersion="0.0.1.001" publishDir="/dist/" dstrip="false">
+	<file name="main.aardio" path="main.aardio" comment="main.aardio"/>
+	<folder name="资源文件" path="res" embed="true"/>
+	<folder name="窗体文件" path="dlg" comment="目录" embed="true">
+		<folder name="登录" path="dlg\login" comment="目录" embed="false">
+			<file name="loading.aardio" path="dlg\login\loading.aardio" comment="dlg\login\loading.aardio"/>
+			<file name="login.aardio" path="dlg\login\login.aardio" comment="dlg\login\login.aardio"/>
+			<file name="reg.aardio" path="dlg\login\reg.aardio" comment="dlg\login\reg.aardio"/>
+		</folder>
+		<folder name="主窗口文件" path="dlg\main" comment="目录" embed="false">
+			<file name="userInfo.aardio" path="dlg\main\userInfo.aardio" comment="dlg\main\userInfo.aardio"/>
+			<file name="tabs1.aardio" path="dlg\main\tabs1.aardio" comment="dlg\main\tabs1.aardio"/>
+			<file name="tabs2.aardio" path="dlg\main\tabs2.aardio" comment="dlg\main\tabs2.aardio"/>
+			<file name="tabs3.aardio" path="dlg\main\tabs3.aardio" comment="dlg\main\tabs3.aardio"/>
+		</folder>
+	</folder>
+</project>

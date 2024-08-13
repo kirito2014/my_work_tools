@@ -1,0 +1,41 @@
+﻿import win.ui;
+/*DSG{{*/
+mainForm = win.form(text="${PROJECTNAME}";right=615;bottom=249;border="dialog frame";exmode="none";max=false;min=false;mode="popup")
+mainForm.add(
+editLog={cls="edit";left=243;top=21;right=596;bottom=225;autohscroll=false;db=1;dl=1;dr=1;dt=1;edge=1;multiline=1;vscroll=1;z=2};
+pie={cls="plus";text="100%";left=-19;top=-8;right=265;bottom=254;background="\res\pie-bg.png";clipBk=false;color=16777215;db=1;dl=1;dt=1;font=LOGFONT(h=-24);foreRepeat="center";foreground="\res\pie.png";repeat="center";z=1}
+)
+/*}}*/
+
+//设置扇形进度条范围
+mainForm.pie.setPieRange(1,100);
+mainForm.show() 
+
+import sevenZip.decoder2;
+var archive = sevenZip.decoder2();
+archive.open( io._exepath ) 
+
+//输出正在解压的文件名
+archive.extractPrepareOperation = function(askExtractMode,itemIndex,filepath,isDir){
+	mainForm.editLog.print(filepath);
+}
+
+//设置解压进度
+archive.extractSetCompleted = function(lowSize,hiSize,percent){
+	if(percent >=100) percent = 99;//可能还剩几个文件
+	
+	mainForm.pie.text = percent + "%";
+	mainForm.pie.progressPercentage = percent;
+	win.peekPumpInputMessage();
+}
+
+//发布后才能解压，可在参数中指定解压目录，“/” 为应用程序根目录
+if(!_STUDIO_INVOKED) archive.extract( "/");
+
+mainForm.pie.text = "100%";
+mainForm.pie.progressPercentage = 100;
+mainForm.editLog.print("已完成");
+thread.delay(1000);
+
+//不想自动关闭，取消下面的注释
+//win.loopMessage();

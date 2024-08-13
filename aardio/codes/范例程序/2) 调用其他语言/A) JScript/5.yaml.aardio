@@ -1,0 +1,30 @@
+//YAML 解析
+import console;
+import web.script.yaml;
+
+//局部变量 yaml 指向 web.script.yaml 名字空间
+var yaml = web.script.yaml;
+
+/*
+YAML 快速入门
+https://quickref.me/zh-CN/docs/yaml.html
+https://learnxinyminutes.com/docs/zh-cn/yaml-cn
+*/
+var yamlText = /*
+YAML: YAML Ain't Markup Language™
+
+What It Is:
+  YAML is a human-friendly data serialization language.
+
+*/
+
+//解析 YAML 格式文本L，读取多文档 YAM。
+var object = yaml.loadAll(yamlText)
+
+//将 aardio 对象转换为 YAML 字符串。
+var yamlText = yaml.dump(object);
+
+//在控制台以 JSON 格式显示对象
+console.dumpJson(object); 
+
+console.pause();

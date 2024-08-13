@@ -1,0 +1,62 @@
+ 
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="工程向导 - winform";right=1031;bottom=712;bgcolor=16777215;border="dialog frame")
+winform.add()
+/*}}*/
+
+import web.form; 
+var wb = web.form( winform );
+wb.html = /**
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8"> 
+     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<script>
+	window.webProject = "app"
+	onClickVersion = function(radio){  
+		window.webProject = radio.value;
+	}
+	</script>
+</head>
+<body style="margin:15px 5px">
+请选择前端项目：<label><input type="radio" name="webProject" value="app" checked onclick="onClickVersion(this)">React</label> 
+<label><input type="radio" name="webProject" value="vue" onclick="onClickVersion(this)">Vue</label> 
+<label><input type="radio" name="webProject" value="htmx" onclick="onClickVersion(this)">htmx</label> 
+<br><br>
+
+调用系统自带的 Chrome 或 Edge 浏览器创建应用程序。<br>
+兼容 Chrome 启动参数的 Chromium 内核浏览器（例如 Edge）。 <br>
+如果没有找到可用的浏览器会下载安装 Edge(Chromium)<br><br>
+
+不需要携带巨大的运行库，在网页 JS 中可以方便地调用本地系统函数，访问本地文件。<br>
+
+<br>
+创建 React，Vue 工程请请先安装 Node.js,VS Code 等前端开发环境。<br>
+<br>
+在网页上点『右键菜单 &gt; 检查』可以打开网页开发工具（ DevTools ），<br>
+在开发工具的「设置 / 语言」界面可切换开发工具的界面语言。<br>
+在 DevTools 控制台可查看程序错误信息。 
+</body>
+</html>
+**/
+
+wb.BeforeNavigate2 = function( pDisp, url, flags, targetFrame, postData, headers, cancel ) { 
+	import process;
+	process.openUrl(url);
+	return url, flags, targetFrame, postData, headers, true;
+}
+winform.setTimeout( 
+	function(){
+		wb.html = wb.html;	
+	},10
+);	
+
+winform.getTemplatePath = function(){
+	return io.fullpath("/template/web/chrome-" + wb.eval("window.webProject")) 
+}
+
+winform.show() 
+win.loopMessage();
+return winform;

@@ -1,0 +1,60 @@
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="aardio form";right=759;bottom=469;parent=...)
+winform.add()
+/*}}*/
+
+import web.form;
+var wb = web.form( winform,5/*_UIFLAG_DIALOG*/,,,true);
+wb.noScriptErr = true;
+
+import process;
+import process.chm;
+import fsys.dlg;
+wb.external = {
+	chmTemplate = function(){
+		process.chm("~\help\AARDIO.CHM","/the language/template_syntax.html");
+	};
+	openUrl = function(url){
+		process.openUrl(url);
+	};
+}
+
+wb.html = /** 
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />  
+    <title></title>
+</head>
+<body style="white-space:pre;font-size:	11pt;word-wrap: break-word;word-break: normal;">
+<pre>aardio 中的 web.form 使用系统自带的 IE 浏览器控件。
+web.form 的优势是简洁轻量，调用本地函数方便，兼容 XP，Vista，Win7，Win8，Win10，Win11......
+使用 web.form 生成的软件也非常小。
+
+系统虽已移除 IE 浏览器，但 IE 控件为系统核心组件不会被移除。
+虽然有些新的前端组件已经不支持 IE内核 了, 但简洁轻量有时候正是我们所需要的。
+我们可以使用 aardio 实现软件的主界面，那么需要用 HTML 写的界面就不会太复杂。
+实际上，这个工程向导界面就使用了 web.form 。
+
+这个范例的网页部分使用了简洁易用的 <a href="javascript:void(0)" onclick="external.openUrl('https://htmx.org/')">htmx.js</a>，
+htmx 相当于将每个 HTML 节点变成了一个可以实时刷新的微浏览器，可以少写很多 JS 代码。
+可以方便地利用 <a href="javascript:void(0)" onclick="external.chmTemplate()">aardio 服务端模板语法生成新的 HTML</a>。
+
+htmx.js 1.8.6 完美支持 IE11 内核， Win10，Win11 已自带 IE11 内核控件。
+如果您的程序仍要支持 Win7，移除 htmx.js 或安装 IE11 都可以。
+
+</pre>
+
+</body>
+</html>
+**/
+
+winform.getTemplatePath = function(){
+	return io.fullpath("/template/web/webform/") 
+}
+
+winform.show(true);
+win.loopMessage();
+return winform;

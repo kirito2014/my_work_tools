@@ -1,0 +1,64 @@
+//多线程界面回调
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="多线程界面回调";right=759;bottom=469)
+winform.add()
+/*}}*/
+
+import web.form;
+var wb = web.form(winform);
+
+wb.external = {
+	ping = function(domain){
+		
+		//创建线程，
+		thread.invoke( 
+			function(wb,domain){
+				
+				import process.popen;
+				 
+				var prcs,err = process.popen("ping "+ domain); //请参考范例 > 进程 > 管道
+				
+				/*
+				如果创建进程失败，err 为错误信息，
+				aardio 中抛出异常，网页 DevTools 调试工具可查看错误信息
+				*/
+				//assert(prcs,err);
+				
+				for( all,out,err in prcs.each() ){
+		    		wb.xcall("document.body.insertAdjacentText",'beforeend',all); 
+				}
+				
+			  /*
+			  web.form 可通过线程参数传入工作线程，
+			  跨线程调用回发到界面线程执行。 	
+			  */	
+			},wb,domain 
+		) 
+		
+		return "<br>已启动多线程 ping"
+	} 
+}
+ 
+wb.html = /**
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" /> 
+</head>
+<body style="white-space: pre;">
+
+	<button  onclick="doSomething()">开始干活了</button>
+    <script>
+        doSomething = function(){
+  		var result = external.ping('www.baidu.com');
+  		document.body.insertAdjacentHTML('beforeend',result);
+	};
+	</script>
+</body>
+</html>
+**/
+
+winform.show();
+win.loopMessage();

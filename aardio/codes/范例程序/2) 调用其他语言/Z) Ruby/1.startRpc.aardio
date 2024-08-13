@@ -1,0 +1,24 @@
+//调用 Ruby 函数
+import console.int;
+import process.ruby;
+
+var code  = /* 
+ 
+#可加载应用程序目录下的其他代码文件
+#load "test.rb"
+
+#定义 Ruby 函数
+def add(a, b)
+  a + b
+end 
+*/  
+ 
+//启动 Ruby RPC 服务端，这样就不用重复启动 Ruby，速度更快
+var ruby,err = process.ruby.startRpc( code )
+ 
+//调用 Ruby 函数
+var ret,err  = ruby.add(2,3)
+
+//获取返回值
+ret = ret[["result"]]
+console.dump(ret);

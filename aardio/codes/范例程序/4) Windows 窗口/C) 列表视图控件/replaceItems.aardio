@@ -1,0 +1,32 @@
+//原地更新数据
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="原地更新";right=759;bottom=469)
+winform.add(
+listview={cls="listview";left=11;top=15;right=742;bottom=441;db=1;dl=1;dr=1;dt=1;edge=1;z=1}
+)
+/*}}*/
+
+//添加列
+winform.listview.setColumns("列1","列2","列3");
+
+//开启双缓冲，显示更流畅
+winform.listview.enableDoubleBuffering();
+
+//创建定时器
+winform.setInterval( 
+	function(){
+		var items = {};
+		for(i=1;math.random(100,200)){
+			table.push(items,{string.random(15),string.random(15),string.random(15)});
+		}
+	
+		//替换数据，重用旧的列表项原地更新数据，避免闪烁。
+		winform.listview.replaceItems(items);	
+	
+		//winform.listview.items = items;
+	},1000
+)
+
+winform.show();
+win.loopMessage();

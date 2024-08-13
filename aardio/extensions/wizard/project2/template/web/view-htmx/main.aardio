@@ -1,0 +1,21 @@
+import win.ui;
+/*DSG{{*/
+mainForm = win.form(text="${PROJECTNAME}";right=759;bottom=469)
+mainForm.add()
+/*}}*/
+
+import web.view;
+var theView  = web.view(mainForm); 
+
+import fsys.dlg;
+theView.external = {
+	getFile = function(){
+		return fsys.dlg.open();
+	} 
+}
+ 
+import wsock.tcp.simpleHttpServer; 
+theView.go("\web\index.html");
+ 
+mainForm.show();
+win.loopMessage();

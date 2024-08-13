@@ -1,0 +1,41 @@
+/*
+编译发布目录下的 *.py 源码为 *.pyc 文件。
+这里的 Python 配置必须与 main.aardio 一致。
+*/
+import process.python;
+//process.python.path = "python.exe";
+//process.python.version = "3.8.10";
+//process.python.win32 = true;
+
+import ide;
+import fsys; 
+import console;
+
+console.showLoading("正在编译 Python 源码，请耐心等待");
+
+//新版 py3 扩展库支持此函数
+process.python.module("compileall","-q","-b","-f"
+	,ide.getPublisDir());
+
+console.showLoading("正在清除发布目录 __pycache__ 目录，请耐心等待")
+
+fsys.enum( ide.getPublisDir(), "__pycache__",
+	function(dir,filename,fullpath,findData){ 
+		if(!filename){ 
+			fsys.delete(fullpath);
+		} 
+	}  
+);
+
+console.showLoading("正在清除发布目录 *.py 源码，请耐心等待")
+
+fsys.enum( ide.getPublisDir(), "*.py",
+	function(dir,filename,fullpath,findData){ 
+		if(filename){ 
+			fsys.delete(fullpath);
+		} 
+	}  
+);
+
+console.log("已完成！");
+console.pause();

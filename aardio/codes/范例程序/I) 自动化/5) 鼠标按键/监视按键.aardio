@@ -1,0 +1,47 @@
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="键盘钩子演示 - 请按键";right=438;bottom=396;max=false;parent=...;topmost=1)
+winform.add(
+edit={cls="edit";left=13;top=12;right=426;bottom=382;edge=1;multiline=1;z=1}
+)
+/*}}*/
+
+import key.hook;
+var hook = key.hook();
+
+//录制回调函数
+hook.proc = function(msg,vkcode,scancode,injected,flags,timeStamp,extraInfo){ 
+	if( injected ) return; //模拟鼠标不处理
+  
+    var kn = key.getName( vkcode ); 
+    	
+    select(msg) {
+    	case 0x100/*_WM_KEYDOWN*/ ,0x104/*_WM_SYSKEYDOWN*/ {
+    	    winform.edit.print("按下","键名:" + kn,"键码:"+vkcode)
+    	}
+    	case 0x101/*_WM_KEYUP*/,0x105/*_WM_SYSKEYUP*/ {
+    	    winform.edit.print("弹起","键名:" + kn,"键码:"+vkcode)
+    	}  
+    } 
+    
+    if( win.getForeground() == winform.hwnd ) return true;  
+} 
+ 
+/**details(限制)
+低级键盘钩子回调函数不要做耗时操作，
+如果耗时超过一秒或超过注册表限制的更小时间，系统会直接删除钩子。
+没有任何方法可以检查到删除操作，应当遵守规则避免滥用。
+
+耗时操作建议在钩子回调中创建线程，或使用 winform.setTimeout 延时异步执行。
+在超级热键回调函数中，如果返回一个函数也可以不阻塞异步执行。
+
+如果仍然出现过一段时间键盘钩子失效。
+建议检查一下是否安装了什么特别的软件导致了这样的问题。
+
+一般不使用这种方法实现快捷键、热键功能,
+创建快捷键、热键参考:aardio范例->Windows窗口应用->快捷键
+end details**/ 
+
+winform.show(true) 
+win.loopMessage();  
+hook.close();

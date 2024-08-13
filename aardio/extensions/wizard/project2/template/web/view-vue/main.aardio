@@ -1,0 +1,29 @@
+import win.ui;
+/*DSG{{*/
+mainForm = win.form(text="${PROJECTNAME}";right=1065;bottom=615)
+mainForm.add()
+/*}}*/
+
+import web.view;
+var theView  = web.view(mainForm); 
+ 
+//导出为 JavaScript 中的 aardio 对象
+theView.external = {
+    hello = function(){
+       return "You did it!" ;
+    }; 
+}
+
+import wsock.tcp.simpleHttpServer;
+
+/*
+如果导入 simpleHttpServer，则单个斜杠开头的路径会转换为嵌入式 HTTP 地址，
+如果同时文件名为 index.html ，则上级目录自动设为根目录，前端应用发布根目录使用默认的 "/" 即可，不需要改动。
+
+去掉下面的前端项目调试端口号 37161 或发布 EXE 后运行才会打开 "\web\index.html"。
+否则打开 http://localhost:37161
+*/
+theView.go("\web\index.html",37161);
+ 
+mainForm.show(3/*_SW_MAXIMIZE*/);
+win.loopMessage();

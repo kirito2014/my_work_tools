@@ -1,0 +1,19 @@
+//登录认证
+import console;
+import web.rest.jsonClient;
+console.showLoading("正在登录")
+ 
+//创建 HTTP 客户端
+var http = web.rest.jsonClient();
+
+//设置登录信息，支持 Basic , Digest 认证
+http.setAuth("user","passwd");
+
+var api = http.api( "http://httpbin.org" );
+
+//发送 GET 请求
+var info = api["digest-auth"].auth["user"]["passwd"].get();
+//var info = http.get( "http://httpbin.org/digest-auth/auth/user/passwd" );
+console.dumpJson(info); 
+
+console.pause();

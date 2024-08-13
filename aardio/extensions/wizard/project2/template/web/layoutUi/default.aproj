@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project ver="10" name="HTMLayout" libEmbed="true" icon="" CompanyName="wubin.in" FileDescription="ui" LegalCopyright="Copyright (C) aardio 2018" ProductName="ui" InternalName="ui" FileVersion="0.0.0.6" ProductVersion="0.0.0.6" publishDir="/dist/" ui="win" output="HTMLayout.exe" dstrip="false">
+	<file name="main.aardio" path="main.aardio"/>
+	<folder name="资源文件(web.layout)" path="layout" comment="" embed="true">
+		<file name="tabs.css" path="layout\tabs.css" comment="layout\tabs.css"/>
+		<file name="ui.css" path="layout\ui.css" comment="layout\ui.css"/>
+		<file name="ui.html" path="layout\ui.html" comment="layout\ui.html"/>
+		<folder name="images" path="layout\images" comment="layout\images">
+			<file name="begin.png" path="layout\images\begin.png" comment="layout\images\begin.png"/>
+			<file name="bj.jpg" path="layout\images\bj.jpg" comment="layout\images\bj.jpg"/>
+			<file name="document.png" path="layout\images\document.png" comment="layout\images\document.png"/>
+			<file name="download.png" path="layout\images\download.png" comment="layout\images\download.png"/>
+			<file name="home.png" path="layout\images\home.png" comment="layout\images\home.png"/>
+			<file name="picture.png" path="layout\images\picture.png" comment="layout\images\picture.png"/>
+		</folder>
+		<folder name="styles" path="layout\styles" comment="layout\styles">
+			<folder name="images" path="layout\styles\images" comment="layout\styles\images"/>
+		</folder>
+	</folder>
+</project>

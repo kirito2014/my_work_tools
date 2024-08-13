@@ -1,0 +1,9 @@
+//SVG 转 PNG 
+import web.form.snap; 
+
+//SVG 转 PNG( Win10 及以上系统 )，参数 @4,@5 指定图像大小
+web.form.snap("https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/whatwg.svg","/svg.png",,32,32 );
+
+//浏览图像
+import process.imageView;
+process.imageView("/svg.png");

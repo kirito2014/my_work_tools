@@ -1,0 +1,23 @@
+//入门
+import console.int;  
+import py2;
+ 
+//导入 Python 模块
+var math = py2.import("math");
+
+//调用 Python 函数，  
+var num = math.floor(22.3);
+
+//在控制台输出数值。 
+console.log(num);
+
+/*
+Python 返回的浮点数值、不大于 53 位的整型数值、布尔值、字节数组
+会自动转换为纯 aardio 值。
+
+其他 Python 对象在 aardio 存为 py3.object 对象（PyObject）。
+
+PyObject 可以在 aardio 中也可以像普通对象一样使用。
+可以调用其成员函数、读写属性、通过下标读写索引项、并支持常用运算符。
+也可以通过 pyObject.parseValue() 函数转换为纯 aardio 值（通过 JSON 自动转换）。
+*/

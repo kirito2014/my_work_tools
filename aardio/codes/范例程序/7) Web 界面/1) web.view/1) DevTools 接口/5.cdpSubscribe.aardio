@@ -1,0 +1,55 @@
+//事件
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="CDP 事件";right=818;bottom=507)
+winform.add()
+/*}}*/
+
+import web.view; 
+var wb = web.view(winform);
+winform.show();
+ 
+//允许监听网络事件
+wb.cdp("Network.enable");
+
+//订阅 CDP 事件
+wb.cdpSubscribe("Network.requestWillBeSent",function(cdpResult){
+	winform.text = cdpResult.documentURL; 
+	
+	//CDP 事件应尽快退出，
+	//如果返回函数，该函数将在 CDP 事件退出以后异步执行。
+	return function(){
+		//阻塞耗时操作适合放到这里。  
+	} 
+})
+
+import crypt;
+import console;
+ 
+//订阅 CDP 事件
+wb.cdpSubscribe("Network.responseReceived",function(cdpResult){
+
+	//CDP 事件内部不要阻塞调用其他 CDP 命令。
+	wb.cdp("Network.getResponseBody",
+		{requestId = cdpResult.requestId},
+		
+		//使用回调函数异步调用其他 CDP 命令
+		function(result,err){
+			if(!result){ 
+				console.log("出错了:",lasterr(err) ) 
+				return;
+			}
+			
+			if(result.base64Encoded){
+				//result.body = crypt.decodeBin(result.body); 
+			}
+			else { 
+				console.dump(result.body);
+			} 
+		}
+	) 
+} ) 
+
+ 
+wb.go("https://www.aardio.com");
+win.loopMessage();

@@ -1,0 +1,14 @@
+﻿//控制台输出
+import console; 
+
+/*
+在导入前打开控制台，
+Julia 才能向控制台输出内容（否则控制台上看不到输出）
+*/
+console.open();
+
+import julia; 
+ 
+julia.eval("print(123)");
+
+console.pause();

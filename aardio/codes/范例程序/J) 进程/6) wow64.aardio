@@ -1,0 +1,25 @@
+//WoW64 重定向
+
+/*
+64 位操作系统在  WoW64 模式默认会存在注册表与文件系统自动重定向。
+然而有个别系统程序（例如 osk.exe）只有 64 位版本，需要暂时禁用 WoW64 重定向才能启动。
+
+process.wow64 的作用就是暂时禁用  WoW64 重定向以启动 64 位系统程序。
+*/
+import process.wow64;
+process.wow64.execute("osk");
+
+/*
+非系统程序一般不需要用到 process.wow64。 
+支持 WoW64 调用的程序（大部分都支持）也不需要用到 process.wow64。 
+*/
+
+/*
+禁用 WoW64 重定向有关的库与函数：
+
+win.regWow64;
+fsys.wow64;
+process.wow64;
+process.popen.cmd64;
+process.popen.bind64;
+*/

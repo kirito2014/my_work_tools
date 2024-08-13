@@ -1,0 +1,20 @@
+//ES5
+import console;
+import web.script.es5;
+
+var js = web.script(); 
+
+js.script = /*****
+var result = 0;
+var numbers = [1,2,3];
+
+if(Array.isArray(numbers)){
+	numbers.forEach(function(value) {
+  	result = result + value; 
+	});	
+}
+
+*****/
+
+console.dump( js.script.result );
+console.pause();

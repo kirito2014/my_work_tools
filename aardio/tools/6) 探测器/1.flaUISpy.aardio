@@ -1,0 +1,385 @@
+//FlaUI 探测器
+import fonts.fontAwesome;
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="FlaUI 探测器（FlaUISpy）";left=-2;top=100;right=522;bottom=464)
+winform.add(
+btnCtrlParent={cls="plus";text="上级控件";left=282;top=105;right=387;bottom=129;align="left";color=8388608;dr=1;dt=1;iconColor=32768;iconStyle={align="left";font=LOGFONT(name='FontAwesome');padding={left=5}};iconText='\uF122';notify=1;textPadding={left=21};z=17};
+btnHelp={cls="plus";text="教程";left=436;top=18;right=493;bottom=42;align="left";color=8388608;dr=1;dt=1;iconStyle={align="left";font=LOGFONT(h=-14;name='FontAwesome')};iconText='\uF059 ';notify=1;textPadding={left=16;bottom=1};z=24};
+btnQuery={cls="plus";left=459;top=134;right=485;bottom=158;align="left";color=8388608;dr=1;dt=1;iconColor=32768;iconStyle={font=LOGFONT(name='FontAwesome')};iconText='\uF002';notify=1;textPadding={left=21};z=20};
+chkCtrl={cls="checkbox";text="按 Ctrl + 移动鼠标启动探测";left=312;top=327;right=501;bottom=349;db=1;dr=1;z=15};
+editCode={cls="richedit";left=77;top=165;right=494;bottom=314;db=1;dl=1;dr=1;dt=1;edge=1;hscroll=1;multiline=1;tabstop=1;vscroll=1;z=13};
+editControlName={cls="edit";left=78;top=78;right=493;bottom=99;dl=1;dr=1;dt=1;edge=1;hidesel=1;readonly=1;tabstop=1;z=12};
+editControlType={cls="edit";left=78;top=105;right=271;bottom=128;dl=1;dr=1;dt=1;edge=1;hidesel=1;readonly=1;tabstop=1;z=11};
+editHwnd={cls="edit";left=78;top=18;right=168;bottom=41;dl=1;dt=1;edge=1;hidesel=1;multiline=1;readonly=1;tabstop=1;z=8};
+editPath={cls="edit";left=78;top=48;right=495;bottom=71;dl=1;dr=1;dt=1;edge=1;hidesel=1;readonly=1;tabstop=1;z=9};
+editPid={cls="edit";left=225;top=18;right=310;bottom=41;dl=1;dr=1;dt=1;edge=1;hidesel=1;readonly=1;tabstop=1;z=10};
+editXPath={cls="edit";left=78;top=135;right=457;bottom=159;border=1;dl=1;dr=1;dt=1;edge=1;hidesel=1;tabstop=1;z=19};
+lbControlType={cls="static";text="ControlType:";left=3;top=106;right=73;bottom=123;align="right";dl=1;dt=1;z=3};
+lbHwnd={cls="static";text="窗口句柄:";left=10;top=20;right=73;bottom=37;align="right";dl=1;dt=1;z=1};
+lbName={cls="static";text="Name:";left=0;top=78;right=73;bottom=95;align="right";dl=1;dt=1;z=2};
+lbPid={cls="static";text="进程ID:";left=174;top=19;right=221;bottom=41;align="right";dl=1;dt=1;z=4};
+lbProcessInfo={cls="static";left=360;top=100;right=495;bottom=122;dr=1;dt=1;transparent=1;z=14};
+lbTip={cls="static";left=198;top=380;right=509;bottom=399;color=255;db=1;dl=1;dr=1;z=23};
+plusCur={cls="plus";left=22;top=316;right=54;bottom=348;background="\.res\1.gif";db=1;dl=1;notify=1;repeat="center";z=5};
+radioUia2={cls="radiobutton";text="UIA2";left=135;top=379;right=195;bottom=396;db=1;dl=1;hide=1;z=22};
+radioUia3={cls="radiobutton";text="UIA3";left=73;top=379;right=133;bottom=396;checked=1;db=1;dl=1;hide=1;z=21};
+static={cls="static";text="启动文件:";left=5;top=49;right=73;bottom=66;align="right";dl=1;dt=1;z=6};
+static2={cls="static";text="请拖动左侧瞄准器图标到目标控件";left=64;top=328;right=293;bottom=353;db=1;dl=1;dr=1;z=7};
+static3={cls="static";text="示例代码:";left=-7;top=164;right=73;bottom=181;align="right";dl=1;dt=1;z=16};
+static4={cls="static";text="XPath:";left=0;top=135;right=73;bottom=152;align="right";dl=1;dt=1;z=18}
+)
+/*}}*/
+
+winform.btnHelp.skin({
+	color={
+		active=0xFF00FF00;
+		default=0xFF000080;
+		disabled=0xFF6D6D6D;
+		hover=0xFFFF0000
+	}
+})
+
+import string.template;
+var codeTemplate = string.template();
+codeTemplate.template = /***
+import FlaUI.${uia};
+var uia = FlaUI.${uia}.${uia}Automation();
+
+//自窗口句柄直接获取窗口对象
+//var window = uia.FromHandle(${hwnd}); 
+
+//启用模式匹配语法搜索窗口
+//var window = uia.FindWindow("${exe}","${classPattern}","${titlePattern}");
+
+//查找窗口
+var window = uia.FindWindow("${exe}","@${class}","@${title}");
+
+if(window){
+	
+	//前置窗口
+	window.Focus();
+	
+	//查找控件 ${xpath}
+	var ctrl  = window.FindFirstByXPath(`${shortXPath}`);
+ 
+	//移动鼠标
+	mouse.move(${x},${y},ctrl);
+	
+	//单击鼠标
+	mouse.click(${x},${y},ctrl);
+	
+	//输入字符串
+	//key.sendString("发送内容")
+}	
+***/
+    
+var validPattern = function(str){
+	if(!#str) return "";
+		
+	var mbs = string.match(str,"[\s\w]*:+[\s\w]*")
+	if(#mbs)
+		return mbs;
+		
+	str = string.replace(str,"(\p)","\\\1") 	
+	str = string.replace(str,"\x+",function(str){
+	 	if(..string.find(str,"\d") ){
+	 		if(..string.find(str,"[a-zA-Z]") ) return "\x+"
+	 		return "\d+"
+	 	}
+	 	return str;
+	} ) 	
+    
+    str = string.replace(str,"\d+","\\d+") 	
+    return str;
+}
+
+import winex;
+import mouse;
+import process;
+import process.wmi;
+import win.ui.mask;
+var frmMask = win.ui.mask(winform);
+
+var ShowInspectInfo = function(ele,x,y){ 
+	
+	if(ele){
+		if(x!==null){
+			winform.uiaInspectInfo.x =  x;
+		}
+		else {
+			x =  winform.uiaInspectInfo.x;
+		}
+		
+		if(y!==null){
+			winform.uiaInspectInfo.y =  y;
+		}
+		else {
+			y =  winform.uiaInspectInfo.y;
+		}
+		
+		
+		if(winform.uiaInspectInfo.element!=ele){
+			winform.uiaInspectInfo.element = ele;
+			ele[["$window"]] = winform.uiaInspectInfo.window;
+			winform.btnCtrlParent.disabled = !winform.uiaInspectInfo.element.Parent;
+			
+			var rc = ::RECT();
+			rc.float(ele.BoundingRectangle); 
+			frmMask.moveToRect(rc)
+		 	
+			winform.editControlType.text =  tostring( ele.Properties.ControlType );
+			winform.editControlName.text = ele.Name; 
+			
+			var hwndStr = ..string.format("0x%0X",winform.uiaInspectInfo.hwnd);
+			if(hwndStr!=winform.editHwnd.text ){
+				winform.editHwnd.text = hwndStr;
+				
+				var tid,pid = win.getThreadProcessId(winform.uiaInspectInfo.hwnd);
+				winform.editPid.text = pid;
+				
+				var prcs = process.wmi(pid);
+				winform.editPath.text = prcs.CommandLine;
+				codeTemplate.$exe = fsys.getFileName(prcs.ExecutablePath);
+				codeTemplate.$class =  win.getClass(winform.uiaInspectInfo.hwnd);
+				codeTemplate.$title =  winex.getText(winform.uiaInspectInfo.hwnd,50);
+				codeTemplate.$classPattern = validPattern(codeTemplate.$class);
+				codeTemplate.$titlePattern = validPattern(codeTemplate.$title);
+				codeTemplate.$hwnd = hwndStr;
+			}
+			
+			var xpath,shortXPath = FlaUI.Spy.GetXPath(ele); 
+			winform.editCode.text = codeTemplate.format(
+				xpath = shortXPath ? ("XPath:" + xpath) : "";
+				shortXPath = shortXPath ? shortXPath : xpath;
+				x = x ? (x - rc.left) : (rc.width() / 2);
+				y = y ? (y - rc.top) : (rc.height()/2);
+			) 
+			
+			winform.editXPath.text = xpath;
+			winform.uiaInspectInfo.shortXPath = shortXPath; 
+			
+			//这个函数很卡，建议改用 aardio 提供的 win.ui.mask
+			//FlaUI.DrawHighlight(ele);
+		}
+		else {
+			var rc = ::RECT();
+			rc.float(ele.BoundingRectangle); 
+			frmMask.moveToRect(rc)
+		} 
+	} 
+}
+
+winform.plusCur.skin(
+	background = { 
+		active = "\.res\2.gif"; 
+	}
+)
+
+import win.cur;
+var hCursor = win.cur.loadfile("\.res\spy.cur") ;
+winform.plusCur.onMouseDown = function(wParam,lParam){
+	win.cur.beginCur();
+	winform.plusCur.capture = true;
+	winform.lastSpyHwnd = null;
+}
+	
+winform.plusCur.onMouseUp = function(wParam,lParam){
+	winform.plusCur.capture = false;
+	win.cur.endCur();
+	frmMask.show(false);
+}
+
+import key;  
+import FlaUI.Spy;
+import FlaUI.UIA3;
+FlaUI.Spy.Automation = FlaUI.UIA3.UIA3Automation();
+FlaUI.Spy.Hwnd = winform.hwnd;
+
+codeTemplate.$uia = "UIA3";
+
+var prevInspectX,prevInspectY,prevInspectTime;
+
+var uiaInspect = function(){
+	 
+	var x,y = mouse.getPos();
+	 
+	var tick = ..time.tick();
+	if(prevInspectTime && prevInspectX && prevInspectY /*&& winform.uiaInspectInfo[["element"]]*/){
+		var x2,y2 = math.abs(x-prevInspectX),math.abs(y-prevInspectY) 
+		if(!(x2||y2)) {
+			if(winform.uiaInspectInfo) ShowInspectInfo(winform.uiaInspectInfo.element,x,y);
+			return;
+		}
+		
+		if((x2<5) && (y2<5)){
+			if(tick - prevInspectTime < 1000 ){
+				if(winform.uiaInspectInfo) ShowInspectInfo(winform.uiaInspectInfo.element,x,y);
+				return;
+			}
+		}	
+			
+	}
+	
+	prevInspectX,prevInspectY = x,y;
+	prevInspectTime = tick; 
+	
+	var ele = FlaUI.Spy.FromPoint(x,y);
+	if(!ele) {
+		return ; 
+	}
+	
+	winform.uiaInspectInfo = { 
+		hwnd = ele.$hwnd;
+		window =  ele.$window;
+	} 
+	
+	ShowInspectInfo(ele,x,y);		
+}
+
+
+var hwndTarget;   
+tmid = winform.setInterval(
+	function(hwnd,msg,id,tick){
+		if( win.cur.beginning ){ 
+			uiaInspect();
+		}
+		elseif( winform.chkCtrl.checked ){ 
+			if( ( win.cur.beginning ) ||(
+				key.getStateX("CTRL") 
+				&& !key.getStateX("SHIFT") 
+				&& !key.getStateX("ALT") 
+				&& !mouse.state()
+				&& !mouse.rb.state()
+				&& !mouse.mb.state() ) ){ 
+					
+				for(i='A'#;'Z'#;1){ 
+					if(key.getStateX(i)){
+						return;
+					}
+				}
+				
+				for(i='0'#;'9'#;1){ 
+					if(key.getStateX(i)){
+						return;
+					}
+				}
+				
+				uiaInspect();
+			} 
+		} 
+		else {
+			frmMask.show(false);
+		} 
+	},700
+)   
+
+import win.ui.tooltip; 
+winform.tooltipCtr = win.ui.tooltip( winform );//在窗口上创建tooltip控件 
+winform.tooltipCtr.add( 
+	btnQuery = "测试 XPath"; 
+	plusCur = "请按住此图标并拖动到目标窗口"; 
+	editControlType = "UIA 控件类型（ControlType）"; 
+	editControlName = "UIA 控件名称（Name）"; 
+	editPath = "启动目标应用程序的执行文件路径与启动参数";   
+	editPid = "这是窗口所在目标进程的10进制ID，进程是正在运行的程序的实例,也就是一个执行中的程序。每一个进程都有它自己的地址空间，在一个进程中可以包含若干个执行线程";
+	editHwnd = "句柄是一个系统对象的唯一标识，在 aardio 中窗口句柄是一个数值（静态类型为 addr )，其他类型句柄一般用指针表示( 静态类型 pointer )，当然他们的本质都是数值。";
+);
+
+winform.btnCtrlParent.skin({
+	color={
+		active=0xFF00FF00;
+		default=0xFF000080;
+		disabled=0xFF6D6D6D;
+		hover=0xFFFF0000
+	}
+})
+
+winform.btnCtrlParent.oncommand = function(id,event){
+	if(winform.uiaInspectInfo[["element"]]){
+		if(winform.uiaInspectInfo.element==winform.uiaInspectInfo.window){
+			return winform.msgboxErr("已经到达根节点！");
+		}
+		
+		ShowInspectInfo(winform.uiaInspectInfo.element.Parent);
+	}
+	else {
+		winform.msgboxErr("请先拖动探针到目标窗口");
+	} 
+}
+
+winform.btnQuery.skin({
+	iconColor={
+		active=0xFF00FF00;
+		default=0xFF000080;
+		disabled=0xFF6D6D6D;
+		hover=0xFFFF0000
+	}
+})
+winform.btnQuery.oncommand = function(id,event){
+	if(!winform.uiaInspectInfo[["window"]]){
+		return winform.msgboxErr("请先拖动探针到目标窗口");
+	}
+	
+	var ele = winform.uiaInspectInfo.window.FindFirstByXPath(winform.editXPath.text);
+	if(!ele){
+		return winform.msgboxErr('没有找到控件，\n请尝试用 // 替换部分 XPath 路径，例如：\n\n' + (winform.uiaInspectInfo.shortXPath : `//Edit[@Name="输入"]`) );	
+	}
+	
+	ShowInspectInfo(ele);
+}
+
+winform.radioUia3.oncommand = function(id,event){
+	FlaUI.Spy.Automation = FlaUI.UIA3.UIA3Automation();
+	codeTemplate.$uia = "UIA3";
+	winform.lbTip.text = "";
+	
+	if(!winform.uiaInspectInfo) return;
+	var ele  = winform.uiaInspectInfo.element;
+	winform.uiaInspectInfo.element = null;
+	if(ele){
+		ShowInspectInfo(ele);
+	} 
+}
+
+winform.radioUia2.oncommand = function(id,event){
+	winform.radioUia3.disabled = true;
+	winform.btnHelp.hide = true;
+	
+	import FlaUI.UIA2;
+	FlaUI.Spy.Automation = FlaUI.UIA2.UIA2Automation();
+	codeTemplate.$uia = "UIA2";
+	winform.lbTip.text = "重启恢复 UIA3 ，不建议使用老旧卡的 UIA2 ！";
+	
+	winform.setTimeout(function(){
+		winform.lbTip.text = "";
+	},3000)
+	
+	if(!winform.uiaInspectInfo) return;
+	var ele  = winform.uiaInspectInfo.element;
+	winform.uiaInspectInfo.element = null;
+	if(ele){
+		ShowInspectInfo(ele);
+	} 
+}
+
+winform.editCode.enablePopMenu({
+	{};
+	{ "全选 + 复制";  function(id){
+		winform.editCode.selectAll();
+		winform.editCode.copy()
+	} };
+	{ "运行代码";  function(id){
+		loadcodex(winform.editCode.text);
+	} }; 
+})
+
+winform.btnHelp.oncommand = function(id,event){
+	import process;
+	process.openUrl("https://mp.weixin.qq.com/s/uEJSete63SQgJYEHw2PacQ")
+}
+
+winform.show(true);
+win.setTopmost(winform.hwnd,true);
+
+win.loopMessage();

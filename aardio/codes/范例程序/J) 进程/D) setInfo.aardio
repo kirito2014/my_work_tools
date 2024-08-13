@@ -1,0 +1,57 @@
+//效率模式
+import fonts.fontAwesome;
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="进程效率模式";right=245;bottom=176;border="dialog frame";max=false;min=false;topmost=1)
+winform.add(
+chkEfficiencyMode={cls="checkbox";text=" 启用效率模式";left=78;top=129;right=200;bottom=156;z=1};
+plus={cls="plus";text='\uF06C';left=21;top=27;right=184;bottom=98;color=12632256;font=LOGFONT(h=-48;name='FontAwesome');z=2}
+)
+/*}}*/
+
+import win.version;
+if(!win.version.isWin11Later){
+	error("至少要 Windows 11 才能支持效率模式");
+	//注意下面的代码在低于 Win11 的系统执行会自动忽略不执行操作，不会报错。
+}
+
+import process;
+
+//打开进程，省略参数打开当前进程
+var prcs = process()
+	
+//设置进程效率模式
+setEfficiencyMode = function(enabled){
+	
+	//设置为『效率模式』
+	prcs.setInfo(4/*_ProcessPowerThrottling*/, {
+  		INT version = 1;
+  		INT controlMask = 1;
+  		INT stateMask = enabled ? 1 : 0;
+	}); 
+	
+	//必须降低进程优先级，任务管理器的『状态』栏才会显示绿叶图标
+	prcs.setPriorityClass(enabled ? 0x40/*_IDLE_PRIORITY_CLASS*/ : 0x20/*_NORMAL_PRIORITY_CLASS*/) 
+}
+
+//复选框事件
+winform.chkEfficiencyMode.oncommand = function(id,event){
+	setEfficiencyMode(winform.chkEfficiencyMode.checked);
+}
+
+//创建定时器，检测效率模式是否开启
+winform.setInterval( 
+	function(){
+		var throttlingState = prcs.getInfo(4/*_ProcessPowerThrottling*/,{
+  			INT version = 1;
+  			INT controlMask;
+  			INT stateMask;
+		})
+		
+		var enabled =throttlingState && throttlingState.controlMask == 1 && throttlingState.stateMask == 1	
+		winform.plus.color = enabled ? 0xFF008000 : 0xFFCCCCCC;
+	},500
+)
+
+winform.show();
+win.loopMessage();

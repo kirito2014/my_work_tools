@@ -1,0 +1,38 @@
+//.NET 引用表转换
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="dotNet.reference 引用表批量转换工具";right=759;bottom=469)
+winform.add(
+edit={cls="edit";left=14;top=10;right=743;bottom=416;edge=1;hscroll=1;multiline=1;vscroll=1;z=1};
+static={cls="static";text="在资源管理器全选所有 DLL 程序集，然后按住 Shift 键点开右键菜单，点击『复制为路径』，切换到此窗口即可自动转换";left=13;top=425;right=737;bottom=463;transparent=1;z=2}
+)
+/*}}*/
+
+import win.clip;
+import fsys;
+winform.onActivateApp = function(activated,threadId){
+	if(activated){ 
+		var str = win.clip.read();
+		
+		var out = {"dotNet.reference("}
+		for path in string.lines(str)	{ 
+			path = string.trim(path,'"');
+			if(io.exist(path) && string.endWith(path,".dll",true)){
+				path = fsys.path.relative(path,io._exedir,true);
+				path = "~" + path;
+				
+				table.push(out,	`	["`+io.splitpath(path).name+`"] = $"`+path+`";`);
+				
+			}
+		}
+		
+		table.push(out,	`)`);
+		
+		if(#out>2){
+			winform.edit.text = ..string.join(out,'\r\n');
+		} 
+	}
+}
+
+winform.show();
+win.loopMessage(); 

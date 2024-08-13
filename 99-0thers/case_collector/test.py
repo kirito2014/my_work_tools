@@ -1,9 +1,12 @@
-import os
+﻿import os
 import glob
 import pandas as pd
 import openpyxl
 from collections import OrderedDict
+import sys
 import re
+
+sys.stdout.reconfigure(encoding='utf-8')
 
 '''
 #def format_data(case_data):
@@ -16,6 +19,33 @@ import re
         ["*五、其它补充信息", "other_supplement"]
     ]
 '''
+
+#重命名将文件名中的空格替换为空
+# def rename_file(file_path):
+#     #循环文件夹下的所有文件
+#     for file_name in os.listdir(file_path):
+#         file_path = os.path.join(file_path, file_name)
+#         print(file_path)
+#         if os.path.isfile(file_path):
+#             new_file_name = file_path.replace('\xa0', ' ').replace(' ', '')
+#             print(new_file_name)
+#             os.rename(file_path, new_file_name)
+
+
+def rename_file(file_path):
+    # 循环文件夹下的所有文件
+    for root, dirs, filenames in os.walk(file_path):
+        for file_name in filenames:
+            file_path = os.path.join(root, file_name)
+            #print(file_path)
+    #file_names = [file_name for file_name in os.listdir(file_path) if not os.path.basename(file_name).startswith('~$')]
+    #for file_name in file_names:
+            if not os.path.basename(file_name).startswith('~$'):#排除临时文件
+                new_file_name = file_path.replace('\xa0', '').replace(' ','')
+                #print(new_file_name)
+                os.rename(file_path, new_file_name)
+        #new_file_name = file_path.replace('\xa0', '')
+
 
 
 def merge_dicts(dict_list):
@@ -709,7 +739,7 @@ def clear_target_file(target_file_path):
         log_error(error_log, f"[ ERROR ]无法保存目标文件: {e}")
 #日志记录
 def log_error(log_file,message):
-    with open(log_file, 'w', encoding='utf-8') as f:
+    with open(log_file, 'w', encoding='gbk',errors='ignore') as f:
         f.write(message + '\n')
     print(message)
 
@@ -735,8 +765,9 @@ def process_files_in_folder(folder_path, target_file_path):
     cust_list = []
     
     # 处理每个源文件
-    for source_file_path in files:
-        print(f"[ INFO ] 处理文件: <{os.path.basename(source_file_path)}>")
+    for source_file_path in files:  
+        source_file_name = os.path.basename(source_file_path)
+        print(f"[ INFO ] 处理文件: <{os.path.basename(source_file_name)}>")
         final_data = check_and_process_file(source_file_path)
         cust_name = load_data_to_target_file(final_data, target_file_path, source_file_path)
         cust_list.append(cust_name)
@@ -747,8 +778,21 @@ def process_files_in_folder(folder_path, target_file_path):
 
 if __name__ == "__main__":
     # 设定文件夹路径和目标文件路径
-    folder_path = 'D:\github\99-0thers\case_collector\第二季度案例收集\第二季度的案例收集_bak'
-    target_file_path = 'D:/github/99-0thers/case_collector/1111.xlsx'
+    #folder_path = 'D:\github\99-0thers\case_collector\第二季度案例收集\第二季度的案例收集_bak'
+    #target_file_path = 'D:/github/99-0thers/case_collector/1111.xlsx'
+    #传入folder_path，target_file_path参数 并校验个数
+    if len(sys.argv) != 3:
+        print("Usage: python test.py <folder_path> <target_file_path>")
+        sys.exit(1)
 
+    folder_path = sys.argv[1]
+    target_file_path = sys.argv[2]
+    if not os.path.isdir(folder_path):
+        print(f"[ ERROR ] <{folder_path}> 不是一个有效的文件夹路径。")
+        sys.exit(1)
+
+    #处理文件夹下的文件名，去除空格
+    rename_file(folder_path)
+    print('[ INFO ] 文件名处理完成')
     # 调用函数处理文件夹中的文件
     process_files_in_folder(folder_path, target_file_path)

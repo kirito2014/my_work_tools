@@ -1,0 +1,18 @@
+//Makefile
+import process.gcc;
+
+//在下面的参数中指定 Makefile 文件所在目录
+var gcc = process.gcc("/");
+
+/*
+
+//也可以如下创建 Makefile 文件
+gcc.makefile = /**********
+hello:
+	@echo "Hello, World"
+**********/
+
+*/
+
+//执行 make 命令，第一个命令行参数可以指定 gcc.exe 同目录下的 EXE 文件名
+gcc.exec("make");

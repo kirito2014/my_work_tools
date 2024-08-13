@@ -1,0 +1,26 @@
+//入门
+import console.int;
+import com.matlab;
+
+//创建 MATLAB 应用程序
+var m = com.matlab(true);
+
+//批量写入变量到 base 工作区
+m.base.assign({
+	var1 = 1;
+	var2 = 2;
+	var3 = 3;
+})
+
+//执行代码，支持用模板语法嵌入 aardio 代码和对象
+m.code = /*
+ 
+var5 = <?
+	//在 MATLAB 代码中直接写 aardio 代码。
+	={ 1,2,3 }
+?>
+*/
+
+//调用 MATLAB 函数
+var result =  m.strcat("hello",",world" );
+console.log(result);

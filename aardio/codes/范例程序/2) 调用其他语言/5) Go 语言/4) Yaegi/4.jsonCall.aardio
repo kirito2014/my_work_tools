@@ -1,0 +1,50 @@
+//aardio 回调函数
+import golang.yaegi;
+var go = golang.yaegi();
+
+go.eval(`
+package main
+
+//导入模块 
+import (
+	"aardio"  
+)
+
+func TestCallBack(fnCallback float64) int{
+	
+	var s = "字符串"
+	
+	/*
+	回调 aardio 用 raw.jsonCall 创建的函数指针。
+	支持可变参数（使用 JSON 自动转换参数），aardio 函数返回 null 或 int 类型整数值 。
+	aardio.CallJson() 返回类型为 (int,error)。
+	
+	注意：aardio 与 Go 导出函数所在的默认 goroutine 之间的互调属于同一线程（这里不用考虑多线程）。
+	*/
+	var r,_ = aardio.CallJson( fnCallback ,s,123,map[string]int{"id": 1, "id2": 2} )
+	 
+	return r
+}
+
+`) 
+
+import raw.jsonCall
+  
+//创建回调函数指针， 在 Go 中必须用 aardio.CallJson 调用。
+var callback = raw.jsonCall(
+	function(a,b,c){ 
+		console.log("回调参数:",a,b) 
+		console.dumpJson(c);
+		return 123;
+	} );
+
+import console.int 
+
+/*
+golang.yaegi 会将函数指针转换为数值。
+而所有数值参数的类型都是 float64，所以 Go 参数要声明类型为 float64。
+其他类型可自 float64 转换过去。
+*/ 
+var ret  = go.TestCallBack( callback )
+
+console.log(ret);

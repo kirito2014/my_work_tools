@@ -1,0 +1,34 @@
+//网卡设备
+import console; 
+import sys.networkCards;
+import inet.adapterInfo;
+
+//列出所有网卡设备
+for networkCard in sys.networkCards.each(){
+	console.log(networkCard.netConnectionId)
+	console.log(networkCard.description)
+	console.log(networkCard.pnpInstanceId)
+	
+	var adapterInfo = inet.adapterInfo.get(networkCard.adapterName);
+	if(adapterInfo){
+		console.log(adapterInfo.mac); //MAC 地址
+		console.log(adapterInfo.adapterName); //GUID
+		console.log(adapterInfo.description); //网卡描述
+		console.log("网卡已启用");
+		
+		if(adapterInfo.operStatusUp){
+			console.log("网卡已连接");
+		}
+		else {
+			console.log("网卡未连接");
+		}
+		
+	}
+	else {
+		console.log("网卡已禁用");
+	}
+	
+	console.more()
+}
+	
+console.pause(true);

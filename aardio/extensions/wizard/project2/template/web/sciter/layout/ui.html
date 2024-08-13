@@ -1,0 +1,100 @@
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+    <link rel="stylesheet" href="ui.css" />
+    <link rel="stylesheet" href="tabs.css" />
+    <title>Document</title>
+</head>
+<script type="module"> 
+    import { h, render, Component } from "preact";
+    import { useState, useEffect, useCallback } from "hooks";
+    JSX = h;
+
+    function Counter() {
+      let externalResult = external.func("Sciter")
+      const [value, setValue] = useState(0);
+      const increment = useCallback(() => {
+        setValue(value + 1);
+      }, [value]);
+
+      // https://zh-hans.reactjs.org/docs/hooks-effect.html
+      // https://preactjs.com/guide/v10/hooks/#useeffect
+      const [time, setTime] = useState(Date.now());
+      useEffect(() => {
+        let timer = setInterval(() => {
+          setTime(Date.now());
+        }, 1000);
+
+        return function cleanup() {
+          clearInterval(timer);
+        };
+      }, []);
+    
+      return (
+        <div>
+          <h2>
+            当前时间:<span>{new Date(time).toLocaleTimeString()}</span> 
+          </h2>
+          当前计数: {value}
+          <br />
+          <button onClick={increment}>
+            点这里增加计数，体验 React Hooks
+          </button><br />
+          调用 aardio 函数 external.func("Sciter") 的返回值：{externalResult}
+          <br /><br />
+现在 Sciter JS 已经可以兼容 Preact ，<br />
+通过 Preact  Hooks 就可以 在 Sciter JS 里使用 React Hooks 写网页了。<br />
+<br />
+React hooks 简洁优雅, 大幅降低了前端开发的门槛和学习成本。<br />
+只要熟悉 useState, useEffect, useCallback, useContext 等几个非常简单的 Hooks 的用法，<br />
+你就可以运用自如，强烈推荐大家学习和使用。<br /><br />
+        </div>
+      );
+    }
+
+    render(<Counter />, document.getElementById("preact"));
+  </script>
+<body > 
+  
+<div #title-bar command="window-caption" >
+     <div class="buttons" command="window-caption" >  
+        <a command="window-close">r</a>
+        <a command="window-max">1</a>  
+        <a command="window-min">0</a>
+     </div>
+</div>
+<div id="logo"></div> 
+
+ <div class="tabs"  > 
+  <ul class="strip" >  
+     <!-- htmlayout 里用 li 关闭按钮出不来 -->
+     <div panel="panel1" selected><img src="images\home.png">首 页</div>
+     <div panel="panel2"><img src="images\download.png">下 载</div>
+     <div panel="panel3"><img src="images\begin.png">入 门</div> 
+     <div panel="panel4"><img src="images\document.png">文 档</div> 
+  </ul>
+
+  <div name="panel1" > 
+    <div id="preact"></div>
+
+      在超链接的URL前面加上tabs://的前缀,例如<br />
+     <a href="tabs://about:blank" title="<img src='images\document.png'>页 面" target="_blank">tabs://about:blank</a> <br /><br />
+      然后在超链接的 title属性中指定新建选项卡的标题,<br />
+      最后指定用target属性指定目标选项卡的名字,"_blank"表示新建选项卡。 <br /> 
+      
+      符合以上条件的超链接 - 点击则会在选项卡页面中打开,<br /><br />  
+      这种动态创建的选项项，鼠标移上去以后会显示一个关闭按钮( 注意CSS中要指定 float:right )。
+  </div> 
+   <div name="panel2"> 
+      这是第二个选项页,其中name属性指定选项卡名字  
+  </div>
+  <div name="panel3"> 
+      这是第三个选项页,其中name属性指定选项卡名字   
+  </div>  
+  <div name="panel4"> 
+      这是第4个选项页,其中name属性指定选项卡名字  
+  </div> 
+</div>
+ 
+</body>
+</html>

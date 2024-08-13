@@ -1,0 +1,38 @@
+//网页转 PDF
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="请在打开网页，请稍候 ……";right=759;bottom=469;bgcolor=16777215;)
+winform.add()
+/*}}*/
+
+import web.view;
+var wb = web.view(winform); 
+winform.show();
+
+wb.go("https://mp.weixin.qq.com/s/wk2oe5USuBvTs3QWdjyYhw"); 
+
+wb.waitDoc();
+
+//调用 DevTools 方法，并等待返回结果，失败返回 null
+var result  = wb.cdp("Page.printToPDF");
+
+if(result[["data"]]){
+	import crypt;
+	var bin = crypt.decodeBin(result[["data"]]);
+	
+	import fsys.path;
+	var fileName = wb.eval("document.title");
+	if(fileName){ 
+		fileName = fsys.path.validName(fileName);
+	}
+	
+    string.save("/"+(fileName:"PDF")+".pdf",bin );
+    
+    import win.clip
+    win.clip.write(io.fullpath("/"+fileName+".pdf")); 
+    winform.text = "已导出 PDF，路径已复制到剪贴板。"
+    
+    wb.go("/"+(fileName:"PDF")+".pdf");
+} 
+
+win.loopMessage();

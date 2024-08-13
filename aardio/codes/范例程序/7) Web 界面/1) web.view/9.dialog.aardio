@@ -1,0 +1,64 @@
+//调用页面元素
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="调用页面元素 - dialog";right=759;bottom=469)
+winform.add(
+button={cls="button";text="显示网页对话框";left=504;top=412;right=674;bottom=458;db=1;dr=1;z=2};
+custom={cls="custom";left=7;top=8;right=748;bottom=402;db=1;dl=1;dr=1;dt=1;z=1};
+edit={cls="edit";left=59;top=414;right=378;bottom=445;db=1;dl=1;edge=1;multiline=1;z=3}
+)
+/*}}*/
+
+import web.view;
+var wb = web.view(winform.custom);
+
+//按键事件
+winform.button.oncommand = function(){
+	//调用页面元素的方法，页面指定 ID 的元素相当于 JavaScript 全局变量，可直接访问
+	wb.xcall("myDialog.showModal")
+}
+
+//导出 aardio 对象给网页
+wb.external = {
+	setText = function(value){
+		//显示网页传过来的值
+		winform.edit.text = value;
+	} 
+}
+
+//设置网页上要显示的 HTML 代码
+wb.html = /**
+<!DOCTYPE html>
+<head>
+    <meta charset="UTF-8">
+    <style> 
+        input,button { font-size: 16px; padding: 2px 10px; margin: 10px; }
+        dialog { padding: 20px; border-radius: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>  
+    <dialog id="myDialog"> 
+        <p>请输入：</p>
+        <form method="dialog" id="form">
+    		<input id="username" />
+    		<button type="submit" value="OK">提交</button>
+  		</form>
+    </dialog>
+
+    <script> 
+    	//dialog 关闭事件
+		myDialog.addEventListener("close", () => {
+			
+			//调用 aardio 函数
+			aardio.setText(form.username.value);
+ 		});
+    </script>
+</body>
+</html>
+**/
+ 
+//显示窗口
+winform.show();
+
+//启动界面消息循环
+win.loopMessage();

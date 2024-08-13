@@ -1,0 +1,36 @@
+import win.ui;
+/*DSG{{*/
+mainForm = win.form(text="${PROJECTNAME}";right=757;bottom=467)
+mainForm.add(
+edit={cls="edit";left=31;top=52;right=723;bottom=371;edge=1;multiline=1;z=1}
+)
+/*}}*/
+
+import process.python;
+//process.python.path = "python.exe";
+//process.python.version = "3.8.10";
+//process.python.win32 = true;
+
+//内存加载资源文件中的 Python 代码，支持模板语法: chm://the%20language/template_syntax.html
+var prcs = process.python.exec(`/res/py.aardio`,"可添加任意个启动参数1","启动参数2");
+var info = prcs.json(); //读取其他数据可以改为 readAll() 或 read() 函数。
+
+//下面直接调用 Python 执行 Python 模块，并返回 JSON-RPC 客户端对象。 
+var python = process.python.jsonRpc("pyMain","可添加任意个启动参数1","启动参数2");
+
+//调用 Python 进程提供的函数
+var rep,err = python.greet("Jacen")
+
+if( rep[["result"]] ){  
+    mainForm.edit.print( `调用 py.greet("Jacen") 成功，返回值：`, rep.result ) 
+} 
+else{
+	/*
+	本地错误则 err 为错误信息，
+	服务端错误则 err 为 rep[["error"]] 对象的 JSON 文本格式
+	*/
+	mainForm.edit.print(  err )
+}
+
+mainForm.show();
+return win.loopMessage();

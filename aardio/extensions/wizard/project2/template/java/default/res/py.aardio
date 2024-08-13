@@ -1,0 +1,12 @@
+?>
+import sys;
+import json
+str = json.dumps(['foo', "<?= 
+
+time() //可使用模板语法嵌入 aardio  代码
+//模板语法手册: chm://the%20language/template_syntax.html
+
+?>",{'bar': ('baz', None, 1.0, 2)},sys.argv])
+
+# print 写到进程标准输出，在 aardio 中可以读取
+print( str  ) 

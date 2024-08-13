@@ -1,0 +1,63 @@
+ //Selenium
+import console;
+console.showLoading(" 正在启动 Selenium .NET ");
+ 
+/*
+在 aardio 里用 chrome.driver 更简单一些。
+aardio 实际不需要任何第三方组件即可调用 ChromeDriver，
+
+dotNet.Selenium 基于开源的 Selenium .NET 版本，一些小的改进：
+1、自动检测并配置运行环境，自动匹配 Chrome 版本下载对应版本的 ChromeDriver。
+2、自动兼容系统安装的 Chrome 或 Edge Chromium，自动选择 ChromeDriver 或 EdgeDriver
+3、内存加载所有 DLL ，可以生成绿色独立的 EXE 文件。
+*/
+import dotNet.Selenium;
+
+//简单化创建 WebDriver 对象
+var wd = Selenium.CreateDefaultWebDriver(); 
+
+//打开网址。
+wd.Url = "https://www.baidu.com" 
+ 
+//By 对象用于创建查找节点的条件对象。
+var By = Selenium.By;
+
+/*
+查找并等待输入框节点，
+Selenium 自己提供的 WebDriverWait 不好用，这个 WaitEle 函数是用 aardio 实现的。 
+*/
+var keyword = wd.WaitEle( By.Id("kw")  ) 
+
+//清空输入框 
+keyword.Clear();
+    
+//发送按键
+keyword.SendKeys("aardio");
+
+//查找按钮
+var button = wd.FindElement( By.Id("su") );
+
+//点击按钮
+button.Click();
+ 
+//获取 cookie  
+var cookies = wd.Manage().Cookies.AllCookies; 
+
+//用 dotNet 遍历 .NET 数组
+for i,cookie in dotNet.each(cookies) {
+	console.log(cookie.Name)
+	console.log(cookie.Value)
+	console.log(cookie.Domain)
+}
+
+//截图
+wd.GetScreenshot().SaveAsFile(io.fullpath("/baidu.png") );
+//上面第2个参数 0 ,也可以用枚举 SeleniumBasic.Utility.ScreenshotImageFormat.Png 获取
+
+console.close();
+console.log(wd.Title, wd.Url);
+console.log(wd.PageSource);
+console.pause(,"按任意键退出浏览器");
+
+//退出浏览器
+wd.Quit();

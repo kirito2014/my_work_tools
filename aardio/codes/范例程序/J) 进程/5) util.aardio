@@ -1,0 +1,20 @@
+//内存与模块搜索
+import console.int; 
+import process.util;
+
+/*
+兼容 64 位与 32 位目标进程。
+兼容 64 位与 32 位操作系统。
+*/
+var prcs = process.util("文件名.exe");
+
+var memInfo = prcs.searchModuleMemory("模块名.dll","要搜索的数据，支持正则",-2);
+
+//从目标内存读取指针地址，再读取指针地址指向指向的字符串
+var data = prcs.readStringPtr(memInfo.address,0x20);
+
+//打印十六进制数据
+console.hex(data);
+
+//进程基址
+console.log( prcs.getModuleBaseAddress() );

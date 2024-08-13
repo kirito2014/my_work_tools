@@ -1,0 +1,92 @@
+//SheetJS
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="web.view - 操作 Excel 表格";right=800;bottom=469;bgcolor=16777215)
+winform.add()
+/*}}*/
+
+import web.view;
+var wb = web.view(winform);
+
+//导出 aardio 函数给 JavaScript
+wb.external = {
+    saveXlsxFile = function(buffer,filename){ 
+        import crypt;
+		import process;
+
+        var buffer = crypt.decodeBin(buffer);
+        string.save(filename,buffer);
+        
+        process.exploreSelect(filename);
+    }; 
+}
+    
+wb.html = /**
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style type="text/css">
+    html,body{ height:100%; margin:0; } 
+    </style>
+    <script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/handsontable/8.3.2/handsontable.full.min.js"></script>
+    <link rel="stylesheet" href="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/handsontable/8.3.2/handsontable.full.min.css" />
+</head>
+<body>
+    <div id="header"></div>
+    <div id="container"> 
+        <div class="lside"> </div> 
+        <div class="rside"> </div>  
+    </div>
+</body>
+
+<script type="text/javascript">
+
+ 	//https://docs.sheetjs.com/docs/api/parse-options
+ 	
+	let data = [
+    	['bookType', 'extension', 'sheets', 'Description'],
+    	['xlsx', '.xlsx', 'multi', 'Excel 2007+ XML Format'],
+    	['xlsb', '.xlsb', 'multi', 'Excel 2007+ Binary Format'],
+	]	 
+	
+	//创建工作簿
+	let book = XLSX.utils.book_new()
+	
+	//创建工作表 
+	let sheet = XLSX.utils.aoa_to_sheet(data) 
+	XLSX.utils.book_append_sheet(book, sheet, 'Sheet1') 
+	 
+	//输出为文件
+	var xlsxData = XLSX.write(book,{bookType:"xlsx",type:"base64"}) 
+	
+	//作为参数传给 aardio 函数
+	aardio.saveXlsxFile(xlsxData,"/test.xlsx")  
+	
+	//读取 XLSX 文件
+	let book2 = XLSX.read(xlsxData , {bookType:"xlsx",type:"base64"})
+	
+	//输出为 HTML 表格
+	let sheet1 = book2.Sheets[book2.SheetNames[0]]
+	//document.body.innerHTML = XLSX.utils.sheet_to_html( sheet1 ); 
+	
+	//转换为数组
+	let array = XLSX.utils.sheet_to_json(sheet1);
+  
+ 	//显示 Excel 
+	const hot = new Handsontable(document.body, {
+  		data: array,
+  		rowHeaders: true,
+  		colHeaders: true,
+  		height: 'auto',
+  		autoWrapRow: true,
+  		autoWrapCol: true,
+  		licenseKey: 'non-commercial-and-evaluation' 
+	});
+</script>
+</html>
+**/
+ 
+winform.show();
+win.loopMessage();

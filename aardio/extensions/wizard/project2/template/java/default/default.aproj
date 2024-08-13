@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project ver="10" name="Java 工程" libEmbed="true" icon="..." ui="win" output="aardio工程22.exe" CompanyName="单位名称" FileDescription="aardio工程22" LegalCopyright="Copyright (C) 作者 2021" ProductName="aardio工程22" InternalName="aardio工程22" FileVersion="0.0.0.1" ProductVersion="0.0.0.1" publishDir="/dist/" dstrip="false" local="false" ignored="false">
+	<file name="main.aardio" path="main.aardio" comment="main.aardio"/>
+	<folder name="资源文件" path="res" comment="嵌入资源目录" embed="true" local="false" ignored="false"/>
+	<folder name="窗体文件" path="dlg" comment="目录" embed="true" local="false" ignored="false"/>
+	<folder name="Java" path="java" embed="false" comment="Jar,class 等 Java 资源请放在此目录下" local="true" ignored="false">
+		<folder name="aardio" path="java\aardio" comment="java\aardio">
+			<folder name="sample" path="java\aardio\sample" comment="java\aardio\sample">
+				<file name="HelloworldApp.class" path="java\aardio\sample\HelloworldApp.class" comment="java\aardio\sample\HelloworldApp.class"/>
+				<file name="HelloworldApp.java" path="java\aardio\sample\HelloworldApp.java" comment="java\aardio\sample\HelloworldApp.java"/>
+			</folder>
+		</folder>
+	</folder>
+</project>

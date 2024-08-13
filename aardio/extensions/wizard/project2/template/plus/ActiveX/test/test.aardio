@@ -1,0 +1,16 @@
+import console.int;
+import com;
+
+var obj = com.TryCreateObject("${COLIBRARY_PATH}.${COCLASS_NAME}"); 
+if(!obj){
+	return console.log("请发布本工程,注册控件以后再运行本示例")  
+}
+
+console.log("12+3等于" ,obj.Add(12,3) );
+
+obj.aardio("
+	import win;
+	win.msgbox('Hello,我是 aardio 编写的COM控件,我正在执行 aardio 代码','${COLIBRARY_PATH}.${COCLASS_NAME}')
+")
+
+obj.Quit();

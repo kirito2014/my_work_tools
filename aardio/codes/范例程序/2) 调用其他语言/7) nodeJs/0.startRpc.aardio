@@ -1,0 +1,36 @@
+//调用 JS 函数
+import console.int;  
+import nodeJs;
+
+//JS 代码
+var js = /******
+
+global.Calculator = class  {
+    static add(a, b) {
+        return a + b;
+    }
+
+    static multiply(a, b) {
+        return a * b;
+    }
+}
+
+global.add = function (a, b) {
+    return a + b;
+}
+******/
+ 
+//启动 Node.js 。
+var node = nodeJs.startRpc(js,//指定 JS 代码或文件路径，这种方式在 JS 里 console.log 不可用
+	"args1","args2");//可选指定任意个启动参数( JS 用 process.argv 获取 )。
+
+//调用 JS 对象，必须是全局对象 global 的成员对象。
+var ret,err = node.Calculator.add(2,3);
+
+//调用 JS 全局函数。
+var ret,err = node.add(2,3);
+
+//获取返回值
+ret = ret[["result"]];
+
+console.log(ret);

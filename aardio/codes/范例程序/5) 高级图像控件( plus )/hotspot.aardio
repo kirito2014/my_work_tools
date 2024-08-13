@@ -1,0 +1,94 @@
+//图像热点效果
+import inet.http;
+import win.ui;
+/*DSG{{*/
+mainForm = win.form(text="太阳系";right=631;bottom=591;border="none")
+mainForm.add(
+plusEarth={cls="plus";text="地球";left=444;top=181;right=536;bottom=273;border={radius=-1};notify=1;z=3};
+plusJupiter={cls="plus";text="木星";left=268;top=319;right=360;bottom=411;border={radius=-1};notify=1;z=5};
+plusMars={cls="plus";text="火星";left=95;top=321;right=187;bottom=413;border={radius=-1};notify=1;z=6};
+plusMercury={cls="plus";text="水星";left=92;top=181;right=184;bottom=273;border={radius=-1};notify=1;z=1};
+plusMoon={cls="plus";text="月球";left=356;top=45;right=448;bottom=137;border={radius=-1};notify=1;z=10};
+plusNeptune={cls="plus";text="海王星";left=268;top=460;right=360;bottom=552;border={radius=-1};notify=1;z=8};
+plusPluto={cls="plus";text="冥王星";left=443;top=460;right=535;bottom=552;border={radius=-1};notify=1;z=9};
+plusSaturn={cls="plus";text="土星";left=444;top=320;right=536;bottom=412;border={radius=-1};notify=1;z=4};
+plusSun={cls="plus";text="太阳";left=176;top=40;right=280;bottom=144;border={radius=-1};notify=1;z=11};
+plusUranus={cls="plus";text="天王星";left=94;top=458;right=186;bottom=550;border={radius=-1};notify=1;z=7};
+plusVenus={cls="plus";text="金星";left=268;top=181;right=360;bottom=273;border={radius=-1};notify=1;z=2}
+)
+/*}}*/
+
+//加载网络图像作为窗口背景，加载工程中的图像更快一些。
+mainForm.image = "http://download.aardio.com/demo/images/solar.jpg";
+
+/*
+如果在窗体设计器中指定背景图像，可以直接设置九宫格切图效果。
+否则可用下面的代码配置窗体九宫格切图参数，参数都为 0 则等同于拉伸图像。
+*/
+with mainForm{bkLeft=0;bkTop=0;bkRight=0;bkBottom=0}
+
+//设置点击热点打开的链接数据表
+var baike = {
+	plusEarth = "https://baike.baidu.com/item/%E5%9C%B0%E7%90%83/6431";
+	plusJupiter = "https://baike.baidu.com/item/%E6%9C%A8%E6%98%9F/222105";
+	plusMars = "https://baike.baidu.com/item/%E7%81%AB%E6%98%9F/5627";
+	plusMercury = "https://baike.baidu.com/item/%E6%B0%B4%E6%98%9F/135917";
+	plusMoon = "https://baike.baidu.com/item/%E6%9C%88%E7%90%83/30767";
+	plusNeptune = "https://baike.baidu.com/item/%E6%B5%B7%E7%8E%8B%E6%98%9F/30351";
+	plusPluto = "https://baike.baidu.com/item/%E5%86%A5%E7%8E%8B%E6%98%9F/137498";
+	plusSaturn = "https://baike.baidu.com/item/%E5%9C%9F%E6%98%9F/136354";
+	plusSun = "https://baike.baidu.com/item/%E5%A4%AA%E9%98%B3/24010";
+	plusUranus = "https://baike.baidu.com/item/%E5%A4%A9%E7%8E%8B%E6%98%9F/21805";
+	plusVenus = "https://baike.baidu.com/item/%E9%87%91%E6%98%9F/19410";
+}
+
+//遍历窗口上的所有 plus 控件
+for( name,ctrl in mainForm.eachControl("plus") ){
+    
+    //设置 plus 控件样式
+	ctrl.skin({ 
+		background = { 
+			hover = 0xA0E0E000;
+			active = 0xE0008080;
+		}
+		foreground = { 
+			hover = 0x00000001;
+			active = 0x00000001;
+		}
+	})
+
+	//启用 plus 控件的径向渐变效果
+	ctrl.linearGradient = -1;
+	
+	//响应 plus 控件的点击事件
+	ctrl.oncommand = function(id,event){
+		
+		//创建子窗口
+		var frmWeb = win.form(text="简介";right=914;bottom=645;parent=mainForm)  
+
+		import web.form; 
+		var wb = web.form( frmWeb );
+		wb.noScriptErr = true;
+		
+		wb.TitleChange = function( text ) {
+			frmWeb.text = text
+		};
+		
+		frmWeb.openUrl = function(url){
+			wb.go(url); 
+		}
+		
+		frmWeb.openUrl(baike[name])
+    	frmWeb.doModal(); 
+	}
+}
+
+//自绘标题栏
+import win.ui.simpleWindow2;
+win.ui.simpleWindow2(mainForm);
+
+//显示窗口
+mainForm.show();
+
+//启动界面线程消息循环
+win.loopMessage();

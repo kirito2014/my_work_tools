@@ -1,0 +1,121 @@
+//fsys.media
+import win.ui;
+import fonts.fontAwesome;
+/*DSG{{*/
+var winform = win.form(text="fsys.media 音频播放控制，显示播放进度";right=534;bottom=84)
+winform.add(
+btnPause={cls="plus";text="暂停";left=226;top=34;right=325;bottom=62;align="left";bgcolor=-5197169;disabled=1;font=LOGFONT(h=-16);iconStyle={align="left";font=LOGFONT(h=-16;name='FontAwesome');padding={left=14;top=2}};iconText='\uF04C';notify=1;textPadding={left=35};z=3};
+btnPlay={cls="plus";text="播放";left=343;top=34;right=433;bottom=62;align="left";bgcolor=-5197169;font=LOGFONT(h=-16);iconStyle={align="left";font=LOGFONT(h=-16;name='FontAwesome');padding={left=14;top=2}};iconText='\uF04B';notify=1;textPadding={left=35};z=2};
+progress={cls="plus";left=15;top=16;right=510;bottom=20;bgcolor=6447459;forecolor=9959653;notify=1;z=1}
+)
+/*}}*/
+
+import fsys.dlg;
+import fsys.media;
+
+var mediaFile;
+winform.btnPlay.oncommand = function(id,event){
+	if(mediaFile) {
+    	mediaFile.stop(); 
+    	winform.progress.hide = true;
+    }
+    
+	if(!winform.btnPlay.checked){
+		return;
+	}
+	winform.btnPlay.checked = false;
+	
+    var path = fsys.dlg.open("*.mp3|*.mp3||");
+    if(!path) return;
+
+	mediaFile = fsys.media(path);
+	if(mediaFile) {
+		mediaFile.play(); 
+		
+		winform.btnPlay.checked = true;
+		winform.btnPause.disabled = false;
+		
+		winform.progress.setProgressRange(0,mediaFile.length());
+	 	winform.progress.progressPos = 0; 
+	 	winform.progress.hide = false;
+	}	
+}
+
+winform.btnPause.oncommand = function(id,event){
+	if( mediaFile ){
+		if(mediaFile.isPlaying()){
+			mediaFile.pause();
+		}
+		else {
+			mediaFile.resume();
+		}
+	} 
+}
+
+winform.setInterval( 
+	function(){ 
+		if( winform.btnPlay.checked && mediaFile){ 
+			if( mediaFile.isPlaying()){
+				winform.progress.progressPos = mediaFile.position();
+			} 
+			elseif( mediaFile.isStopped() ) {
+				winform.progress.hide = true;
+				winform.btnPlay.checked = false; 
+				winform.btnPause.disabled = true;
+			}
+		} 
+	},500
+)
+
+winform.btnPause.skin({
+	background={
+		default=0x668FB2B0;
+		disabled=0xFFCCCCCC;
+		hover=0xFF928BB3
+	};
+	color={
+		default=0xFF000000;
+		disabled=0xFF6D6D6D
+	};
+	checked = {
+		iconText = '\uF04B';
+		text = "继续";
+		background={
+			default=0x668FB2B0;
+			disabled=0xFFCCCCCC;
+			hover=0xFF928BB3
+		};
+		color={
+			default=0xFF000000;
+			disabled=0xFF6D6D6D
+		};
+	}
+})
+
+winform.btnPlay.skin({
+	background={
+		default=0x668FB2B0;
+		disabled=0xFFCCCCCC;
+		hover=0xFF928BB3
+	};
+	color={
+		default=0xFF000000;
+		disabled=0xFF6D6D6D
+	};
+	checked = {
+		iconText = '\uF04D';
+		text = "停止";
+		background={
+			default=0x668FB2B0;
+			disabled=0xFFCCCCCC;
+			hover=0xFF928BB3
+		};
+		color={
+			default=0xFF000000;
+			disabled=0xFF6D6D6D
+		};
+	}
+})
+
+winform.show();
+win.loopMessage();

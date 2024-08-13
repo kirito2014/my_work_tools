@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Script Runner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 15px;
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .output {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>Python Script Runner</h2>
+    <label for="folderPath">选择文件夹:</label>
+    <input type="text" id="folderPath" placeholder="选择文件夹" readonly>
+    <input type="file" webkitdirectory directory multiple style="display: none;" id="folderSelector">
+
+    <label for="filePath">选择目标文件:</label>
+    <input type="text" id="filePath" placeholder="选择目标文件" readonly>
+    <input type="file" accept=".xlsx,.xls,.xlsm" style="display: none;" id="fileSelector">
+
+    <button id="runButton" disabled>确认</button>
+
+    <div id="output" class="output"></div>
+</div>
+
+<script>
+    const folderSelector = document.getElementById('folderSelector');
+    const fileSelector = document.getElementById('fileSelector');
+    const folderPathInput = document.getElementById('folderPath');
+    const filePathInput = document.getElementById('filePath');
+    const runButton = document.getElementById('runButton');
+    const outputDiv = document.getElementById('output');
+
+    folderPathInput.addEventListener('click', () => folderSelector.click());
+    filePathInput.addEventListener('click', () => fileSelector.click());
+
+    folderSelector.addEventListener('change', (event) => {
+        const files = event.target.files;
+        if (files.length > 0) {
+            const folderPath = files[0].webkitRelativePath.split('/')[0];
+            folderPathInput.value = folderPath;
+        } else {
+            folderPathInput.value = '';
+        }
+        checkEnableRunButton();
+    });
+
+    fileSelector.addEventListener('change', (event) => {
+        const filePath = event.target.files[0];
+        if (filePath) {
+            filePathInput.value = filePath.name;
+        } else {
+            filePathInput.value = '';
+        }
+        checkEnableRunButton();
+    });
+
+    function checkEnableRunButton() {
+        if (folderPathInput.value && filePathInput.value) {
+            runButton.disabled = false;
+        } else {
+            runButton.disabled = true;
+        }
+    }
+
+    runButton.addEventListener('click', () => {
+        outputDiv.textContent = '运行中...';
+
+        const formData = new FormData();
+        formData.append('folderPath', folderPathInput.value);
+        formData.append('filePath', filePathInput.value);
+
+        fetch('/run-script', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                outputDiv.textContent = `错误: ${data.error}`;
+            } else {
+                outputDiv.textContent = `输出: ${data.output}`;
+            }
+        })
+        .catch(error => {
+            outputDiv.textContent = `请求失败: ${error}`;
+        });
+    });
+</script>
+
+</body>
+</html>

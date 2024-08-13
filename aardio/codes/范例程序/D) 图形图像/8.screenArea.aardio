@@ -1,0 +1,12 @@
+//截屏选区
+import gdip.snap;
+import mouse.screenArea;
+var screenArea = mouse.screenArea();
+screenArea.onSelectionChanged = function(rc){
+	
+	var bmp = gdip.snap.file("/test.jpg",screenArea.hwnd,rc);
+	owner.close();
+	
+	raw.explore("/test.jpg");
+}
+screenArea.doModal();

@@ -1,0 +1,41 @@
+//线程通道
+import console; 
+import thread.channel;
+ 
+//创建通道
+var chan = thread.channel(10);
+ 
+//创建新的线程
+thread.invoke( 
+	function(chan){  
+ 
+ 		//发送值到通道，如果通道缓存队列满了就等待
+		chan <<= "这是字符串1";
+		chan <<= "这是字符串2";
+		chan <<= "这是字符串3";
+		chan <<= "这是字符串4";
+ 
+	},chan 
+)
+
+//如果通道非空（或仍有其他线程占用该通道）则循环读取
+while( ! chan.empty() ){
+	/*
+	注意：即使通道的缓存值队列空了没有数据，
+	如果仍有其他引用该通道的线程在工作中， chan.empty() 仍然会返回 false 。
+	仅获取通道中值队列长度可改用 chan.len() 函数。
+	*/
+	var v;
+	
+	//自通道读取值，没有值就等待
+	v <<= chan;
+	
+	console.log(v); 
+}
+
+//也可以这样写：循环读取通道缓存队列的值，直接通道为空
+for v in chan.each(){
+	console.log(v);
+}
+
+console.pause(true);

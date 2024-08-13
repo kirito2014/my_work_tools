@@ -1,0 +1,74 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project ver="10" name="工程向导" libEmbed="true" icon="..." ui="win" output="tabs.exe" CompanyName="单位名称" FileDescription="附加说明......" LegalCopyright="Copyright (C) 作者 2011" ProductName="aardio工程15" InternalName="快手工程15" FileVersion="0.0.1.04" ProductVersion="0.0.1.04" publishDir="/dist/" dstrip="false" publishDir="/Publish/" local="false" ignored="false">
+	<file name="main.aardio" path="main.aardio" comment="main.aardio"/>
+	<folder name="资源文件" path="res" embed="true">
+		<folder name="icons" path="res\icons" comment="res\icons">
+			<file name="console.png" path="res\icons\console.png" comment="res\icons\console.png"/>
+			<file name="fastcgi.png" path="res\icons\fastcgi.png" comment="res\icons\fastcgi.png"/>
+			<file name="plus.png" path="res\icons\plus.png" comment="res\icons\plus.png"/>
+			<file name="web.png" path="res\icons\web.png" comment="res\icons\web.png"/>
+			<file name="website.png" path="res\icons\website.png" comment="res\icons\website.png"/>
+			<file name="winform.png" path="res\icons\winform.png" comment="res\icons\winform.png"/>
+		</folder>
+		<folder name="images" path="res\images" comment="res\images" embed="false">
+			<file name="bg.gif" path="res\images\bg.gif" comment="res\images\bg.gif"/>
+			<file name="bg.png" path="res\images\bg.png" comment="res\images\bg.png"/>
+			<file name="check-active1.png" path="res\images\check-active1.png" comment="res\images\check-active1.png"/>
+			<file name="check-disabled1.png" path="res\images\check-disabled1.png" comment="res\images\check-disabled1.png"/>
+			<file name="check-hover1.png" path="res\images\check-hover1.png" comment="res\images\check-hover1.png"/>
+			<file name="check1.png" path="res\images\check1.png" comment="res\images\check1.png"/>
+			<file name="main-nav-bg-hover.png" path="res\images\main-nav-bg-hover.png" comment="res\images\main-nav-bg-hover.png"/>
+			<file name="main-nav-bg.png" path="res\images\main-nav-bg.png" comment="res\images\main-nav-bg.png"/>
+			<file name="uncheck-active1.png" path="res\images\uncheck-active1.png" comment="res\images\uncheck-active1.png"/>
+			<file name="uncheck-disabled1.png" path="res\images\uncheck-disabled1.png" comment="res\images\uncheck-disabled1.png"/>
+			<file name="uncheck-hover1.png" path="res\images\uncheck-hover1.png" comment="res\images\uncheck-hover1.png"/>
+			<file name="uncheck1.png" path="res\images\uncheck1.png" comment="res\images\uncheck1.png"/>
+		</folder>
+	</folder>
+	<folder name="窗体" path="forms" comment="" embed="true" local="false" ignored="false">
+		<file name="console.aardio" path="forms\console.aardio" comment="forms\console.aardio"/>
+		<file name="fastcgi.aardio" path="forms\fastcgi.aardio" comment="forms\fastcgi.aardio"/>
+		<file name="plus.aardio" path="forms\plus.aardio" comment="forms\plus.aardio"/>
+		<file name="web.aardio" path="forms\web.aardio" comment="forms\web.aardio"/>
+		<file name="website.aardio" path="forms\website.aardio" comment="forms\website.aardio"/>
+		<file name="winform.aardio" path="forms\winform.aardio" comment="forms\winform.aardio"/>
+		<folder name="console" path="forms\console" comment="forms\console">
+			<file name="console.aardio" path="forms\console\console.aardio" comment="forms\console\console.aardio"/>
+			<file name="service.aardio" path="forms\console\service.aardio" comment="forms\console\service.aardio"/>
+		</folder>
+		<folder name="images" path="forms\images" comment="forms\images">
+			<file name="console.jpg" path="forms\images\console.jpg" comment="forms\images\console.jpg"/>
+			<file name="electron.jpg" path="forms\images\electron.jpg" comment="forms\images\electron.jpg"/>
+			<file name="htmlayout.jpg" path="forms\images\htmlayout.jpg" comment="forms\images\htmlayout.jpg"/>
+			<file name="winform.jpg" path="forms\images\winform.jpg" comment="forms\images\winform.jpg"/>
+		</folder>
+		<folder name="plus" path="forms\plus" comment="forms\plus" local="false" embed="false" ignored="false">
+			<file name="activeX.aardio" path="forms\plus\activeX.aardio" comment="forms\plus\activeX.aardio"/>
+			<file name="bat.aardio" path="forms\plus\bat.aardio" comment="forms\plus\bat.aardio"/>
+			<file name="first.aardio" path="forms\plus\first.aardio" comment="forms\plus\first.aardio"/>
+			<file name="icon.aardio" path="forms\plus\icon.aardio" comment="forms\plus\icon.aardio"/>
+			<file name="sfx.aardio" path="forms\plus\sfx.aardio" comment="forms\plus\sfx.aardio"/>
+			<file name="tabs.aardio" path="forms\plus\tabs.aardio" comment="forms\plus\tabs.aardio"/>
+			<folder name="images" path="forms\plus\images" comment="forms\plus\images">
+				<file name="1.jpg" path="forms\plus\images\1.jpg" comment="forms\plus\images\1.jpg"/>
+			</folder>
+		</folder>
+		<folder name="server" path="forms\server" comment="forms\server" local="false" embed="false"/>
+		<folder name="web" path="forms\web" comment="forms\web" local="false" embed="false" ignored="false">
+			<file name="chromeApp.aardio" path="forms\web\chromeApp.aardio" comment="forms\web\chromeApp.aardio"/>
+			<file name="htmlayout.aardio" path="forms\web\htmlayout.aardio" comment="forms\web\htmlayout.aardio"/>
+			<file name="webform.aardio" path="forms\web\webform.aardio" comment="forms\web\webform.aardio"/>
+			<file name="sciter.aardio" path="forms\web\sciter.aardio" comment="forms\web\sciter.aardio"/>
+			<file name="view.aardio" path="forms\web\view.aardio" comment="forms\web\view.aardio"/>
+		</folder>
+		<folder name="winform" path="forms\winform" comment="forms\winform" local="false" embed="false" ignored="false">
+			<file name="blank.aardio" path="forms\winform\blank.aardio" comment="forms\winform\blank.aardio"/>
+			<file name="demo.aardio" path="forms\winform\demo.aardio" comment="forms\winform\demo.aardio"/>
+			<file name="java.aardio" path="forms\winform\java.aardio" comment="forms\winform\java.aardio"/>
+			<file name="python.aardio" path="forms\winform\python.aardio" comment="forms\winform\python.aardio"/>
+			<folder name="images" path="forms\winform\images" comment="forms\winform\images">
+				<file name="paint.png" path="forms\winform\images\paint.png" comment="forms\winform\images\paint.png"/>
+			</folder>
+		</folder>
+	</folder>
+</project>

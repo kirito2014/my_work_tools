@@ -1,0 +1,26 @@
+//UIA/ACC 探测器
+import process;
+import sevenZip.decoder2.httpFile;
+import winex;
+import win;
+
+for processEntry in process.each( "Inspect.exe" ) {
+	var hwnd = winex.find("InspectClass","^Inspect\s+",processEntry.th32ProcessID);
+	if(hwnd){
+		win.setForeground(hwnd);
+		return;
+	} 
+}
+
+var pathInspect = "~\download\tools\Inspect.exe"
+if(!io.exist(pathInspect)){
+	sevenZip.decoder2.httpFile.download(
+		"http://download.aardio.com/v10.files/tool/Inspect.7z",
+		"正在下载 UIA / MSAA 自动化探测器：Inspect ","~/download/tools/Inspect-temp","~/download/tools/"
+	)
+	
+	import fsys;
+	fsys.delete("~/download/tools/Inspect-temp")	
+}
+
+process.execute(pathInspect)

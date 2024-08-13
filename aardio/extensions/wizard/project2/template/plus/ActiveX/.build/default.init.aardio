@@ -1,0 +1,33 @@
+﻿//发布前触发
+import vc6; 
+import console;
+import fsys;
+import ide;
+
+var tlbDir = ..io.exist("/typelib") || ..io.exist("/../typelib");
+	
+var vc = vc6(tlbDir);
+console.log("正在编译 COM 类型库。")
+
+var err;
+fsys.enum( tlbDir, "*.odl",
+	function(dir,filename,fullpath,findData){ 
+		if(filename){ 
+				
+				var exitCode = vc.exec('MIDL.EXE'
+					,"/client", "none", "/server","none" 
+					,"/I","../.build/include"
+					, filename
+					,"/tlb", io.splitpath(filename).name + ".tlb")
+					
+				if(exitCode){
+					err = true;
+				}
+		} 
+	},false
+); 
+
+if(..io.exist("/typelib") || err )console.pause()
+else {
+	..io.close();
+}

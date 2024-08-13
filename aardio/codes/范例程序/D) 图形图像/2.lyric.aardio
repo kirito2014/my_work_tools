@@ -1,0 +1,7 @@
+//桌面歌词效果
+import win.util.lyric;
+var lyric = win.util.lyric();
+lyric.show();
+
+lyric.text = "桌面歌词，右键退出";
+win.loopMessage();
