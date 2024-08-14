@@ -1,4 +1,28 @@
-#
+# -*- coding: utf-8 -*-
+"""
+********************************************************************
+*
+*    Filename   :  case_collector.py
+*
+*    Description:  Demonstrate how to add copyright comments in Python.
+*
+*    Version    :  1.0
+*    Created    :  2024/08/01 10:25:07
+*    Revision   :  none
+*    Compiler   :  python
+*
+*    Author     :  wangmujun(解决方案部/战略规划部), 
+*    Company    :  深圳市长亮科技股份有限公司
+*
+*    Author(s)  :  wangmujun (wangmujun@sunline.cn)
+*
+*    License    :  GPL
+*
+*    Copyright (c) 2024, Sunline Corporation. All rights reserved.
+*
+********************************************************************
+"""
+
 
 import os,sys,re
 import glob
