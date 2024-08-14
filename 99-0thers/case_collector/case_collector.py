@@ -825,10 +825,11 @@ class App():
                 self.info_display.insert(tk.END, message + "\n", highlight)
                 if highlight:
                     self.info_display.tag_config(highlight, foreground="white", background=highlight)
+                self.info_display.see(tk.END)  # 自动滚动到最新行
         except queue.Empty:
             pass
         self.root.after(100, self.update_log_display)  # 每100ms检查一次队列
-        
+
     # def log_message(self, message, color="blue"):
     #     self.info_display.insert(tk.END, f"{message}\n", "highlight")
     #     self.info_display.tag_config("highlight", foreground="white", background=color)
