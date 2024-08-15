@@ -30,12 +30,13 @@ import pandas as pd
 import openpyxl
 from collections import OrderedDict
 import tkinter as tk
-from tkinter import Tk, Label
+from tkinter import Tk, Label,ttk
 from tkinter import filedialog, messagebox,Text,ttk,scrolledtext
 from pathlib import Path
 from PIL import Image, ImageTk
 import queue
 import threading
+from ttkthemes import ThemedTk
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -796,54 +797,41 @@ def get_resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
-# def load_and_display_image():
-#     # 打开图片
-#     image_path = "res/sunline_logo_original.png"
-#     image = Image.open(image_path)
-    
-#     # 缩放到原来的30%
-#     image = image.resize((int(image.width * 0.3), int(image.height * 0.3)), Image.ANTIALIAS)
-    
-#     # 转换为适合Tkinter显示的格式
-#     photo = ImageTk.PhotoImage(image)
-    
-#     # 创建Label并显示图片
-#     label = Label(root, image=photo)
-#     label.image = photo  # 需要保持对图片的引用，否则图片会被垃圾回收
-#     label.pack()
 
 class App():
     def __init__(self, root):
-        self.root = root
+        # 使用主题
+        self.root = ThemedTk(theme="breeze")
         self.root.title("案例合并工具")
+        self.root.geometry('700x500')
+        self.root.configure(bg='#f0f0f0')  # 设置背景颜色
+        self.root.option_add("*Font", "微软雅黑 10")  # 设置全局字体
 
         # 加载logo图片
         logo_path = get_resource_path('res/sunline_logo_original.png')
         logo_image = Image.open(logo_path)
         logo_image = logo_image.resize((int(logo_image.width * 0.4), int(logo_image.height * 0.4)))
         self.logo_photo = ImageTk.PhotoImage(logo_image)
+        self.logo_label = tk.Label(self.root, image=self.logo_photo, bg='#f0f0f0')
+        self.logo_label.place(x=20, y=20)
 
-        # 显示logo在左上角
-        self.logo_label = tk.Label(self.root, image=self.logo_photo)
-        self.logo_label.place(x=10, y=15)  # 设置在左上角
+        # 布局
+        frame = tk.Frame(self.root, bg='#f0f0f0')
+        frame.pack(pady=30, padx=20, anchor="n")
 
+        ttk.Button(frame, text="选择要合并的文件夹", command=self.select_folder, width=20).grid(row=0, column=0, padx=10, pady=5)
+        ttk.Button(frame, text="选择目标文件", command=self.select_target_file, width=20).grid(row=0, column=1, padx=10, pady=5)
+        ttk.Button(frame, text="合并案例", command=self.run_script, width=20).grid(row=1, column=0, padx=10, pady=5)
+        ttk.Button(frame, text="清除信息", command=self.clear_info, width=20).grid(row=1, column=1, padx=10, pady=5)
 
-        self.folder_var = tk.StringVar()
-        self.target_file_var = tk.StringVar()
+        self.info_display = scrolledtext.ScrolledText(
+            self.root, height=15, width=80, bg='#e0e0e0', fg='#333333', font=("Consolas", 10), bd=1, relief='solid'
+        )
+        self.info_display.pack(pady=10)
 
-        frame = tk.Frame(self.root)
-        frame.pack(pady=30, anchor="n")
-
-        tk.Button(frame, text="选择要合并的文件夹", command=self.select_folder, width=20).grid(row=0, column=0, padx=5, pady=5)
-        tk.Button(frame, text="选择目标文件", command=self.select_target_file, width=20).grid(row=0, column=1, padx=5, pady=5)
-        tk.Button(frame, text="合并案例", command=self.run_script, width=20).grid(row=1, column=0, padx=5, pady=5)
-        tk.Button(frame, text="清除信息", command=self.clear_info, width=20).grid(row=1, column=1, padx=5, pady=5)
-
-        self.info_display = scrolledtext.ScrolledText(self.root, height=15, width=80)
-        self.info_display.pack(pady=5)
-
-        self.info_label = tk.Label(self.root, text="请选择文件夹或文件", fg="red")
+        self.info_label = ttk.Label(self.root, text="请选择文件夹或文件", foreground="red", background="#f0f0f0")
         self.info_label.pack()
+
         # 启动实时日志显示功能
         self.update_log_display()
 
@@ -859,10 +847,6 @@ class App():
         except queue.Empty:
             pass
         self.root.after(100, self.update_log_display)  # 每100ms检查一次队列
-
-    # def log_message(self, message, color="blue"):
-    #     self.info_display.insert(tk.END, f"{message}\n", "highlight")
-    #     self.info_display.tag_config("highlight", foreground="white", background=color)
 
     def select_folder(self):
         folder_path = filedialog.askdirectory()
@@ -899,19 +883,8 @@ class App():
             log_message(f"[ ERROR] 请选择有效文件.","red")
             return
 
-        # try:
-        #     log_message(self.info_display,f"[  INFO ] |源文件路径：{folder_path}.  \n |目标文件：{target_file_path}.", "blue")
-        #     rename_file(folder_path)
-        #     log_message(self.info_display,"[  INFO ] 文件名处理完成.", "green")
-        #     log_message(self.info_display,"[  INFO ] 正在合并请稍后.", "green")
-        #     process_files_in_folder(folder_path, target_file_path)
-        #     log_message(self.info_display,"[  INFO ] 处理客户清单.", "blue")
-        #     log_message(self.info_display,"[  INFO ] 文件合并处理完成.", "blue")
-                # 在后台线程中运行脚本
         threading.Thread(target=self.run_background_script, args=(folder_path, target_file_path)).start()
 
-        # except Exception as e:
-        #     log_message(self.info_display, f"[ ERROR] 执行脚本失败: {e}","red")
     def run_background_script(self, folder_path, target_file_path):
         try:
             log_message(f"--++本脚本最终解释权归长亮科技所有++--", "blue")

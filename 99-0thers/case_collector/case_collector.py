@@ -800,36 +800,38 @@ def get_resource_path(relative_path):
 
 class App():
     def __init__(self, root):
-        self.root = root
+        # 使用主题
+        self.root = ThemedTk(theme="breeze")
         self.root.title("案例合并工具")
+        self.root.geometry('700x500')
+        self.root.configure(bg='#f0f0f0')  # 设置背景颜色
+        self.root.option_add("*Font", "微软雅黑 10")  # 设置全局字体
 
         # 加载logo图片
         logo_path = get_resource_path('res/sunline_logo_original.png')
         logo_image = Image.open(logo_path)
         logo_image = logo_image.resize((int(logo_image.width * 0.4), int(logo_image.height * 0.4)))
         self.logo_photo = ImageTk.PhotoImage(logo_image)
+        self.logo_label = tk.Label(self.root, image=self.logo_photo, bg='#f0f0f0')
+        self.logo_label.place(x=20, y=20)
 
-        # 显示logo在左上角
-        self.logo_label = tk.Label(self.root, image=self.logo_photo)
-        self.logo_label.place(x=10, y=15)  # 设置在左上角
+        # 布局
+        frame = tk.Frame(self.root, bg='#f0f0f0')
+        frame.pack(pady=30, padx=20, anchor="n")
 
+        ttk.Button(frame, text="选择要合并的文件夹", command=self.select_folder, width=20).grid(row=0, column=0, padx=10, pady=5)
+        ttk.Button(frame, text="选择目标文件", command=self.select_target_file, width=20).grid(row=0, column=1, padx=10, pady=5)
+        ttk.Button(frame, text="合并案例", command=self.run_script, width=20).grid(row=1, column=0, padx=10, pady=5)
+        ttk.Button(frame, text="清除信息", command=self.clear_info, width=20).grid(row=1, column=1, padx=10, pady=5)
 
-        self.folder_var = tk.StringVar()
-        self.target_file_var = tk.StringVar()
+        self.info_display = scrolledtext.ScrolledText(
+            self.root, height=15, width=80, bg='#e0e0e0', fg='#333333', font=("Consolas", 10), bd=1, relief='solid'
+        )
+        self.info_display.pack(pady=10)
 
-        frame = tk.Frame(self.root)
-        frame.pack(pady=30, anchor="n")
-
-        tk.Button(frame, text="选择要合并的文件夹", command=self.select_folder, width=20).grid(row=0, column=0, padx=5, pady=5)
-        tk.Button(frame, text="选择目标文件", command=self.select_target_file, width=20).grid(row=0, column=1, padx=5, pady=5)
-        tk.Button(frame, text="合并案例", command=self.run_script, width=20).grid(row=1, column=0, padx=5, pady=5)
-        tk.Button(frame, text="清除信息", command=self.clear_info, width=20).grid(row=1, column=1, padx=5, pady=5)
-
-        self.info_display = scrolledtext.ScrolledText(self.root, height=15, width=80)
-        self.info_display.pack(pady=5)
-
-        self.info_label = tk.Label(self.root, text="请选择文件夹或文件", fg="red")
+        self.info_label = ttk.Label(self.root, text="请选择文件夹或文件", foreground="red", background="#f0f0f0")
         self.info_label.pack()
+
         # 启动实时日志显示功能
         self.update_log_display()
 
