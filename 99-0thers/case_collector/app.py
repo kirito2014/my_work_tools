@@ -21,7 +21,7 @@ def run_script():
 
     try:
         # 替换为实际的 Python 脚本路径和命令
-        command = f'python test.py "{folder_path}" "{file_path}"'
+        command = f'python case_collector.py "{folder_path}" "{file_path}"'
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
         if result.returncode != 0:
             return jsonify({"output": result.stdout, "error": result.stderr}), 500
