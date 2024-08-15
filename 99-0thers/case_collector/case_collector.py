@@ -3,7 +3,6 @@
 ********************************************************************
 *
 *    Filename   :  case_collector.py
-*
 *    Description:  Demonstrate how to add copyright comments in Python.
 *
 *    Version    :  1.0
@@ -13,9 +12,7 @@
 *
 *    Author     :  wangmujun(解决方案部/战略规划部), 
 *    Company    :  深圳市长亮科技股份有限公司
-*
-*    Author(s)  :  wangmujun (wangmujun@sunline.cn)
-*
+*    E-mail     :  wangmujun@sunline.cn
 *    License    :  GPL
 *
 *    Copyright (c) 2024, Sunline Corporation. All rights reserved.
@@ -129,7 +126,7 @@ def format_basic_info_data(case_data):
                 #print(basic_info_dict)
                 return basic_info_dict
     else:
-        log_message(f"[ ERROR ]无法找到 <{start_key}> 或 <{end_key}>","red")
+        log_message(f"[ ERROR ]无法找到 <{start_key}> 或 <{end_key}>","#DB231D")
         return None
 
 #格式化项目实施内容,这部分用不到
@@ -181,7 +178,7 @@ def format_project_exc_data(case_data):
                 #print(basic_info_dict)
                 return project_info_dict
     else:
-        log_message(f"[ ERROR ]无法找到 <{start_key}> 或 <{end_key}>","red")
+        log_message(f"[ ERROR ]无法找到 <{start_key}> 或 <{end_key}>","#DB231D")
         return None
 
 
@@ -261,7 +258,7 @@ def format_case_classify_data(case_data):
             return class_info_dict
     
     else:
-        log_message(f"[ ERROR ]无法找到 <{start_key}> 或 <{end_key}>","red")
+        log_message(f"[ ERROR ]无法找到 <{start_key}> 或 <{end_key}>","#DB231D")
         return None
 
 #格式化通用补充信息信息
@@ -343,7 +340,7 @@ def format_supply_info_data(case_data):
                 #print(supply_info_dict)
                 return supply_info_dict
     else:
-        log_message(f"[ ERROR ]无法找到 <{start_key}> 或 <{end_key}>","red")
+        log_message(f"[ ERROR ]无法找到 <{start_key}> 或 <{end_key}>","#DB231D")
         return None
 
 
@@ -426,7 +423,7 @@ def format_other_info_data(case_data):
                # print(other_info_dict)
                 return other_info_dict
     else:
-        log_message(f"[ ERROR ] 无法找到 <{start_key}> ","red")
+        log_message(f"[ ERROR ] 无法找到 <{start_key}> ","#DB231D")
         return None
 
 # 文档检查
@@ -454,7 +451,7 @@ def check_and_process_file(filepath):
         return data_first_elements
     
     except Exception as e:
-        log_message(f"[ ERROR ] 打开文件<{filepath}>失败: {e}","red")
+        log_message(f"[ ERROR ] 打开文件<{filepath}>失败: {e}","#DB231D")
         return None
     
 # 获取最大非空行
@@ -471,7 +468,7 @@ def load_data_to_target_file(data, target_file_path,source_file_path):
     try:
         workbook = openpyxl.load_workbook(target_file_path)
     except Exception as e:
-        log_message(f"[ ERROR ] 无法加载目标文件: {e}","red")
+        log_message(f"[ ERROR ] 无法加载目标文件: {e}","#DB231D")
         return
 
     sheets_to_check = ["案例清单", "通用补充信息", "数据应用类补充信息","客户清单"]
@@ -487,7 +484,7 @@ def load_data_to_target_file(data, target_file_path,source_file_path):
     supply_data = data.get("supply_data", None)
     other_data = data.get("other_data", None)
     if not basic_info:
-        log_message(f"[ ERROR ] 未找到<{os.path.basename(source_file_path)}>中填写的基本信息",'red')
+        log_message(f"[ ERROR ] 未找到<{os.path.basename(source_file_path)}>中填写的基本信息","#F24405")
         return
     #获取基本信息中的合同名称和客户名称
 
@@ -583,7 +580,7 @@ def load_data_to_target_file(data, target_file_path,source_file_path):
                         sheet.cell(row=target_row, column=31, value=f'=IFERROR(HYPERLINK("#\'通用补充信息\'!A"&MATCH(A{target_row}, 通用补充信息!A:A, 0), ">>>通用补充信息<<<"), ">>>暂无补充<<<")')
                         sheet.cell(row=target_row, column=32, value=f'=IFERROR(HYPERLINK("#\'数据应用类补充信息\'!A"&MATCH(A{target_row}, 数据应用类补充信息!A:A, 0), ">>>数据应用类补充信息<<<"), ">>>暂无补充<<<")')
 
-                        log_message(f"[SUCCESS] 写入 {os.path.basename(source_file_path)} 的数据到 <{sheet_name}> ","green")
+                        log_message(f"[SUCCESS] 写入 {os.path.basename(source_file_path)} 的数据到 <{sheet_name}> ","#298073")
                         #print(f"写入 {os.path.basename(source_file_path)} 的数据到 {sheet_name} ")
                     elif sheet_name == "通用补充信息":
 
@@ -635,7 +632,7 @@ def load_data_to_target_file(data, target_file_path,source_file_path):
                         sheet.cell(row=target_row, column=14, value=middleware_version)
                         sheet.cell(row=target_row, column=14, value='/')
 
-                        log_message(f"[SUCCESS] 写入 {os.path.basename(source_file_path)} 的数据到 <{sheet_name}> ","green")
+                        log_message(f"[SUCCESS] 写入 {os.path.basename(source_file_path)} 的数据到 <{sheet_name}> ","#298073")
                     elif sheet_name == "数据应用类补充信息":
 
                         data_source               = other_data.get("data_source", None)  #
@@ -653,38 +650,38 @@ def load_data_to_target_file(data, target_file_path,source_file_path):
                         sheet.cell(row=target_row, column=6, value=data_source) #
                         sheet.cell(row=target_row, column=7, value=original_implementation)#
 
-                        log_message(f"[SUCCESS] 写入 {os.path.basename(source_file_path)} 的数据到 <{sheet_name}> ","green")
+                        log_message(f"[SUCCESS] 写入 {os.path.basename(source_file_path)} 的数据到 <{sheet_name}> ","#298073")
 
             else:
-                log_message(f"[ ERROR ]目标文件中缺少 <{sheet_name}> 页，请检查","red")
+                log_message(f"[ ERROR ]目标文件中缺少 <{sheet_name}> 页，请检查","#DB231D")
                 continue
     else:
-        log_message(f"[  INFO ]{os.path.basename(source_file_path)} 中contract_name 为空或为 '/'，跳过处理","blue")
+        log_message(f"[  INFO ]{os.path.basename(source_file_path)} 中contract_name 为空或为 '/'，跳过处理","#348888")
         
 
     #保存文件
     try:
         workbook.save(target_file_path)
     except Exception as e:
-        log_message(f"[ ERROR ]无法保存目标文件: {e}","red")
+        log_message(f"[ ERROR ]无法保存目标文件: {e}","#DB231D")
 
     return cust_list
 
 def update_customer_list(cust_list, target_file_path):
     # 去重后的客户列表，并排除掉 '/' 和 None 的情况
     unique_cust_list = [cust for cust in list(set(cust_list)) if cust and cust != '/']
-
+    log_message(f"[SUCCESS] 客户清单:{','.join(unique_cust_list)}","#298073")
     try:
         # 打开目标文件
         workbook = openpyxl.load_workbook(target_file_path)
     except Exception as e:
-        log_message(f"[ERROR] 无法加载目标文件: {e}","red")
+        log_message(f"[ERROR] 无法加载目标文件: {e}","#DB231D")
         return
     
     # 获取客户清单 sheet
     sheet_name = "客户清单"
     if sheet_name not in workbook.sheetnames:
-        log_message(f"[ERROR] 目标文件中缺少 <{sheet_name}> 页，请检查","red")
+        log_message(f"[ERROR] 目标文件中缺少 <{sheet_name}> 页，请检查","#DB231D")
         return
 
     sheet = workbook[sheet_name]
@@ -704,14 +701,14 @@ def update_customer_list(cust_list, target_file_path):
         sheet.cell(row=idx, column=4, value=formula_d)
         sheet.cell(row=idx, column=5, value=formula_e)
     
-    log_message(f"[SUCCESS] 客户清单已成功写入到 <{sheet_name}> 页","green")
+    log_message(f"[SUCCESS] 客户清单已成功写入到 <{sheet_name}> 页","#298073")
 
     # 保存文件并关闭
     try:
         workbook.save(target_file_path)
         workbook.close()
     except Exception as e:
-        log_message(f"[ERROR] 无法保存目标文件: {e}","red")
+        log_message(f"[ERROR] 无法保存目标文件: {e}","#DB231D")
 
 #清除目标文件信息
 def clear_target_file(target_file_path):
@@ -720,7 +717,7 @@ def clear_target_file(target_file_path):
     try:
         workbook = openpyxl.load_workbook(target_file_path)
     except Exception as e:
-        log_message( f"[ ERROR ]无法加载目标文件: {e}","red")
+        log_message( f"[ ERROR ]无法加载目标文件: {e}","#DB231D")
         return
     
     for sheet_name in sheet_names_to_check:
@@ -732,12 +729,12 @@ def clear_target_file(target_file_path):
                         cell.value = None
 
         else:
-            log_message( f"[ ERROR ]目标文件中缺少 <{sheet_name}> 页，请检查","red")
+            log_message( f"[ ERROR ]目标文件中缺少 <{sheet_name}> 页，请检查","#DB231D")
     
     try:
         workbook.save(target_file_path)
     except Exception as e:
-        log_message( f"[ ERROR ]无法保存目标文件: {e}","red")
+        log_message( f"[ ERROR ]无法保存目标文件: {e}","#DB231D")
 #日志记录
 def log_error(log_file,message):
     with open(log_file, 'w', encoding='gbk',errors='ignore') as f:
@@ -763,7 +760,7 @@ def process_files_in_folder(folder_path, target_file_path):
         files.extend(matched_files)
 
     if not files:
-        log_message("[ ERROR ] 未找到符合条件的文件.","red")
+        log_message("[ ERROR ] 未找到符合条件的文件.","#DB231D")
         return
 
     # 清理目标文件
@@ -773,7 +770,7 @@ def process_files_in_folder(folder_path, target_file_path):
     # 处理每个源文件
     for source_file_path in files:  
         source_file_name = os.path.basename(source_file_path)
-        log_message(f"[  INFO ] 处理文件: <{os.path.basename(source_file_name)}>","green")
+        log_message(f"[  INFO ] 处理文件: <{os.path.basename(source_file_name)}>","#298073")
         #info_display.insert(tk.END, f"[  INFO ] 处理文件: <{os.path.basename(source_file_name)}>\n","highlight")
         final_data = check_and_process_file(source_file_path)
         cust_name = load_data_to_target_file(final_data, target_file_path, source_file_path)
@@ -801,27 +798,26 @@ def get_resource_path(relative_path):
 class App():
     def __init__(self, root):
         # 使用主题
-        self.root = ThemedTk(theme="breeze")
-        self.root.title("案例合并工具")
-        self.root.geometry('700x500')
+        self.root = root
+        self.root.title("解决方案部-案例合并工具")
+        self.root.geometry('700x450')
         self.root.configure(bg='#f0f0f0')  # 设置背景颜色
         self.root.option_add("*Font", "微软雅黑 10")  # 设置全局字体
+        self.root.set_theme("breeze")
 
-        # 加载logo图片
-        logo_path = get_resource_path('res/sunline_logo_original.png')
-        logo_image = Image.open(logo_path)
-        logo_image = logo_image.resize((int(logo_image.width * 0.4), int(logo_image.height * 0.4)))
-        self.logo_photo = ImageTk.PhotoImage(logo_image)
-        self.logo_label = tk.Label(self.root, image=self.logo_photo, bg='#f0f0f0')
-        self.logo_label.place(x=20, y=20)
+        #加载logo
+        self.load_logo()
 
+        # 其余 GUI 组件初始化
+        self.folder_var = tk.StringVar()
+        self.target_file_var = tk.StringVar()
         # 布局
         frame = tk.Frame(self.root, bg='#f0f0f0')
         frame.pack(pady=30, padx=20, anchor="n")
-
+        
         ttk.Button(frame, text="选择要合并的文件夹", command=self.select_folder, width=20).grid(row=0, column=0, padx=10, pady=5)
         ttk.Button(frame, text="选择目标文件", command=self.select_target_file, width=20).grid(row=0, column=1, padx=10, pady=5)
-        ttk.Button(frame, text="合并案例", command=self.run_script, width=20).grid(row=1, column=0, padx=10, pady=5)
+        ttk.Button(frame, text="确认合并案例", command=self.run_script, width=20).grid(row=1, column=0, padx=10, pady=5)
         ttk.Button(frame, text="清除信息", command=self.clear_info, width=20).grid(row=1, column=1, padx=10, pady=5)
 
         self.info_display = scrolledtext.ScrolledText(
@@ -829,11 +825,21 @@ class App():
         )
         self.info_display.pack(pady=10)
 
-        self.info_label = ttk.Label(self.root, text="请选择文件夹或文件", foreground="red", background="#f0f0f0")
+        self.info_label = ttk.Label(self.root, text="请选择文件夹或文件", foreground="#DB231D", background="#f0f0f0")
         self.info_label.pack()
 
         # 启动实时日志显示功能
         self.update_log_display()
+
+    def load_logo(self):
+        logo_path = get_resource_path('res/sunline_logo_original.png')  # 请确保路径正确
+        logo_image = Image.open(logo_path)
+        logo_image = logo_image.resize((int(logo_image.width * 0.4), int(logo_image.height * 0.4)), Image.LANCZOS)
+        self.logo_photo = ImageTk.PhotoImage(logo_image)
+
+        # 显示logo在左上角
+        self.logo_label = ttk.Label(self.root, image=self.logo_photo, background='#f0f0f0')
+        self.logo_label.place(x=50, y=40)  # 设置图片位置
 
     def update_log_display(self):
         """实时更新消息栏"""
@@ -854,21 +860,21 @@ class App():
         if folder_path:
             self.folder_var.set(folder_path)
             self.update_info_label(folder_path)
-            log_message("[SUCCESS] 源文件夹获取成功.", "green")
+            log_message("[SUCCESS] 源文件夹获取成功.", "#298073")
         else:
-            self.info_label.config(text="请选择源文件所在的文件夹", fg='red')
+            self.info_label.config(text="请选择源文件所在的文件夹", foreground="#F24405")
 
     def select_target_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls *.xlsm")])
         if file_path:
             self.target_file_var.set(file_path)
             self.update_info_label(file_path)
-            log_message("[SUCCESS] 目标文件获取成功.", "green")
+            log_message("[SUCCESS] 目标文件获取成功.", "#298073")
         else:
-            self.info_label.config(text="请选择目标文件", fg='red')
+            self.info_label.config(text="请选择目标文件", foreground="#F24405")
 
     def update_info_label(self, path):
-        self.info_label.config(text=f"已选择：{os.path.basename(path)}", fg='green')
+        self.info_label.config(text=f"已选择：{os.path.basename(path)}", foreground='#298073')
 
     def run_script(self):
         self.info_display.delete(1.0, tk.END)
@@ -876,27 +882,27 @@ class App():
         target_file_path = self.target_file_var.get()
 
         if not folder_path or not Path(folder_path).is_dir():
-            log_message(f"[ ERROR] 请选择有效文件夹.","red")
+            log_message(f"[ ERROR] 请选择有效文件夹.","#DB231D")
             return
         
         if not target_file_path or not Path(target_file_path).is_file():
-            log_message(f"[ ERROR] 请选择有效文件.","red")
+            log_message(f"[ ERROR] 请选择有效文件.","#DB231D")
             return
 
         threading.Thread(target=self.run_background_script, args=(folder_path, target_file_path)).start()
 
     def run_background_script(self, folder_path, target_file_path):
         try:
-            log_message(f"--++本脚本最终解释权归长亮科技所有++--", "blue")
-            log_message(f"[  INFO ] 源文件路径：{folder_path}\n目标文件：{target_file_path}.", "blue")
+            log_message(f"--+++++++++本脚本最终解释权归长亮科技所有+++++++++--", "#348888")
+            log_message(f"[  INFO ] 源文件路径：{folder_path}\n目标文件：{target_file_path}.", "#348888")
             rename_file(folder_path)
-            log_message(f"[  INFO ] 文件名处理完成.", "green")
-            log_message(f"[  INFO ] 正在合并请稍后.", "green")
+            log_message(f"[  INFO ] 文件名处理完成.", "#298073")
+            log_message(f"[  INFO ] 正在合并请稍后.", "#298073")
             process_files_in_folder(folder_path, target_file_path)
-            log_message(f"[  INFO ] 处理客户清单.", "green")
-            log_message(f"[  INFO ] 文件合并处理完成.", "green")
+            log_message(f"[  INFO ] 处理客户清单.", "#298073")
+            log_message(f"[  INFO ] 文件合并处理完成，若某一模块下客户未填写信息，请检查修改后再执行.", "#298073")
         except Exception as e:
-            log_message(f"[ ERROR] 执行脚本失败: {e}","red")
+            log_message(f"[ ERROR] 执行脚本失败: {e}","#DB231D")
 
     def clear_info(self):
         self.folder_var.set("")
@@ -906,10 +912,13 @@ class App():
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = App(root)
-    root.mainloop()
-
+    try:
+        root = ThemedTk(theme=False)
+        app = App(root)
+        root.mainloop()
+    except Exception as e:
+        print(f"出现错误: {e}")
+        input("按任意键退出...")
 
 
 '''
