@@ -804,9 +804,9 @@ class App():
         self.root.title("解决方案部-案例合并工具")
         self.root.geometry('800x500')
         self.root.configure(bg='#f0f0f0')  # 设置背景颜色
-        self.root.set_theme("vista") #breeze
-        self.root.option_add("*Font", "微软雅黑 10 bold")  # 设置全局字体
-
+        self.root.set_theme("arc") #breeze
+        self.root.option_add("*Font", "黑体 10")  # 设置全局字体
+        #print(root.get_themes())
         #加载logo
         self.load_logo()
 
