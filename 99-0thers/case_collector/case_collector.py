@@ -782,9 +782,6 @@ def process_files_in_folder(folder_path, target_file_path):
     # 更新客户清单
     update_customer_list(cust_list, target_file_path)
 
-def log_message(message, highlight=None):
-    log_queue.put((message, highlight))
-
 
 def get_resource_path(relative_path):
     """获取打包后资源文件的路径"""
