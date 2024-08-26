@@ -799,7 +799,7 @@ class App():
         # 使用主题
         self.root = root
         self.root.title("解决方案部-案例合并工具")
-        self.root.geometry('800x500')
+        self.root.geometry('500x600')
         self.root.configure(bg='#f0f0f0')  # 设置背景颜色
         self.root.set_theme("arc") #breeze
         self.root.option_add("*Font", "黑体 10")  # 设置全局字体
@@ -814,53 +814,37 @@ class App():
         self.target_file_var = tk.StringVar()
         # 布局
         frame = tk.Frame(self.root, bg='#f0f0f0')
-        frame.pack(pady=30, padx=20, anchor="n")
+        frame.pack(pady=30, padx=50, anchor="e")
         
-        ttk.Button(frame, text="选择要合并的文件夹", command=self.select_folder, width=20).grid(row=0, column=0, padx=10, pady=5)
-        ttk.Button(frame, text="选择目标文件", command=self.select_target_file,width=20).grid(row=0, column=1, padx=10, pady=5)
-        ttk.Button(frame, text="确认合并案例", command=self.run_script, width=20).grid(row=1, column=0, padx=10, pady=5)
-        ttk.Button(frame, text="清除信息", command=self.clear_info, width=20).grid(row=1, column=1, padx=10, pady=5)
+        ttk.Button(frame, text="选择要合并的文件夹", command=self.select_folder, width=20).grid(row=0, column=1, padx=10, pady=5)
+        ttk.Button(frame, text="选择目标文件", command=self.select_target_file,width=20).grid(row=1, column=1, padx=10, pady=5)
+        ttk.Button(frame, text="确认合并案例", command=self.run_script, width=20).grid(row=2, column=1, padx=10, pady=5)
+        ttk.Button(frame, text="清除信息", command=self.clear_info, width=20).grid(row=3, column=1, padx=10, pady=5)
         
         # 创建自定义样式并应用字体
         style = ttk.Style()  #, style="Bold.TButton"
         style.configure("Bold.TButton", font=bold_font)
 
         self.info_display = scrolledtext.ScrolledText(
-            self.root, height=15, width=80, bg='#e0e0e0', fg='#333333', font=("Consolas", 10), bd=1, relief='solid'
+            self.root, height=15, width=70, bg='#e0e0e0', fg='#333333', font=("Consolas", 10), bd=1, relief='solid'
         )
-        self.info_display.pack(pady=10)
+        self.info_display.pack(padx=20,pady=10)
 
         self.info_label = ttk.Label(self.root, text="请选择文件夹或文件", foreground="#DB231D", background="#f0f0f0")
         self.info_label.pack()
 
-        # self.add_gradient_text()
         # 启动实时日志显示功能
         self.update_log_display()
 
     def load_logo(self):
         logo_path = get_resource_path('res/sunline_logo_original.png')  # 请确保路径正确
         logo_image = Image.open(logo_path)
-        logo_image = logo_image.resize((int(logo_image.width * 0.5), int(logo_image.height * 0.5)), Image.LANCZOS)
+        logo_image = logo_image.resize((int(logo_image.width * 0.6), int(logo_image.height * 0.6)), Image.LANCZOS)
         self.logo_photo = ImageTk.PhotoImage(logo_image)
 
         # 显示logo在左上角
         self.logo_label = ttk.Label(self.root, image=self.logo_photo, background='#f0f0f0')
-        self.logo_label.place(x=40, y=40)  # 设置图片位置
-
-    # def add_gradient_text(self):
-    #     # 使用 Canvas 绘制渐变文本
-    #     canvas = tk.Canvas(self.root, width=50, height=30, bg='#f0f0f0', bd=0, highlightthickness=0)
-    #     canvas.place(x=40, y=40)  # 精确设置位置为 (x=40, y=80)
-        
-    #     text = "长于专业 亮于服务"
-    #     font = tkfont.Font(family="微软雅黑", size=8, weight="bold")
-    #     colors = ["#0000FF", "#1E90FF", "#87CEFA", "#B0E0E6"]  # 渐变色
-
-    #     x = 0  # 相对于 canvas 的起始位置
-    #     for i, char in enumerate(text):
-    #         color = colors[i % len(colors)]
-    #         canvas.create_text(x, 10, text=char, font=font, fill=color, anchor="nw")
-    #         x += font.measure(char)
+        self.logo_label.place(x=40, y=60)  # 设置图片位置
 
     def update_log_display(self):
         """实时更新消息栏"""
@@ -914,7 +898,7 @@ class App():
 
     def run_background_script(self, folder_path, target_file_path):
         try:
-            log_message(f"--++++++++++++++++本脚本最终解释权归长亮科技所有++++++++++++++--", "#348888")
+            log_message(f"--++++++++本脚本最终解释权归长亮科技所有++++++--", "#348888")
             log_message(f"[  INFO ] 源文件路径：{folder_path}\n目标文件：{target_file_path}.", "#348888")
             rename_file(folder_path)
             log_message(f"[  INFO ] 文件名处理完成.", "#298073")
