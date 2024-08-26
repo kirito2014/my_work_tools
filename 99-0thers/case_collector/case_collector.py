@@ -780,6 +780,7 @@ def process_files_in_folder(folder_path, target_file_path):
 
     #print(cust_list)
     # 更新客户清单
+    log_message(f"[  INFO ] 处理客户清单.", "#298073")
     update_customer_list(cust_list, target_file_path)
 
 
@@ -904,7 +905,7 @@ class App():
             log_message(f"[  INFO ] 文件名处理完成.", "#298073")
             log_message(f"[  INFO ] 正在合并请稍后.", "#298073")
             process_files_in_folder(folder_path, target_file_path)
-            log_message(f"[  INFO ] 处理客户清单.", "#298073")
+            
             log_message(f"[  INFO ] 文件合并处理完成，若某一模块下客户未填写信息，请检查修改后再执行.", "#298073")
         except Exception as e:
             log_message(f"[ ERROR] 执行脚本失败: {e}","#DB231D")
