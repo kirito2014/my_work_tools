@@ -28,12 +28,13 @@ def filter_department_data(workbook_name, sheet_name, department_name):
     return filtered_df
 
 # 示例用法
-workbook_name = 'D:\github\99-0thers\case_split\original_file\售前统计_202408(1).xlsm'
-sheet_name = '部门商机明细'
-department_name = '金融业务三部'
+if __name__ == '__main__':
+    workbook_name = 'D:\github\99-0thers\case_split\original_file\售前统计_202408(1).xlsm'
+    sheet_name = '部门商机明细'
+    department_name = '金融业务三部'
 
-try:
-    result_df = filter_department_data(workbook_name, sheet_name, department_name)
-    print(result_df)
-except Exception as e:
-    print(f"发生错误: {e}")
+    try:
+        result_df = filter_department_data(workbook_name, sheet_name, department_name)
+        print(result_df)
+    except Exception as e:
+        print(f"发生错误: {e}")
