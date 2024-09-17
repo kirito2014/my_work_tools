@@ -225,7 +225,7 @@ class App():
 
                 self.update_progress(step_size * (index + 1))  # 更新进度条
 
-            self.info_label.config(text=f"[INFO] 文件合并处理完成.", foreground="#298073")
+            self.info_label.config(text=f"[INFO] 文件拆分处理完成.", foreground="#298073")
         except Exception as e:
             self.info_label.config(text=f"[ERROR] 执行脚本失败: {e}", foreground="#DB231D") 
 
