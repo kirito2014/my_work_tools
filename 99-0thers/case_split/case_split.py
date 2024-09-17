@@ -143,8 +143,8 @@ class App():
         ttk.Button(frame, text="清除信息", command=self.clear_info, width=20).grid(row=1, column=1, padx=10, pady=5)
 
         # 创建进度条
-        self.progress = ttk.Progressbar(self.root, orient='horizontal', mode='determinate', length=300)
-        self.progress.pack(pady=10)
+        self.progress = ttk.Progressbar(self.root, orient='horizontal', mode='determinate', length=320)
+        self.progress.pack(padx=50,pady=10)
 
         self.info_label = ttk.Label(self.root, text="请选择文件", foreground="#DB231D", background="#f0f0f0")
         self.info_label.pack()
