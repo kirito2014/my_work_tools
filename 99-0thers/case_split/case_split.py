@@ -227,7 +227,7 @@ class App():
 
             self.info_label.config(text=f"[INFO] 文件合并处理完成.", foreground="#298073")
         except Exception as e:
-            self.info_label.config(text=f"[ERROR] 执行脚本失败: {e}", foreground="#DB231D")
+            self.info_label.config(text=f"[ERROR] 执行脚本失败: {e}", foreground="#DB231D") 
 
 
     def update_progress(self, value):
