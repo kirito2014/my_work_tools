@@ -1,165 +1,250 @@
 import os
-import openpyxl
+import threading
+import tkinter as tk
+from tkinter import filedialog, ttk
+from ttkthemes import ThemedTk
+from pathlib import Path
 import pandas as pd
-from openpyxl.utils import get_column_letter
-from openpyxl import Workbook
+import shutil
+from openpyxl import load_workbook
+from datetime import datetime
 
-# 模块 1：创建新表并添加内容
-def add_sheet(wb, sheet_name="AddSheet"):
-    """
-    创建一个新的工作表，命名为指定名称
-    """
-    if sheet_name in wb.sheetnames:
-        ws = wb[sheet_name]
-    else:
-        ws = wb.create_sheet(title=sheet_name)
-    return ws
+#pyinstaller --onefile --noconsole --add-data "res;res" --icon=sunline.ico case_split.py  # 打包命令
+# 模块1: 读取文件并提取部门信息,用于获取部门列表 方便循环操作
+def get_unique_departments(source_file: str, sheet_name: str, usecols:str) -> list:
+    """从源文件中读取部门信息并去重"""
+    df = pd.read_excel(source_file, sheet_name=sheet_name)
+    departments = df[usecols].dropna().unique().tolist()  # 去重部门列表 
+    departments = [str(dp).strip() for dp in departments if dp != '合计']  # 去除空格
+    #print(departments)
+    return departments
 
-# 模块 2：插入表格内容到新工作表
-def loop_insert(wb, ws, arr="标题及目录,售前情况统计表,部门商机明细,商机报工明细"):
-    """
-    将数组中的表名插入新创建的工作表，并按顺序填入单元格
-    """
-    sheet_list = arr.split(',')
-    for i, sheet_name in enumerate(sheet_list):
-        ws.cell(row=i + 1, column=1, value=sheet_name)
-    return sheet_list
+# 模块2: 检测并删除旧文件
+def check_and_remove_file(new_file_name: str,output_directory: str):
+    """检查文件夹下是否有该文件，如有则删除"""
+    # 拼接文件名
+    new_file_name = os.path.join(output_directory, new_file_name)
+    #检查文件夹是否存在该文件，如有则删除
+    if os.path.exists(new_file_name):
+        os.remove(new_file_name)
+        #print(f"文件 {os.path.basename(new_file_name)} 已删除。")
 
-# 模块 3：根据指定顺序调整工作表顺序
-def change_order(wb, sheet_list):
-    """
-    根据指定顺序调整工作表的顺序
-    """
-    for i, sheet_name in enumerate(sheet_list):
-        if sheet_name in wb.sheetnames:
-            sheet = wb[sheet_name]
-            wb._sheets.remove(sheet)
-            wb._sheets.insert(i, sheet)
 
-# 模块 4：删除指定的工作表
-def delete_sheet(wb, sheet_name):
-    """
-    删除指定的工作表
-    """
-    if sheet_name in wb.sheetnames:
-        del wb[sheet_name]
+# 模块3: 创建新文件并保存到output文件夹
+def create_new_file(template_file: str, new_file_name: str,output_directory: str):
+    """从模板创建新的部门文件"""
+    new_file_name = os.path.join(output_directory, new_file_name)
+    shutil.copy(template_file, new_file_name)  # 复制模板文件
+    #print(f"新文件 {os.path.basename(new_file_name)} 已创建。")
+    app.info_label.config(text=f"[ INFO ] 新文件 {os.path.basename(new_file_name)} 已创建.", foreground="#298073")
 
-# 模块 5：日期格式化函数
-def format_time(start_date, flag=1):
-    """
-    根据指定的格式标志，将日期格式化为指定格式
-    flag:
-        1 - yyyy-mm-dd hh:mm:ss
-        2 - yyyy-mm-dd
-        3 - hh:mm:ss
-        4 - yyyy年mm月dd日
-        5 - yyyymmdd
-        6 - yyyymm
-        7 - yyyy-mm+1-dd
-        8 - mm
-    """
-    if pd.isnull(start_date):
-        return None
-    date_format = {
-        1: "%Y-%m-%d %H:%M:%S",
-        2: "%Y-%m-%d",
-        3: "%H:%M:%S",
-        4: "%Y年%m月%d日",
-        5: "%Y%m%d",
-        6: "%Y%m",
-        7: "%Y-%m-%d",  # 假设这是增加月份的格式
-        8: "%m"
-    }
-    return start_date.strftime(date_format.get(flag, "%Y-%m-%d %H:%M:%S"))
 
-# 模块 6：查找指定部门所在的列号
-def find_col(sheet, dept_name):
-    """
-    查找指定部门所在的列号
-    """
-    for col in sheet.iter_cols(1, sheet.max_column):
-        for cell in col:
-            if cell.value == dept_name:
-                return cell.column
-    return None
+# 模块4: 读取部门数据并筛选写入新文件
+def filter_department_data(workbook_name: str, sheet_name: str, department_name: str,usecols:str):
+    # 检查文件是否存在
+    if not os.path.exists(workbook_name):
+        raise FileNotFoundError(f"文件 '{workbook_name}' 不存在")
+    # 检查工作簿是否能被打开，以及是否包含指定的 sheet
+    try:
+        excel_file = pd.ExcelFile(workbook_name)
+    except Exception as e:
+        raise ValueError(f"无法读取文件 '{workbook_name}'，错误: {e}")
+    if sheet_name not in excel_file.sheet_names:
+        raise ValueError(f"Sheet '{sheet_name}' 在文件 '{workbook_name}' 中不存在")
+    # 读取 Excel 文件中的指定 sheet
+    df = pd.read_excel(workbook_name, sheet_name=sheet_name)
+    
+    # 检查 筛选 列是否存在 todo 修改筛选判断逻辑
+    if usecols not in df.columns:
+        raise ValueError(f"{usecols} 列在工作表中不存在")
+    # 筛选 B 列中对应部门名称的数据
+    filtered_df = df[df[usecols] == department_name]
+    return filtered_df
 
-# 模块 7：查找工作表中是否存在错误，并记录错误信息
-def check_errors(wb):
-    """
-    检查工作簿中的错误，并生成一张错误信息表
-    """
-    error_list = []
-    for sheet in wb.worksheets:
-        if sheet.title not in ["部门清单"]:
-            for row in sheet.iter_rows():
-                for cell in row:
-                    if isinstance(cell.value, str) and "#ERROR" in cell.value:
-                        error_list.append(f"{sheet.title} 的第 {cell.row} 行第 {cell.column} 列")
+# 模块5: 获取当前月份并返回yyyymm字符串
+def get_current_month() -> str:
+    """获取当前月份并返回yyyymm字符串"""
+    from datetime import datetime
+    current_date = datetime.now()
+    current_year = current_date.year
+    current_month = current_date.month
+    file_date = f"{current_year}{current_month:02d}"
+    return file_date
 
-    if error_list:
-        error_sheet = add_sheet(wb, "错误信息")
-        for i, error in enumerate(error_list, 1):
-            error_sheet.cell(row=i, column=1, value=error)
-        return len(error_list)
-    return 0
+# 模块6: sheet页与列名对应关系
+cols_mapping = {
+    '售前情况统计表': '业务部',
+    '部门商机明细': '归属业务部',
+    '投标数据': '归属业务部',
+    '商机报工明细':'归属业务部门'
+}
+# 模块7:自动获取对应列名
+def get_usecols(sheet_name: str):
+    column_name = cols_mapping.get(sheet_name)
+    
+    # 如果没有找到匹配的列名，返回 None
+    if column_name is None:
+        app.info_label.config(text=f"[WARNING] 无法找到 sheet '{sheet_name}' 对应的列名.", foreground="#DB231D")
+    
+    return column_name
+# 模块8: 拼接新文件名，模板名_部门名_当前月份，模板名以_分割 去除第二个元素，拼接新文件名
+def get_new_file_name(template_file: str, dp_name: str):
+    """拼接新文件名，模板名_部门名_当前月份，模板名以_分割 去除第二个元素，拼接新文件名"""
+    file_date = get_current_month()
+    file_name = os.path.basename(template_file)
+    file_name_parts = file_name.split('_')
+    new_file_name = f"{file_name_parts[0]}_{dp_name}_{file_date}.xlsx"
+    return new_file_name
+# 模块9: 写入特定单元格
 
-# 模块 8：文件是否存在检查
-def is_file_exists(file_path):
-    """
-    检查文件是否存在
-    """
-    return os.path.exists(file_path)
-
-# 模块 9：列号与字母转换
-def col_to_letter(col):
-    """
-    将列号转为字母
-    """
-    return get_column_letter(col)
-
-def letter_to_col(letter):
-    """
-    将字母转为列号
-    """
-    return openpyxl.utils.column_index_from_string(letter)
-
-# 主函数流程
-def main_process(excel_path, dept_name):
-    """
-    主函数，处理 Excel 工作表，并应用各模块的功能
-    """
-    if not is_file_exists(excel_path):
-        print(f"文件 {excel_path} 不存在")
+def write_to_specific_cells(file_path: str, sheet_name: str,dp_name: str):
+    # 打开 Excel 文件
+    wb = load_workbook(file_path)
+    
+    if sheet_name not in wb.sheetnames:
+        app.info_label.config(text=f"[WARNING] 工作表 '{sheet_name}' 不存在于文件中.", foreground="#DB231D")
         return
+    ws = wb[sheet_name]
+    # 写入 C1 单元格
+    ws['C1'] = dp_name
+    # 写入 D4 单元格
+    ws['D4'] = dp_name
+    # 写入 D5 单元格，当前时间
+    ws['D5'] = datetime.now().strftime('%Y-%m-%d')
+    #写入 D6 单元格，(yyyy年mm月）
+    ws['D6'] = datetime.now().strftime('%Y年%m月')
 
-    # 加载工作簿
-    wb = openpyxl.load_workbook(excel_path)
-    
-    # 创建新表
-    ws = add_sheet(wb)
-    
-    # 插入内容
-    sheet_list = loop_insert(wb, ws)
-    
-    # 调整表顺序
-    change_order(wb, sheet_list)
-    
-    # 删除新增的表
-    delete_sheet(wb, "AddSheet")
+    # 保存更改
+    wb.save(file_path)
+    app.info_label.config(text=f"[ INFO ] 文件 {file_path} 已更新.", foreground="#298073")
 
-    # 检查是否存在错误
-    error_count = check_errors(wb)
-    if error_count > 0:
-        print(f"发现 {error_count} 个错误，请查看 '错误信息' 表")
-    else:
-        print("未发现错误")
 
-    # 保存处理后的文件
-    wb.save(excel_path)
-    print(f"文件 {excel_path} 已成功保存")
 
-# 示例调用
+
+class App():
+    def __init__(self, root):
+        self.root = root
+        self.root.title("解决方案部-售前统计工具")
+        self.root.geometry('500x200')
+        self.root.configure(bg='#f0f0f0')
+        self.root.set_theme("arc")
+        self.root.option_add("*Font", "黑体 10")
+        self.load_logo()
+
+        self.source_file_var = tk.StringVar()
+        self.template_file_var = tk.StringVar()
+
+        frame = tk.Frame(self.root, bg='#f0f0f0')
+        frame.pack(pady=30, padx=50, anchor="e")
+        
+        ttk.Button(frame, text="选择源文件", command=self.select_folder, width=20).grid(row=0, column=0, padx=10, pady=5)
+        ttk.Button(frame, text="选择模板文件", command=self.select_target_file, width=20).grid(row=0, column=1, padx=10, pady=5)
+        ttk.Button(frame, text="确认执行", command=self.run_script, width=20).grid(row=1, column=0, padx=10, pady=5)
+        ttk.Button(frame, text="清除信息", command=self.clear_info, width=20).grid(row=1, column=1, padx=10, pady=5)
+
+        # 创建进度条
+        self.progress = ttk.Progressbar(self.root, orient='horizontal', mode='determinate', length=320)
+        self.progress.pack(padx=50,pady=10)
+
+        self.info_label = ttk.Label(self.root, text="请选择文件", foreground="#DB231D", background="#f0f0f0")
+        self.info_label.pack()
+
+    def load_logo(self):
+        # 省略 logo 加载部分的代码
+        pass
+
+    def select_folder(self):
+        source_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls *.xlsm")])
+        ##print(source_path)
+        self.clear_info()
+        if source_path:
+            self.source_file_var.set(source_path)
+            self.update_info_label(source_path)
+        else:
+            self.info_label.config(text="请选择要处理的源文件", foreground="#F24405")
+
+    def select_target_file(self):
+        file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls *.xlsm")])
+        if file_path:
+            self.template_file_var.set(file_path)
+            self.update_info_label(file_path)
+        else:
+            self.info_label.config(text="请选择模板文件", foreground="#F24405")
+
+    def update_info_label(self, path):
+        self.info_label.config(text=f"已选择：{os.path.basename(path)}", foreground='#298073')
+
+    def run_script(self):
+            self.progress['value'] = 0  # 重置进度条
+            source_file_path = self.source_file_var.get()
+            target_file_path = self.template_file_var.get()
+
+            if not source_file_path or not Path(source_file_path).is_file():
+                self.info_label.config(text=f"[ERROR] 请选择有效源文件.", foreground="#DB231D")
+                return
+
+            if not target_file_path or not Path(target_file_path).is_file():
+                self.info_label.config(text=f"[ERROR] 请选择有效模板文件.", foreground="#DB231D")
+                return
+
+            threading.Thread(target=self.process_files, args=(source_file_path, target_file_path, "售前情况输出")).start()
+
+    def process_files(self, source_file_path, target_file_path, output_directory):
+        try:
+            # 检查输出文件夹是否存在，没有则新建文件夹
+            output_path = os.path.join(os.path.dirname(source_file_path), output_directory)
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+                #print(f"文件夹 {output_path} 已创建。")
+                self.info_label.config(text=f"[INFO] 文件夹 {output_path} 已创建.", foreground="#298073")
+                
+
+            # 获取所有不重复的部门名称
+            departments = get_unique_departments(source_file_path, sheet_name='售前情况统计表', usecols=get_usecols('售前情况统计表'))
+            
+            total_steps = len(departments)
+            step_size = 100 / total_steps  # 计算每个部门的进度步进
+
+            for index, dp_name in enumerate(departments):
+                new_file_name = get_new_file_name(target_file_path, dp_name)
+                #print(new_file_name)
+                # 检查并删除旧文件
+                check_and_remove_file(new_file_name, output_path)
+                create_new_file(target_file_path, new_file_name, output_path)
+                # 循环 cols_mapping 的值作为 sheet_name
+                self.info_label.config(text=f"[INFO] 正在处理 <{dp_name}> .", foreground="#298073")
+                for sheet_name in cols_mapping.keys():
+                    target_file = os.path.join(output_path, new_file_name)
+                    filter_col = get_usecols(sheet_name)
+                    data = filter_department_data(source_file_path, sheet_name=sheet_name, department_name=dp_name, usecols=filter_col)
+                    # 将筛选后的数据写入目标文件的指定 sheet_name 的 A1 单元格
+                    with pd.ExcelWriter(target_file, mode='a', if_sheet_exists='overlay') as writer:
+                        data.to_excel(writer, sheet_name=sheet_name, index=False, startrow=0, startcol=0)
+                    # 填写目标文件 标题及目录 sheet 页
+                write_to_specific_cells(target_file, sheet_name="标题及目录", dp_name=dp_name)
+
+                self.update_progress(step_size * (index + 1))  # 更新进度条
+
+            self.info_label.config(text=f"[INFO] 文件拆分处理完成.", foreground="#298073")
+        except Exception as e:
+            self.info_label.config(text=f"[ERROR] 执行脚本失败: {e}", foreground="#DB231D") 
+
+
+    def update_progress(self, value):
+        """更新进度条"""
+        self.progress['value'] = value
+        self.root.update_idletasks()
+
+    def clear_info(self):
+        self.source_file_var.set("")
+        self.template_file_var.set("")
+        self.progress['value'] = 0  # 重置进度条
+
 if __name__ == "__main__":
-    excel_file = "your_excel_file.xlsx"
-    department_name = "业务支持部"
-    main_process(excel_file, department_name)
+    try:
+        root = ThemedTk(theme=False)
+        app = App(root)
+        root.mainloop()
+    except Exception as e:
+        app.info_label.config(text=f"[ERROR] 出现错误: {e}", foreground="#DB231D")
+        
