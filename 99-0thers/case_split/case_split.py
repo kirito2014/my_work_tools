@@ -8,6 +8,7 @@ import pandas as pd
 import shutil
 from openpyxl import load_workbook
 from datetime import datetime
+from PIL import Image, ImageTk
 
 #pyinstaller --onefile --noconsole --add-data "res;res" --icon=sunline.ico case_split.py  # 打包命令
 # 模块1: 读取文件并提取部门信息,用于获取部门列表 方便循环操作
@@ -119,13 +120,22 @@ def write_to_specific_cells(file_path: str, sheet_name: str,dp_name: str):
     app.info_label.config(text=f"[ INFO ] 文件 {file_path} 已更新.", foreground="#298073")
 
 
+def get_resource_path(relative_path):
+    """获取打包后资源文件的路径"""
+    try:
+        # 获取应用程序目录
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 
 class App():
     def __init__(self, root):
         self.root = root
         self.root.title("解决方案部-售前统计工具")
-        self.root.geometry('500x200')
+        self.root.geometry('500x400')
         self.root.configure(bg='#f0f0f0')
         self.root.set_theme("arc")
         self.root.option_add("*Font", "黑体 10")
@@ -133,6 +143,9 @@ class App():
 
         self.source_file_var = tk.StringVar()
         self.template_file_var = tk.StringVar()
+        self.department_vars = []
+        self.department_checkbuttons = []
+
 
         frame = tk.Frame(self.root, bg='#f0f0f0')
         frame.pack(pady=30, padx=50, anchor="e")
@@ -141,6 +154,12 @@ class App():
         ttk.Button(frame, text="选择模板文件", command=self.select_target_file, width=20).grid(row=0, column=1, padx=10, pady=5)
         ttk.Button(frame, text="确认执行", command=self.run_script, width=20).grid(row=1, column=0, padx=10, pady=5)
         ttk.Button(frame, text="清除信息", command=self.clear_info, width=20).grid(row=1, column=1, padx=10, pady=5)
+        
+        # 增加一个获取部门列表的按钮
+        ttk.Button(frame, text="获取部门列表", command=self.load_departments, width=20).grid(row=2, column=0, padx=10, pady=5)
+
+        # 增加执行选中部门的按钮
+        ttk.Button(frame, text="执行选中部门文件生成", command=self.run_selected_departments, width=20).grid(row=2, column=1, padx=10, pady=5)
 
         # 创建进度条
         self.progress = ttk.Progressbar(self.root, orient='horizontal', mode='determinate', length=320)
@@ -150,8 +169,17 @@ class App():
         self.info_label.pack()
 
     def load_logo(self):
-        # 省略 logo 加载部分的代码
-        pass
+        logo_path = get_resource_path('res/sunline_logo_original.png')  # 请确保路径正确
+        logo_image = Image.open(logo_path)
+        logo_image = logo_image.resize((int(logo_image.width * 0.6), int(logo_image.height * 0.6)), Image.LANCZOS)
+
+        #透明度10
+        #logo_image.putalpha(0)
+        self.logo_photo = ImageTk.PhotoImage(logo_image)
+
+        # 显示logo在左上角
+        self.logo_label = ttk.Label(self.root, image=self.logo_photo, background='#f0f0f0')
+        self.logo_label.place(x=40, y=60)  # 设置图片位置
 
     def select_folder(self):
         source_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls *.xlsm")])
@@ -188,6 +216,95 @@ class App():
                 return
 
             threading.Thread(target=self.process_files, args=(source_file_path, target_file_path, "售前情况输出")).start()
+
+    def load_departments(self):
+        """从源文件中获取部门列表并生成复选框"""
+        source_file_path = self.source_file_var.get()
+        if not source_file_path or not Path(source_file_path).is_file():
+            self.info_label.config(text="请先选择有效的源文件", foreground="#DB231D")
+            return
+
+        departments = get_unique_departments(source_file_path, sheet_name='售前情况统计表', usecols=get_usecols('售前情况统计表'))
+
+        # 清除旧的复选框
+        for cb in self.department_checkbuttons:
+            cb.grid_forget()
+        self.department_vars = []
+        self.department_checkbuttons = []
+
+        # 生成复选框
+        for i, department in enumerate(departments):
+            var = tk.BooleanVar()
+            self.department_vars.append(var)
+            cb = ttk.Checkbutton(self.root, text=department, variable=var)
+            cb.pack(anchor='w')  # 放置到窗口上
+            self.department_checkbuttons.append(cb)
+        self.info_label.config(text=f"[INFO] 获取部门列表成功，选择要执行的部门并执行.", foreground="#298073")
+
+    def process_selected_departments( self,source_file_path, target_file_path, output_directory, selected_departments):
+        """处理选中的部门"""
+        try:
+            for department in selected_departments:
+                self.process_single_department(source_file_path, target_file_path, output_directory, department)
+            self.info_label.config(text="文件生成完成", foreground="#298073")
+        except Exception as e:
+            self.info_label.config(text=f"处理失败: {e}", foreground="#DB231D")
+
+    def run_selected_departments(self):
+        """执行选中的部门的文件生成"""
+        source_file_path = self.source_file_var.get()
+        target_file_path = self.template_file_var.get()
+
+        if not source_file_path or not Path(source_file_path).is_file():
+            self.info_label.config(text="请选择有效的源文件", foreground="#DB231D")
+            return
+
+        if not target_file_path or not Path(target_file_path).is_file():
+            self.info_label.config(text="请选择有效的模板文件", foreground="#DB231D")
+            return
+
+        selected_departments = [dep for var, dep in zip(self.department_vars, get_unique_departments(source_file_path, sheet_name='售前情况统计表', usecols=get_usecols('售前情况统计表'))) if var.get()]
+
+
+        if not selected_departments:
+            self.info_label.config(text="请选择至少一个部门", foreground="#DB231D")
+            return
+
+        # 使用多线程处理选中的部门
+        threading.Thread(target=self.process_selected_departments, args=(source_file_path, target_file_path, "售前情况输出", selected_departments)).start()
+
+    def process_single_department(self,source_file_path, target_file_path, output_directory, department_name):
+        """处理单个部门的数据"""
+        try:
+            # 创建输出目录
+            output_path = os.path.join(os.path.dirname(source_file_path), output_directory)
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+                self.info_label.config(text=f"[INFO] 文件夹 {output_path} 已创建.", foreground="#298073")
+
+            # 生成新文件名
+            new_file_name = get_new_file_name(target_file_path, department_name)
+            self.info_label.config(text=f"[INFO] 处理部门: {department_name}, 文件名: {new_file_name}")
+
+            # 删除旧文件并创建新文件
+            check_and_remove_file(new_file_name, output_path)
+            create_new_file(target_file_path, new_file_name, output_path)
+
+            # 循环处理 cols_mapping 中的 sheet_name
+            for sheet_name in cols_mapping.keys():
+                filter_col = get_usecols(sheet_name)
+                data = filter_department_data(source_file_path, sheet_name=sheet_name, department_name=department_name, usecols=filter_col)
+                
+                # 写入到目标文件
+                target_file = os.path.join(output_path, new_file_name)
+                with pd.ExcelWriter(target_file, mode='a', if_sheet_exists='overlay') as writer:
+                    data.to_excel(writer, sheet_name=sheet_name, index=False, startrow=0, startcol=0)
+            
+            # 在标题及目录 sheet 中填写部门信息
+            write_to_specific_cells(target_file, sheet_name="标题及目录", dp_name=department_name)
+            self.info_label.config(text=f"[INFO] 文件拆分处理完成.", foreground="#298073")
+        except Exception as e:
+            self.info_label.config(text=f"[ERROR] 处理部门 {department_name} 时发生错误: {e}")
 
     def process_files(self, source_file_path, target_file_path, output_directory):
         try:
@@ -229,7 +346,6 @@ class App():
         except Exception as e:
             self.info_label.config(text=f"[ERROR] 执行脚本失败: {e}", foreground="#DB231D") 
 
-
     def update_progress(self, value):
         """更新进度条"""
         self.progress['value'] = value
@@ -238,6 +354,13 @@ class App():
     def clear_info(self):
         self.source_file_var.set("")
         self.template_file_var.set("")
+        #清除复选框
+        # 清除旧的复选框
+        for cb in self.department_checkbuttons:
+            cb.grid_forget()
+        self.department_vars = []
+        self.department_checkbuttons = []
+
         self.progress['value'] = 0  # 重置进度条
 
 if __name__ == "__main__":
@@ -246,5 +369,6 @@ if __name__ == "__main__":
         app = App(root)
         root.mainloop()
     except Exception as e:
-        app.info_label.config(text=f"[ERROR] 出现错误: {e}", foreground="#DB231D")
+        print(f"出现错误: {e}")
+        input("按任意键退出...")
         
