@@ -144,6 +144,7 @@ class App():
         self.template_file_var = tk.StringVar()
         self.department_vars = []
         self.department_checkbuttons = []
+        self.select_all_var = tk.BooleanVar()  # 全选控制变量
 
         # 调用布局方法
         self.create_layout()
@@ -151,24 +152,17 @@ class App():
     def create_layout(self):
         # 左侧区域 - 部门复选框区域，带有滚动条
         left_frame = tk.Frame(self.root, bg='#f0f0f0', width=150, height=300)
-        left_frame.pack(side='left', fill='both', padx=10, pady=30,expand=True)
+        left_frame.pack(side='left', fill='both', padx=10, pady=30, expand=True)
 
         self.scroll_canvas = tk.Canvas(left_frame, bg='#f0f0f0', width=250, height=300)
         self.scrollbar = tk.Scrollbar(left_frame, orient="vertical", command=self.scroll_canvas.yview)
-
-        
         self.scroll_canvas.configure(yscrollcommand=self.scrollbar.set)
-
         self.scrollbar.pack(side='left', fill='y')
         self.scroll_canvas.pack(side='left', fill='both', expand=True)
 
         self.scrollable_frame = tk.Frame(self.scroll_canvas, bg='#f0f0f0')
-
         self.scroll_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        #self.scroll_canvas.config(scrollregion=self.scroll_canvas.bbox("all"))
         self.scrollable_frame.bind("<Configure>", lambda e: self.scroll_canvas.configure(scrollregion=self.scroll_canvas.bbox("all")))
-
-        
 
         # 右侧区域 - 按钮区域
         right_frame = tk.Frame(self.root, bg='#f0f0f0', width=200, height=400)
@@ -177,10 +171,12 @@ class App():
         # 按钮设置
         ttk.Button(right_frame, text="选择源文件", command=self.select_folder, width=20).pack(pady=5)
         ttk.Button(right_frame, text="选择模板文件", command=self.select_target_file, width=20).pack(pady=5)
-        ttk.Button(right_frame, text="确认全量执行", command=self.run_script, width=20).pack(pady=5)
-        ttk.Button(right_frame, text="清除执行信息", command=self.clear_info, width=20).pack(pady=5)
+        #ttk.Button(right_frame, text="确认全量执行", command=self.run_script, width=20).pack(pady=5)
         ttk.Button(right_frame, text="获取部门列表", command=self.load_departments, width=20).pack(pady=5)
         ttk.Button(right_frame, text="执行选中部门文件生成", command=self.run_selected_departments, width=20).pack(pady=5)
+        ttk.Button(right_frame, text="清除执行信息", command=self.clear_info, width=20).pack(pady=5)
+
+        self.select_all_checkbox = None  # 延迟显示的全选按钮
 
         # 底部区域 - 进度条和信息展示
         bottom_frame = tk.Frame(self.root, bg='#f0f0f0')
@@ -191,6 +187,12 @@ class App():
 
         self.info_label = ttk.Label(bottom_frame, text="请选择文件", foreground="#DB231D", background="#f0f0f0")
         self.info_label.pack()
+
+    def toggle_select_all(self):
+        """控制全选/取消全选功能"""
+        select_all = self.select_all_var.get()
+        for var in self.department_vars:
+            var.set(select_all)
 
     def load_logo(self):
         logo_path = get_resource_path('res/sunline_logo_original.png')  # 请确保路径正确
@@ -249,25 +251,35 @@ class App():
 
         # 清除旧的复选框
         for cb in self.department_checkbuttons:
-            cb.grid_forget()
+            cb.pack_forget()
         self.department_vars = []
         self.department_checkbuttons = []
 
         # 生成复选框
-        for i, department in enumerate(departments):
+        for department in departments:
             var = tk.BooleanVar()
             self.department_vars.append(var)
             cb = ttk.Checkbutton(self.scrollable_frame, text=department, variable=var)
             cb.pack(anchor='w')  # 放置到窗口上
             self.department_checkbuttons.append(cb)
 
+        # 显示“全选”按钮
+        if not self.select_all_checkbox:
+            self.select_all_checkbox = ttk.Checkbutton(self.scrollable_frame, text="全选", variable=self.select_all_var, command=self.toggle_select_all)
+            self.select_all_checkbox.pack(anchor='w', before=self.department_checkbuttons[0])  # 显示在列表最上方
+
         self.info_label.config(text=f"[INFO] 获取部门列表成功，选择要执行的部门并执行.", foreground="#298073")
+
 
     def process_selected_departments( self,source_file_path, target_file_path, output_directory, selected_departments):
         """处理选中的部门"""
         try:
-            for department in selected_departments:
+            total_steps = len(selected_departments)
+            step_size = 100 / total_steps  # 计算每个部门的进度步进
+            for index,department in enumerate(selected_departments):
+            
                 self.process_single_department(source_file_path, target_file_path, output_directory, department)
+                self.update_progress(step_size * (index + 1))  # 更新进度条
             self.info_label.config(text="文件生成完成", foreground="#298073")
         except Exception as e:
             self.info_label.config(text=f"处理失败: {e}", foreground="#DB231D")
@@ -285,14 +297,16 @@ class App():
             self.info_label.config(text="请选择有效的模板文件", foreground="#DB231D")
             return
 
-        selected_departments = [dep for var, dep in zip(self.department_vars, get_unique_departments(source_file_path, sheet_name='售前情况统计表', usecols=get_usecols('售前情况统计表'))) if var.get()]
-
-        if not selected_departments:
-            self.info_label.config(text="请选择至少一个部门", foreground="#DB231D")
-            return
-
-        # 使用多线程处理选中的部门
-        threading.Thread(target=self.process_selected_departments, args=(source_file_path, target_file_path, "售前情况输出", selected_departments)).start()
+        if self.select_all_var.get():
+            # 全选状态，执行全量处理
+            self.run_script()
+        else:
+            # 仅处理选中的部门
+            selected_departments = [dep for var, dep in zip(self.department_vars, get_unique_departments(source_file_path, sheet_name='售前情况统计表', usecols=get_usecols('售前情况统计表'))) if var.get()]
+            if not selected_departments:
+                self.info_label.config(text="请选择至少一个部门", foreground="#DB231D")
+                return
+            threading.Thread(target=self.process_selected_departments, args=(source_file_path, target_file_path, "售前情况输出", selected_departments)).start()
 
     def process_single_department(self,source_file_path, target_file_path, output_directory, department_name):
         """处理单个部门的数据"""
