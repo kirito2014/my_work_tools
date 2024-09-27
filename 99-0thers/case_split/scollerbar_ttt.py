@@ -10,6 +10,7 @@ from openpyxl import load_workbook
 from datetime import datetime
 from PIL import Image, ImageTk
 
+
 #pyinstaller --onefile --noconsole --add-data "res;res" --icon=sunline.ico case_split.py  # 打包命令
 # 模块1: 读取文件并提取部门信息,用于获取部门列表 方便循环操作
 def get_unique_departments(source_file: str, sheet_name: str, usecols:str) -> list:
@@ -130,56 +131,88 @@ def get_resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
-
 class App():
     def __init__(self, root):
         self.root = root
         self.root.title("解决方案部-售前统计工具")
-        self.root.geometry('500x400')
+        self.root.geometry('600x500')
         self.root.configure(bg='#f0f0f0')
         self.root.set_theme("arc")
-        self.root.option_add("*Font", "黑体 10")
         self.load_logo()
 
         self.source_file_var = tk.StringVar()
         self.template_file_var = tk.StringVar()
         self.department_vars = []
         self.department_checkbuttons = []
+        self.select_all_var = tk.BooleanVar()  # 用于全选功能
 
+        # 调用布局方法
+        self.create_layout()
 
-        frame = tk.Frame(self.root, bg='#f0f0f0')
-        frame.pack(pady=30, padx=50, anchor="e")
+    def create_layout(self):
+        # 左侧区域 - 部门复选框区域，带有滚动条
+        left_frame = tk.Frame(self.root, bg='#f0f0f0', width=150, height=300)
+        left_frame.pack(side='left', fill='both', padx=10, pady=30,expand=True)
+
+        self.scroll_canvas = tk.Canvas(left_frame, bg='#f0f0f0', width=250, height=300)
+        self.scrollbar = tk.Scrollbar(left_frame, orient="vertical", command=self.scroll_canvas.yview)
+
         
-        ttk.Button(frame, text="选择源文件", command=self.select_folder, width=20).grid(row=0, column=0, padx=10, pady=5)
-        ttk.Button(frame, text="选择模板文件", command=self.select_target_file, width=20).grid(row=0, column=1, padx=10, pady=5)
-        ttk.Button(frame, text="确认执行", command=self.run_script, width=20).grid(row=1, column=0, padx=10, pady=5)
-        ttk.Button(frame, text="清除信息", command=self.clear_info, width=20).grid(row=1, column=1, padx=10, pady=5)
+        self.scroll_canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.scrollbar.pack(side='left', fill='y')
+        self.scroll_canvas.pack(side='left', fill='both', expand=True)
+
+        self.scrollable_frame = tk.Frame(self.scroll_canvas, bg='#f0f0f0')
+
+        self.scroll_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        #self.scroll_canvas.config(scrollregion=self.scroll_canvas.bbox("all"))
+        self.scrollable_frame.bind("<Configure>", lambda e: self.scroll_canvas.configure(scrollregion=self.scroll_canvas.bbox("all")))
+        # 全选复选框
+        self.select_all_checkbox = ttk.Checkbutton(self.scrollable_frame, text="全选", variable=self.select_all_var, command=self.toggle_select_all)
+        self.select_all_checkbox.pack(anchor='w')
         
-        # 增加一个获取部门列表的按钮
-        ttk.Button(frame, text="获取部门列表", command=self.load_departments, width=20).grid(row=2, column=0, padx=10, pady=5)
+        # 虚线间隔
 
-        # 增加执行选中部门的按钮
-        ttk.Button(frame, text="执行选中部门文件生成", command=self.run_selected_departments, width=20).grid(row=2, column=1, padx=10, pady=5)
+        separator = ttk.Separator(self.root, orient='vertical')
+        separator.pack(side='left', fill='y', padx=10, pady=10)
+        # 右侧区域 - 按钮区域
+        right_frame = tk.Frame(self.root, bg='#f0f0f0', width=200, height=300)
+        right_frame.pack(side='top', fill='y', padx=10, pady=80)
 
-        # 创建进度条
-        self.progress = ttk.Progressbar(self.root, orient='horizontal', mode='determinate', length=320)
-        self.progress.pack(padx=50,pady=10)
+        # 按钮设置
+        ttk.Button(right_frame, text="选择源文件", command=self.select_folder, width=20).pack(pady=5)
+        ttk.Button(right_frame, text="选择模板文件", command=self.select_target_file, width=20).pack(pady=5)
+        #ttk.Button(right_frame, text="确认全量执行", command=self.run_script, width=20).pack(pady=5)
+        ttk.Button(right_frame, text="清除执行信息", command=self.clear_info, width=20).pack(pady=5)
+        ttk.Button(right_frame, text="获取部门列表", command=self.load_departments, width=20).pack(pady=5)
+        ttk.Button(right_frame, text="执行选中部门文件生成", command=self.run_selected_departments, width=20).pack(pady=5)
 
-        self.info_label = ttk.Label(self.root, text="请选择文件", foreground="#DB231D", background="#f0f0f0")
+        # 底部区域 - 进度条和信息展示
+        bottom_frame = tk.Frame(self.root, bg='#f0f0f0')
+        bottom_frame.pack(side='bottom', fill='x', padx=10, pady=10)
+
+        self.progress = ttk.Progressbar(bottom_frame, orient='horizontal', mode='determinate', length=520)
+        self.progress.pack(pady=5)
+
+        self.info_label = ttk.Label(bottom_frame, text="请选择文件", foreground="#DB231D", background="#f0f0f0")
         self.info_label.pack()
+
+    def toggle_select_all(self):
+        """全选/取消全选功能"""
+        select_all = self.select_all_var.get()
+        for var in self.department_vars:
+            var.set(select_all)
 
     def load_logo(self):
         logo_path = get_resource_path('res/sunline_logo_original.png')  # 请确保路径正确
         logo_image = Image.open(logo_path)
-        logo_image = logo_image.resize((int(logo_image.width * 0.6), int(logo_image.height * 0.6)), Image.LANCZOS)
-
-        #透明度10
-        #logo_image.putalpha(0)
+        logo_image = logo_image.resize((int(logo_image.width * 0.4), int(logo_image.height * 0.4)), Image.LANCZOS)
         self.logo_photo = ImageTk.PhotoImage(logo_image)
 
         # 显示logo在左上角
         self.logo_label = ttk.Label(self.root, image=self.logo_photo, background='#f0f0f0')
-        self.logo_label.place(x=40, y=60)  # 设置图片位置
+        self.logo_label.place(x=420, y=20)  # 设置图片位置
 
     def select_folder(self):
         source_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls *.xlsm")])
@@ -228,18 +261,20 @@ class App():
 
         # 清除旧的复选框
         for cb in self.department_checkbuttons:
-            cb.grid_forget()
+            cb.pack_forget()
         self.department_vars = []
         self.department_checkbuttons = []
 
         # 生成复选框
-        for i, department in enumerate(departments):
+        for department in departments:
             var = tk.BooleanVar()
             self.department_vars.append(var)
-            cb = ttk.Checkbutton(self.root, text=department, variable=var)
+            cb = ttk.Checkbutton(self.scrollable_frame, text=department, variable=var)
             cb.pack(anchor='w')  # 放置到窗口上
             self.department_checkbuttons.append(cb)
+
         self.info_label.config(text=f"[INFO] 获取部门列表成功，选择要执行的部门并执行.", foreground="#298073")
+
 
     def process_selected_departments( self,source_file_path, target_file_path, output_directory, selected_departments):
         """处理选中的部门"""
@@ -263,15 +298,17 @@ class App():
             self.info_label.config(text="请选择有效的模板文件", foreground="#DB231D")
             return
 
-        selected_departments = [dep for var, dep in zip(self.department_vars, get_unique_departments(source_file_path, sheet_name='售前情况统计表', usecols=get_usecols('售前情况统计表'))) if var.get()]
-
-
-        if not selected_departments:
-            self.info_label.config(text="请选择至少一个部门", foreground="#DB231D")
-            return
-
-        # 使用多线程处理选中的部门
-        threading.Thread(target=self.process_selected_departments, args=(source_file_path, target_file_path, "售前情况输出", selected_departments)).start()
+        if self.select_all_var.get():
+            # 全选状态，执行全量处理
+            self.run_script()
+        else:
+            # 仅处理选中的部门
+            selected_departments = [dep for var, dep in zip(self.department_vars, get_unique_departments(source_file_path, sheet_name='售前情况统计表', usecols=get_usecols('售前情况统计表'))) if var.get()]
+            #print(selected_departments)
+            if not selected_departments:
+                self.info_label.config(text="请选择至少一个部门", foreground="#DB231D")
+                return
+            threading.Thread(target=self.process_selected_departments, args=(source_file_path, target_file_path, "售前情况输出", selected_departments)).start()
 
     def process_single_department(self,source_file_path, target_file_path, output_directory, department_name):
         """处理单个部门的数据"""
@@ -362,7 +399,6 @@ class App():
         self.department_checkbuttons = []
 
         self.progress['value'] = 0  # 重置进度条
-
 if __name__ == "__main__":
     try:
         root = ThemedTk(theme=False)
@@ -371,4 +407,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"出现错误: {e}")
         input("按任意键退出...")
-        
+
