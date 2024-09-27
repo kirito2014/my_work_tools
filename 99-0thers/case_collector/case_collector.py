@@ -158,11 +158,13 @@ def format_project_exc_data(case_data):
     if start_index is not None and end_index is not None:
         # 提取基本信息部分的数据
         project_info_df = case_data.iloc[start_index:end_index].reset_index(drop=True)
+        #print(project_info_df)
         if project_info_df is not None:
             #print("项目实施内容:")
             fddd = project_info_df.iloc[1:].dropna(how='all').copy()
             fddd.columns = project_info_df.iloc[0]
-            if len(fddd) <= 1:
+            #print(len(fddd))
+            if len(fddd) < 1:
                 default_row = ['/' for _ in range(len(fddd.columns))]
                 fddd.loc[len(fddd)] = default_row
             #print(fddd)
@@ -436,6 +438,7 @@ def check_and_process_file(filepath):
         # 格式化数据，提取各个部分的信息
         basic_info_dict = format_basic_info_data(df_source)
         project_info = format_project_exc_data(df_source)
+        #print(project_info)
         class_data = format_case_classify_data(df_source)
         supply_data = format_supply_info_data(df_source)
         other_data = format_other_info_data(df_source)
@@ -482,6 +485,7 @@ def load_data_to_target_file(data, target_file_path,source_file_path):
     #数据加载
     basic_info = data.get("basic_info", None)
     project_info = data.get("project_info", None)
+    #print(project_info)
     class_data = data.get("class_data", None)
     supply_data = data.get("supply_data", None)
     other_data = data.get("other_data", None)
@@ -524,6 +528,7 @@ def load_data_to_target_file(data, target_file_path,source_file_path):
 
                         #项目实施内容
                         project_info = project_info.get("project_info", None)
+                        #print(project_info)
 
                         #分类信息
                         consulting_plan 	= class_data.get("consulting_plan", None)
