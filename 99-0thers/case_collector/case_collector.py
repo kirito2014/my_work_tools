@@ -3,7 +3,7 @@
 ********************************************************************
 *
 *    Filename   :  case_collector.py
-*    Description:  Demonstrate how to add copyright comments in Python.
+*    Description:  join all the case files into one file
 *
 *    Version    :  1.0
 *    Created    :  2024/08/01 10:25:07

@@ -1,3 +1,24 @@
+# -*- coding: utf-8 -*-
+"""
+********************************************************************
+*
+*    Filename   :  case_split_single.py
+*    Description:  split excel file by department
+*
+*    Version    :  1.1.0
+*    Created    :  2024/09/028 10:25:07
+*    Revision   :  2024/08/01 10:25:07
+*    Compiler   :  python
+*
+*    Author     :  wangmujun(解决方案部/战略规划部), 
+*    Company    :  深圳市长亮科技股份有限公司
+*    E-mail     :  wangmujun@sunline.cn
+*    License    :  GPL
+*
+*    Copyright (c) 2024, Sunline Corporation. All rights reserved.
+*
+********************************************************************
+"""
 import os,sys
 import threading
 import tkinter as tk
