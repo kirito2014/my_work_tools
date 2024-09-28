@@ -135,7 +135,7 @@ class App():
     def __init__(self, root):
         self.root = root
         self.root.title("解决方案部-售前统计工具")
-        self.root.geometry('600x500')
+        self.root.geometry('600x630')
         self.root.configure(bg='#f0f0f0')
         self.root.set_theme("arc")
         self.load_logo()
@@ -148,45 +148,54 @@ class App():
 
         # 调用布局方法
         self.create_layout()
-
     def create_layout(self):
         # 左侧区域 - 部门复选框区域，带有滚动条
         left_frame = tk.Frame(self.root, bg='#f0f0f0', width=150, height=300)
         left_frame.pack(side='left', fill='both', padx=10, pady=30, expand=True)
 
-        self.scroll_canvas = tk.Canvas(left_frame, bg='#f0f0f0', width=250, height=300)
+        self.scroll_canvas = tk.Canvas(left_frame, bg='#f0f0f0', width=150, height=300)
         self.scrollbar = tk.Scrollbar(left_frame, orient="vertical", command=self.scroll_canvas.yview)
         self.scroll_canvas.configure(yscrollcommand=self.scrollbar.set)
         self.scrollbar.pack(side='left', fill='y')
         self.scroll_canvas.pack(side='left', fill='both', expand=True)
+        #滚动条宽度25，颜色为蓝色,圆角样式
+        self.scrollbar.config(width=25, troughcolor="#f0f0f0", activebackground="#298073", highlightthickness=0, bd=0)
 
         self.scrollable_frame = tk.Frame(self.scroll_canvas, bg='#f0f0f0')
         self.scroll_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.scrollable_frame.bind("<Configure>", lambda e: self.scroll_canvas.configure(scrollregion=self.scroll_canvas.bbox("all")))
 
-        # 右侧区域 - 按钮区域
-        right_frame = tk.Frame(self.root, bg='#f0f0f0', width=200, height=400)
+        # 右侧区域 - 按钮区域,
+        right_frame = tk.Frame(self.root, bg='#f0f0f0', width=150, height=300)
         right_frame.pack(side='top', fill='y', padx=10, pady=80)
 
+        #竖向分割线，样式为虚线，颜色为灰色
+        ttk.Separator(left_frame, orient='vertical').pack(side='right', fill='y', padx=20, pady=10)
+
         # 按钮设置
-        ttk.Button(right_frame, text="选择源文件", command=self.select_folder, width=20).pack(pady=5)
+        ttk.Button(right_frame, text="选择来源文件", command=self.select_folder, width=20).pack(pady=5)
         ttk.Button(right_frame, text="选择模板文件", command=self.select_target_file, width=20).pack(pady=5)
         #ttk.Button(right_frame, text="确认全量执行", command=self.run_script, width=20).pack(pady=5)
         ttk.Button(right_frame, text="获取部门列表", command=self.load_departments, width=20).pack(pady=5)
-        ttk.Button(right_frame, text="执行选中部门文件生成", command=self.run_selected_departments, width=20).pack(pady=5)
+        ttk.Button(right_frame, text="执行文件拆分", command=self.run_selected_departments, width=20).pack(pady=5)
         ttk.Button(right_frame, text="清除执行信息", command=self.clear_info, width=20).pack(pady=5)
 
         self.select_all_checkbox = None  # 延迟显示的全选按钮
 
         # 底部区域 - 进度条和信息展示
-        bottom_frame = tk.Frame(self.root, bg='#f0f0f0')
+        bottom_frame = tk.Frame(self.root, bg='#f0f0f0', width=200, height=80)
         bottom_frame.pack(side='bottom', fill='x', padx=10, pady=10)
+        #横向分割线，样式为虚线，颜色为灰色
+        ttk.Separator(bottom_frame, orient='horizontal').pack(side='top', fill='x', padx=10, pady=5)
 
-        self.progress = ttk.Progressbar(bottom_frame, orient='horizontal', mode='determinate', length=520)
-        self.progress.pack(pady=5)
+        self.progress = ttk.Progressbar(bottom_frame, orient='horizontal', mode='determinate', length=290)
+        self.progress.pack(side='bottom',fill='x', padx=10, pady=20)
 
         self.info_label = ttk.Label(bottom_frame, text="请选择文件", foreground="#DB231D", background="#f0f0f0")
         self.info_label.pack()
+
+        self.info_label_select_source = ttk.Label(right_frame, text=f"使用方法：\n\t<--选择要拆分的文件 \n\t<--选择拆分模板文件 \n\t<--获取部门列表\n\t<--选择拆分部门或全选\n\t<--执行拆分\r\n程序版权所有：深圳市长亮科技有限公司", foreground="#298073", background="#f0f0f0")
+        self.info_label_select_source.pack(pady=5)
 
     def toggle_select_all(self):
         """控制全选/取消全选功能"""
@@ -200,9 +209,9 @@ class App():
         logo_image = logo_image.resize((int(logo_image.width * 0.4), int(logo_image.height * 0.4)), Image.LANCZOS)
         self.logo_photo = ImageTk.PhotoImage(logo_image)
 
-        # 显示logo在左上角
+        # 显示logo在右上角
         self.logo_label = ttk.Label(self.root, image=self.logo_photo, background='#f0f0f0')
-        self.logo_label.place(x=420, y=20)  # 设置图片位置
+        self.logo_label.place(x=410, y=20)  # 设置图片位置
 
     def select_folder(self):
         source_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls *.xlsm")])
@@ -280,9 +289,9 @@ class App():
             
                 self.process_single_department(source_file_path, target_file_path, output_directory, department)
                 self.update_progress(step_size * (index + 1))  # 更新进度条
-            self.info_label.config(text="文件生成完成", foreground="#298073")
+            self.info_label.config(text=f"[ INFO ] 拆分文件处理完成", foreground="#298073")
         except Exception as e:
-            self.info_label.config(text=f"处理失败: {e}", foreground="#DB231D")
+            self.info_label.config(text=f"[ERROR] 处理失败: {e}", foreground="#DB231D")
 
     def run_selected_departments(self):
         """执行选中的部门的文件生成"""
@@ -392,9 +401,13 @@ class App():
         #清除复选框
         # 清除旧的复选框
         for cb in self.department_checkbuttons:
-            cb.grid_forget()
+            cb.pack_forget()
         self.department_vars = []
         self.department_checkbuttons = []
+        #清除旧的全选框
+        self.select_all_var.set(False)
+        if  self.select_all_checkbox:
+            self.select_all_checkbox.pack_forget()
 
         self.progress['value'] = 0  # 重置进度条
 if __name__ == "__main__":
