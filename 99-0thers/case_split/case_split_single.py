@@ -22,6 +22,7 @@
 import os,sys
 import threading
 import tkinter as tk
+#import pywinstyles
 from tkinter import filedialog, ttk
 from ttkthemes import ThemedTk
 from pathlib import Path
@@ -30,7 +31,8 @@ import shutil
 from openpyxl import load_workbook
 from datetime import datetime
 from PIL import Image, ImageTk
-
+import openpyxl
+from openpyxl.styles import Font, Border, Side, Alignment
 
 #pyinstaller --onefile --noconsole --add-data "res;res" --icon=sunline.ico case_split.py  # 打包命令
 # 模块1: 读取文件并提取部门信息,用于获取部门列表 方便循环操作
@@ -123,25 +125,53 @@ def get_new_file_name(template_file: str, dp_name: str):
 def write_to_specific_cells(file_path: str, sheet_name: str,dp_name: str):
     # 打开 Excel 文件
     wb = load_workbook(file_path)
-    
-    if sheet_name not in wb.sheetnames:
-        app.info_label.config(text=f"[WARNING] 工作表 '{sheet_name}' 不存在于文件中.", foreground="#DB231D")
-        return
-    ws = wb[sheet_name]
-    # 写入 C1 单元格
-    ws['C1'] = dp_name
-    # 写入 D4 单元格
-    ws['D4'] = dp_name
-    # 写入 D5 单元格，当前时间
-    ws['D5'] = datetime.now().strftime('%Y-%m-%d')
-    #写入 D6 单元格，(yyyy年mm月）
-    ws['D6'] = datetime.now().strftime('%Y年%m月')
+    #如果是目录sheet页填入内容，如果不是则执行美化
+    if sheet_name == "标题及目录":    
+        if sheet_name not in wb.sheetnames:
+            app.info_label.config(text=f"[WARNING] 工作表 '{sheet_name}' 不存在于文件中.", foreground="#DB231D")
+            return
+        ws = wb[sheet_name]
+        # 写入 C1 单元格
+        ws['C1'] = dp_name
+        # 写入 D4 单元格
+        ws['D4'] = dp_name
+        # 写入 D5 单元格，当前时间
+        ws['D5'] = datetime.now().strftime('%Y-%m-%d')
+        #写入 D6 单元格，(yyyy年mm月）
+        ws['D6'] = datetime.now().strftime('%Y年%m月')
+    else:
+        try:
+            sheet = wb[sheet_name]
 
+            # 设置字体、边框和对齐方式
+            font = Font(name='宋体', size=10)
+            border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+            alignment = Alignment(vertical='center')
+
+            # 获取当前 sheet 页的最大行和最大列
+            max_row = sheet.max_row
+            max_col = sheet.max_column
+
+            # 从 A2 开始遍历整个数据区域，添加边框，修改字体，设置垂直居中
+            for row in sheet.iter_rows(min_row=2, max_row=max_row, min_col=1, max_col=max_col):
+                for cell in row:
+                    cell.font = font
+                    cell.border = border
+                    cell.alignment = alignment
+
+            # 保存文件
+            wb.save(file_path)
+            app.info_label.config(text=f"[INFO] Sheet {sheet_name} 已美化.", foreground="#298073")
+
+        except Exception as e:
+            app.info_label.config(text=f"[ERROR] 美化 sheet {sheet_name} 时发生错误: {e}")
     # 保存更改
     wb.save(file_path)
-    app.info_label.config(text=f"[ INFO ] 文件 {file_path} 已更新.", foreground="#298073")
+    app.info_label.config(text=f"[ INFO ] 文件 {os.path.basename(file_path)} 已更新首页并调格式.", foreground="#298073")
 
 
+
+#模块10:logo展示用获取打包后资源文件的路径
 def get_resource_path(relative_path):
     """获取打包后资源文件的路径"""
     try:
@@ -152,11 +182,43 @@ def get_resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
+#模块11:文件内容美化,写入标题内容
+def beautify_sheet(self, file_path, sheet_name):
+    """对指定的 sheet 页进行美化，添加边框、设置字体和垂直居中"""
+    try:
+        # 使用 openpyxl 打开文件
+        wb = openpyxl.load_workbook(file_path)
+        sheet = wb[sheet_name]
+
+        # 设置字体、边框和对齐方式
+        font = Font(name='宋体', size=10)
+        border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+        alignment = Alignment(vertical='center')
+
+        # 获取当前 sheet 页的最大行和最大列
+        max_row = sheet.max_row
+        max_col = sheet.max_column
+
+        # 从 A2 开始遍历整个数据区域，添加边框，修改字体，设置垂直居中
+        for row in sheet.iter_rows(min_row=2, max_row=max_row, min_col=1, max_col=max_col):
+            for cell in row:
+                cell.font = font
+                cell.border = border
+                cell.alignment = alignment
+
+        # 保存文件
+        wb.save(file_path)
+        self.info_label.config(text=f"[INFO] Sheet {sheet_name} 已美化.", foreground="#298073")
+
+    except Exception as e:
+        self.info_label.config(text=f"[ERROR] 美化 sheet {sheet_name} 时发生错误: {e}")
+
+#主窗口
 class App():
     def __init__(self, root):
         self.root = root
         self.root.title("解决方案部-售前统计工具")
-        self.root.geometry('600x630')
+        self.root.geometry('600x800')
         self.root.configure(bg='#f0f0f0')
         self.root.set_theme("arc")
         self.load_logo()
@@ -364,9 +426,12 @@ class App():
                 target_file = os.path.join(output_path, new_file_name)
                 with pd.ExcelWriter(target_file, mode='a', if_sheet_exists='overlay') as writer:
                     data.to_excel(writer, sheet_name=sheet_name, index=False, startrow=0, startcol=0)
-            
-            # 在标题及目录 sheet 中填写部门信息
-            write_to_specific_cells(target_file, sheet_name="标题及目录", dp_name=department_name)
+
+                # 美化除了 "标题及目录" 之外的 sheet 页
+                # if sheet_name != "标题及目录":
+                #     self.beautify_sheet(target_file, sheet_name)
+                # 在标题及目录 sheet 中填写部门信息
+                write_to_specific_cells(target_file, sheet_name=sheet_name, dp_name=department_name)
             self.info_label.config(text=f"[INFO] 文件拆分处理完成.", foreground="#298073")
         except Exception as e:
             self.info_label.config(text=f"[ERROR] 处理部门 {department_name} 时发生错误: {e}")
@@ -403,7 +468,11 @@ class App():
                     with pd.ExcelWriter(target_file, mode='a', if_sheet_exists='overlay') as writer:
                         data.to_excel(writer, sheet_name=sheet_name, index=False, startrow=0, startcol=0)
                     # 填写目标文件 标题及目录 sheet 页
-                write_to_specific_cells(target_file, sheet_name="标题及目录", dp_name=dp_name)
+
+                    # 美化除了 "标题及目录" 之外的 sheet 页
+                    # if sheet_name != "标题及目录":
+                    #     self.beautify_sheet(target_file, sheet_name)
+                    write_to_specific_cells(target_file, sheet_name=sheet_name, dp_name=dp_name)
 
                 self.update_progress(step_size * (index + 1))  # 更新进度条
 
