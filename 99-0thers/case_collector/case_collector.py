@@ -671,6 +671,8 @@ def load_data_to_target_file(data, target_file_path,source_file_path):
         workbook.save(target_file_path)
     except Exception as e:
         log_message(f"[ ERROR ]无法保存目标文件: {e}","#DB231D")
+    finally:
+        workbook.close()
 
     return cust_list
 
@@ -716,6 +718,8 @@ def update_customer_list(cust_list, target_file_path):
         workbook.close()
     except Exception as e:
         log_message(f"[ERROR] 无法保存目标文件: {e}","#DB231D")
+    finally:
+        workbook.close()
 
 #清除目标文件信息
 def clear_target_file(target_file_path):
@@ -742,6 +746,8 @@ def clear_target_file(target_file_path):
         workbook.save(target_file_path)
     except Exception as e:
         log_message( f"[ ERROR ]无法保存目标文件: {e}","#DB231D")
+    finally:
+        workbook.close()
 #日志记录
 def log_error(log_file,message):
     with open(log_file, 'w', encoding='gbk',errors='ignore') as f:

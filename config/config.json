@@ -1,0 +1,18 @@
+[
+    {
+        "name": "11111",
+        "path": "D:/github/99-0thers/case_split/case_split_single.py",
+        "params": [
+            "1",
+            "1"
+        ]
+    },
+    {
+        "name": "1111",
+        "path": "D:/github/99-0thers/case_split/case_split_single.py",
+        "params": [
+            "\u6587\u672c\u53c2\u6570: \u6587\u672c\u53c2\u65701",
+            "\u6587\u672c\u53c2\u6570: \u6587\u672c\u53c2\u65702"
+        ]
+    }
+]

@@ -165,6 +165,9 @@ def write_to_specific_cells(file_path: str, sheet_name: str,dp_name: str):
 
         except Exception as e:
             app.info_label.config(text=f"[ERROR] 美化 sheet {sheet_name} 时发生错误: {e}")
+        finally:
+            wb.save(file_path)
+            wb.close()
     # 保存更改
     wb.save(file_path)
     app.info_label.config(text=f"[ INFO ] 文件 {os.path.basename(file_path)} 已更新首页并调格式.", foreground="#298073")
@@ -212,6 +215,9 @@ def beautify_sheet(self, file_path, sheet_name):
 
     except Exception as e:
         self.info_label.config(text=f"[ERROR] 美化 sheet {sheet_name} 时发生错误: {e}")
+    finally:
+        wb.save(file_path)
+        wb.close()
 
 #主窗口
 class App():
