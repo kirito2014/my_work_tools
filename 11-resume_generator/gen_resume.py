@@ -1,7 +1,7 @@
 import os
 import sys
 
-from package.function import resume_generator,render
+from package.function import resume_generator
 
 
 
