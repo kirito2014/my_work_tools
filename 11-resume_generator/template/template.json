@@ -1,0 +1,59 @@
+{
+    "PersonName": {
+        "BasicInfo": {
+            "Name": "1",
+            "WorkYears": "2",
+            "GraduationTime": "3",
+            "GraduationSchool": "4",
+            "Major": "5",
+            "HighestEducation": "6",
+            "Department": "7",
+            "Title": "8",
+            "PersonalProfile": "9"
+        },
+        "WorkExperience": [
+            {
+                "StartTime": "2023/01/01",
+                "EndTime": "至今",
+                "CompanyName": "xxx1公司",
+                "Position": "xxxx职务",
+                "JobDescription": "xxxxxxxx"
+            },
+            {
+                "StartTime": "2022/01/01",
+                "EndTime": "2022/12/31",
+                "CompanyName": "xxx2公司",
+                "Position": "xxxx职务",
+                "JobDescription": "xxxxxxxx"
+            },
+            {
+                "StartTime": "2021/01/01",
+                "EndTime": "2021/12/31",
+                "CompanyName": "xxx3公司",
+                "Position": "xxxx职务",
+                "JobDescription": "xxxxxxxx"
+            }
+        ],
+        "ProjectExperience": [
+            {
+                "StartTime": "2023/01/01",
+                "EndTime": "至今",
+                "ProjectName": "xxx1项目",
+                "ProjectRole": "xxxx职务",
+                "JobDescription": "xxxxxxxx"
+            },
+            {
+                "StartTime": "2022/01/01",
+                "EndTime": "2022/12/31",
+                "ProjectName": "xxx2项目",
+                "ProjectRole": "xxxx职务",
+                "JobDescription": "xxxxxxxx"
+            }
+        ],
+        "WorkAbility": {
+            "BusinessAbility": "",
+            "Certification": "",
+            "Training": ""
+        }
+    }
+}
