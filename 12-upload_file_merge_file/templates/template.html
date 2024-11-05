@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Python Script Runner</title>
+    <style>
+        /* 弹出窗口样式 */
+        #popup {
+            display: none;
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            background-color: white;
+            border: 1px solid #ddd;
+            padding: 20px;
+            z-index: 1000;
+        }
+        #popupContent {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 500;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload and Run Script</h1>
+    <h3>Upload table_list-xxx.txt:</h3>
+    <input type="file" id="txtFileInput" accept=".txt">
+    <button onclick="uploadFile('txt')">Upload TXT</button>
+    <button onclick="analyzeTxt()">Analyze TXT</button> <!-- 新增按钮 -->
+
+    <h3>Upload pub_cd_map-xxx.xlsx:</h3>
+    <input type="file" id="xlsxFileInput" accept=".xlsx">
+    <button onclick="uploadFile('xlsx')">Upload XLSX</button>
+
+    <button onclick="runScript()">Run Script</button>
+    <p id="progress">Progress: 0%</p>
+
+    <button onclick="downloadFile()">Download Result</button>
+    <button onclick="clearFiles()">Clear Files</button> <!-- 新增按钮 -->
+
+    <!-- 弹出窗口 -->
+    <div id="overlay"></div>
+    <div id="popup">
+        <h3>TXT File Content</h3>
+        <div id="popupContent"></div>
+        <button onclick="closePopup()">Close</button>
+    </div>
+
+    <script>
+        let txtFilename = '';
+        let xlsxFilename = '';
+        let txtContent = [];  // 保存 TXT 内容
+
+        function uploadFile(type) {
+            const fileInput = document.getElementById(type === 'txt' ? 'txtFileInput' : 'xlsxFileInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("Please select a file");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    if (type === 'txt') {
+                        txtFilename = data.filename;
+                        txtContent = data.content;  // 保存返回的文件内容
+                        alert(data.filename + " uploaded successfully.");
+                    }
+                    if (type === 'xlsx') xlsxFilename = data.filename;
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+
+        function analyzeTxt() {
+            if (txtContent.length === 0) {
+                alert("Please upload a TXT file first.");
+                return;
+            }
+            // 将文件内容显示到弹出窗口
+            const popupContent = document.getElementById('popupContent');
+            popupContent.innerHTML = txtContent.join('<br>');
+            document.getElementById('popup').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+        }
+
+        function closePopup() {
+            document.getElementById('popup').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        }
+
+        function runScript() {
+            if (!txtFilename || !xlsxFilename) {
+                alert("Please upload both the TXT and XLSX files.");
+                return;
+            }
+
+            fetch('/run', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ txt_filename: txtFilename, xlsx_filename: xlsxFilename })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    checkProgress();
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+
+        function checkProgress() {
+            fetch('/progress')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('progress').innerText = "Progress: " + data.progress + "%";
+                if (data.progress < 100) {
+                    setTimeout(checkProgress, 1000);  // 每隔1秒检查一次进度
+                } else {
+                    alert("Processing complete. You can download the file now.");
+                }
+            });
+        }
+
+        function downloadFile() {
+            window.location.href = '/download';
+        }
+
+        function clearFiles() {
+            // 重置文件名变量
+            txtFilename = '';
+            xlsxFilename = '';
+            txtContent = [];
+
+            // 清空文件输入框
+            document.getElementById('txtFileInput').value = '';
+            document.getElementById('xlsxFileInput').value = '';
+
+            // 重置进度条
+            document.getElementById('progress').innerText = "Progress: 0%";
+
+            alert("Files cleared successfully.");
+        }
+    </script>
+</body>
+</html>
