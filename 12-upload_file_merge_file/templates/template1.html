@@ -31,24 +31,38 @@
             background: rgba(0, 0, 0, 0.5);
             z-index: 500;
         }
+        /* 提示信息样式 */
+        .file-status {
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status-red {
+            color: red;
+        }
+        .status-green {
+            color: green;
+        }
     </style>
 </head>
 <body>
     <h1>Upload and Run Script</h1>
+
     <h3>Upload table_list-xxx.txt:</h3>
-    <input type="file" id="txtFileInput" accept=".txt">
+    <input type="file" id="txtFileInput" accept=".txt" onchange="updateStatus('txt')">
     <button onclick="uploadFile('txt')">Upload TXT</button>
-    <button onclick="analyzeTxt()">Analyze TXT</button> <!-- 新增按钮 -->
+    <span id="txtStatus" class="file-status status-red">No file selected</span>
+    <button onclick="analyzeTxt()">Analyze TXT</button>
 
     <h3>Upload pub_cd_map-xxx.xlsx:</h3>
-    <input type="file" id="xlsxFileInput" accept=".xlsx">
+    <input type="file" id="xlsxFileInput" accept=".xlsx" onchange="updateStatus('xlsx')">
     <button onclick="uploadFile('xlsx')">Upload XLSX</button>
+    <span id="xlsxStatus" class="file-status status-red">No file selected</span>
 
     <button onclick="runScript()">Run Script</button>
     <p id="progress">Progress: 0%</p>
 
     <button onclick="downloadFile()">Download Result</button>
-    <button onclick="clearFiles()">Clear Files</button> <!-- 新增按钮 -->
+    <button onclick="clearFiles()">Clear Files</button>
 
     <!-- 弹出窗口 -->
     <div id="overlay"></div>
@@ -62,6 +76,20 @@
         let txtFilename = '';
         let xlsxFilename = '';
         let txtContent = [];  // 保存 TXT 内容
+
+        function updateStatus(type) {
+            const statusElem = document.getElementById(type === 'txt' ? 'txtStatus' : 'xlsxStatus');
+            const fileInput = document.getElementById(type === 'txt' ? 'txtFileInput' : 'xlsxFileInput');
+            if (fileInput.files.length > 0) {
+                statusElem.innerText = "File selected: " + fileInput.files[0].name;
+                statusElem.classList.remove('status-red');
+                statusElem.classList.add('status-green');
+            } else {
+                statusElem.innerText = "No file selected";
+                statusElem.classList.remove('status-green');
+                statusElem.classList.add('status-red');
+            }
+        }
 
         function uploadFile(type) {
             const fileInput = document.getElementById(type === 'txt' ? 'txtFileInput' : 'xlsxFileInput');
@@ -85,9 +113,12 @@
                         txtFilename = data.filename;
                         txtContent = data.content;  // 保存返回的文件内容
                         alert(data.filename + " uploaded successfully.");
+                        updateStatus('txt');
                     }
-                    if (type === 'xlsx') xlsxFilename = data.filename;
-                        //alert(data.filename + " uploaded successfully.");
+                    if (type === 'xlsx') {
+                        xlsxFilename = data.filename;
+                        updateStatus('xlsx');
+                    }
                 } else {
                     alert(data.message);
                 }
@@ -160,6 +191,12 @@
             // 清空文件输入框
             document.getElementById('txtFileInput').value = '';
             document.getElementById('xlsxFileInput').value = '';
+
+            // 重置提示信息
+            document.getElementById('txtStatus').innerText = "No file selected";
+            document.getElementById('txtStatus').className = "file-status status-red";
+            document.getElementById('xlsxStatus').innerText = "No file selected";
+            document.getElementById('xlsxStatus').className = "file-status status-red";
 
             // 重置进度条
             document.getElementById('progress').innerText = "Progress: 0%";
