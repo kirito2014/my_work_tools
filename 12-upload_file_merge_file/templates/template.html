@@ -4,6 +4,95 @@
     <meta charset="UTF-8">
     <title>Python Script Runner</title>
     <style>
+        /* 全局字体设置 */
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            color: #444;
+        }
+
+        /* 主容器样式 */
+        .container {
+            width: 600px;
+            background: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        /* 自定义文件选择按钮 */
+        .file-upload-wrapper {
+            margin: 15px 0;
+        }
+        .file-input-label {
+            background-color: #5cb85c;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: inline-block;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        .file-input {
+            display: none;
+        }
+
+        /* 文件状态样式 */
+        .file-status {
+            font-weight: bold;
+            font-size: 14px;
+            vertical-align: middle;
+        }
+        .status-red {
+            color: red;
+        }
+        .status-green {
+            color: green;
+        }
+
+        /* 底部按钮样式 */
+        .button-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        button {
+            background-color: #5cb85c;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+            flex: 1;
+            margin: 0 5px;
+        }
+        button:hover {
+            background-color: #4cae4c;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* 进度条样式 */
+        #progress {
+            font-size: 16px;
+            color: #5cb85c;
+            margin-top: 10px;
+        }
+
         /* 弹出窗口样式 */
         #popup {
             display: none;
@@ -15,11 +104,14 @@
             background-color: white;
             border: 1px solid #ddd;
             padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             z-index: 1000;
+            border-radius: 8px;
         }
         #popupContent {
             max-height: 300px;
             overflow-y: auto;
+            text-align: left;
         }
         #overlay {
             display: none;
@@ -34,40 +126,65 @@
     </style>
 </head>
 <body>
-    <h1>Upload and Run Script</h1>
-    <h3>Upload table_list-xxx.txt:</h3>
-    <input type="file" id="txtFileInput" accept=".txt">
-    <button onclick="uploadFile('txt')">Upload TXT</button>
-    <button onclick="analyzeTxt()">Analyze TXT</button> <!-- 新增按钮 -->
+    <div class="container">
+        <h1>Python Script Runner</h1>
 
-    <h3>Upload pub_cd_map-xxx.xlsx:</h3>
-    <input type="file" id="xlsxFileInput" accept=".xlsx">
-    <button onclick="uploadFile('xlsx')">Upload XLSX</button>
+        <div class="file-upload-wrapper">
+            <label class="file-input-label" for="txtFileInput">Choose table_list-xxx.txt</label>
+            <input type="file" id="txtFileInput" class="file-input" accept=".txt" onchange="updateStatus('txt')">
+            <button onclick="uploadFile('txt')">Upload TXT</button>
+            <span id="txtStatus" class="file-status status-red">No file selected</span>
+            <button onclick="analyzeTxt()">Analyze TXT</button>
+        </div>
 
-    <button onclick="runScript()">Run Script</button>
-    <p id="progress">Progress: 0%</p>
+        <div class="file-upload-wrapper">
+            <label class="file-input-label" for="xlsxFileInput">Choose pub_cd_map-xxx.xlsx</label>
+            <input type="file" id="xlsxFileInput" class="file-input" accept=".xlsx" onchange="updateStatus('xlsx')">
+            <button onclick="uploadFile('xlsx')">Upload XLSX</button>
+            <span id="xlsxStatus" class="file-status status-red">No file selected</span>
+        </div>
 
-    <button onclick="downloadFile()">Download Result</button>
-    <button onclick="clearFiles()">Clear Files</button> <!-- 新增按钮 -->
+        <p id="progress">Progress: 0%</p>
 
-    <!-- 弹出窗口 -->
-    <div id="overlay"></div>
-    <div id="popup">
-        <h3>TXT File Content</h3>
-        <div id="popupContent"></div>
-        <button onclick="closePopup()">Close</button>
+        <div class="button-row">
+            <button onclick="runScript()">Run Script</button>
+            <button onclick="downloadFile()">Download Result</button>
+            <button onclick="clearFiles()">Clear Files</button>
+        </div>
+
+        <!-- 弹出窗口 -->
+        <div id="overlay"></div>
+        <div id="popup">
+            <h3>TXT File Content</h3>
+            <div id="popupContent"></div>
+            <button onclick="closePopup()">Close</button>
+        </div>
     </div>
 
     <script>
         let txtFilename = '';
         let xlsxFilename = '';
-        let txtContent = [];  // 保存 TXT 内容
+        let txtContent = [];
+
+        function updateStatus(type) {
+            const statusElem = document.getElementById(type === 'txt' ? 'txtStatus' : 'xlsxStatus');
+            const fileInput = document.getElementById(type === 'txt' ? 'txtFileInput' : 'xlsxFileInput');
+            if (fileInput.files.length > 0) {
+                statusElem.innerText = type.toUpperCase() + " file selected";
+                statusElem.classList.remove('status-red');
+                statusElem.classList.add('status-green');
+            } else {
+                statusElem.innerText = "No file selected";
+                statusElem.classList.remove('status-green');
+                statusElem.classList.add('status-red');
+            }
+        }
 
         function uploadFile(type) {
             const fileInput = document.getElementById(type === 'txt' ? 'txtFileInput' : 'xlsxFileInput');
             const file = fileInput.files[0];
             if (!file) {
-                alert("Please select a file");
+                alert("Please select a file first.");
                 return;
             }
 
@@ -83,11 +200,13 @@
                 if (data.status === 'success') {
                     if (type === 'txt') {
                         txtFilename = data.filename;
-                        txtContent = data.content;  // 保存返回的文件内容
+                        txtContent = data.content;
                         alert(data.filename + " uploaded successfully.");
                     }
-                    if (type === 'xlsx') xlsxFilename = data.filename;
-                        //alert(data.filename + " uploaded successfully.");
+                    if (type === 'xlsx') {
+                        xlsxFilename = data.filename;
+                        alert(data.filename + " uploaded successfully.");
+                    }
                 } else {
                     alert(data.message);
                 }
@@ -99,7 +218,6 @@
                 alert("Please upload a TXT file first.");
                 return;
             }
-            // 将文件内容显示到弹出窗口
             const popupContent = document.getElementById('popupContent');
             popupContent.innerHTML = txtContent.join('<br>');
             document.getElementById('popup').style.display = 'block';
@@ -140,7 +258,7 @@
             .then(data => {
                 document.getElementById('progress').innerText = "Progress: " + data.progress + "%";
                 if (data.progress < 100) {
-                    setTimeout(checkProgress, 1000);  // 每隔1秒检查一次进度
+                    setTimeout(checkProgress, 1000);
                 } else {
                     alert("Processing complete. You can download the file now.");
                 }
@@ -152,18 +270,16 @@
         }
 
         function clearFiles() {
-            // 重置文件名变量
             txtFilename = '';
             xlsxFilename = '';
             txtContent = [];
-
-            // 清空文件输入框
             document.getElementById('txtFileInput').value = '';
             document.getElementById('xlsxFileInput').value = '';
-
-            // 重置进度条
+            document.getElementById('txtStatus').innerText = "No file selected";
+            document.getElementById('xlsxStatus').innerText = "No file selected";
+            document.getElementById('txtStatus').className = "file-status status-red";
+            document.getElementById('xlsxStatus').className = "file-status status-red";
             document.getElementById('progress').innerText = "Progress: 0%";
-
             alert("Files cleared successfully.");
         }
     </script>
