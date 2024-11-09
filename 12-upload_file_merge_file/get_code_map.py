@@ -24,19 +24,18 @@ def process_code_mapping(table_list_file):
     print(f"本次共处理{table_list}张表") 
     processed_table_count=0 
     
-    print(f"正在处理<{person_name}>-<{table_name}>的码值映射。") 
-    code_map_files = [ 
-        os.path.join('uploads',f'pub_cd_map-{person_name}.xlsx'), 
-        os.path.join('uploads',f'pub_cd_map-{person_name}.xls'), 
-        os.path.join('uploads',f'pub_cd_map-{person_name}.xlsm') 
-        ]
-    code_map_file = next((file for file in code_map_files if os.path.exists(file)),None)
-    print(code_map_files)
-    if not code_map_file: 
-        log_error(error_log,f"{person_name}的代码映射文件不存在.") 
-        sys.exit() 
-
     for table_name in table_names: 
+        print(f"正在处理<{person_name}>-<{table_name}>的码值映射。") 
+        code_map_files = [ 
+            os.path.join('uploads',f'pub_cd_map-{person_name}.xlsx'), 
+            os.path.join('uploads',f'pub_cd_map-{person_name}.xls'), 
+            os.path.join('uploads',f'pub_cd_map-{person_name}.xlsm') 
+            ]
+        code_map_file = next((file for file in code_map_files if os.path.exists(file)),None)
+        print(code_map_files)
+        if not code_map_file: 
+            log_error(error_log,f"{person_name}的代码映射文件不存在.") 
+            sys.exit()         
         try: 
             src_wb=xw.Book(code_map_file)
             rem_code_map_sheet='rem-代码映射' 
