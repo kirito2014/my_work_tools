@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Python Script Runner</title>
+    <title>在线码值生成工具</title>
     <style>
         /* 全局字体与布局设置 */
         body {
@@ -69,7 +69,10 @@
             background-color: #007bff;
             color: white;
         }
-
+        button.close-btn {
+            background-color: #47d142;
+            color: white;
+        }
         button.upload-btn:hover {
             background-color: #0056b3;
         }
@@ -99,54 +102,58 @@
             transition: width 0.3s;
         }
 
-        #popup {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) scale(0.9);
-            width: 300px;
-            background: white;
-            padding: 20px;
-            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
-            z-index: 11;
-            opacity: 0;
-            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-        }
-
+        /* 设置遮罩背景 */
         #overlay {
-            display: none;
+            display: none; /* 默认隐藏 */
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.5); /* 半透明黑色背景 */
             z-index: 10;
             opacity: 0;
-            transition: opacity 0.3s ease-in-out;
+            /* transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; */
         }
 
-        /* 显示时的类 */
-        .show {
+        /* 弹窗样式 */
+        #popup {
+            display: none; /* 默认隐藏 */
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9); /* 居中并缩放初始状态 */
+            width: 300px;
+            background: rgb(255, 255, 255); /* 白色背景 */
+            padding: 20px;
+            border-radius: 8px; /* 圆角 */
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2); /* 阴影 */
+            z-index: 11;
+            opacity: 0;
+            transition: opacity 1s ease-in-out, transform 1s ease-in-out;
+        }
+
+        /* 显示状态的类 */
+        #popup.visible,
+        #overlay.visible {
             display: block;
-            opacity: 1; /* 完全不透明 */
+            opacity: 1;
+            /* transform: translate(-50%, -50%) scale(1) 1s ease-in-out ; */
         }
 
-        /* 弹出动画 */
-        .popup-animate-in {
-            transform: translate(-50%, -50%) scale(1); /* 弹出时恢复原始大小 */
+        /* 弹窗动画放大效果 */
+        #popup.animate-in {
+            transform: translate(-50%, -50%) scale(1) 1s ease-in-out ; /* 从缩小到正常尺寸 */
+        }
+        /* 根据内容高度调整弹窗高度 */
+
+        #popupContent {
+            max-height: 200px; /* 设置弹窗内容区域的最大高度 */
+            overflow-y: auto;  /* 超出内容自动出现垂直滚动条 */
+            padding: 5px;      /* 内边距，保持内容不贴边 */
+            border-radius: 8px; /* 使滚动内容区域也有圆角 */
         }
 
-        /* 添加动画效果 */
-        #popup.show {
-            opacity: 1; /* 显示弹出窗口 */
-            transform: translate(-50%, -50%) scale(1); /* 放大到正常大小 */
-        }
-
-        #overlay.show {
-            opacity: 1; /* 显示遮罩层 */
-        }
     </style>
 </head>
 <body>
@@ -154,17 +161,17 @@
         <div class="upload-container">
             <!-- TXT 上传容器 -->
             <div class="file-box" id="txtBox">
-                <p class="file-status" id="txtStatus">No file selected</p>
+                <p class="file-status" id="txtStatus">未选择文件</p>
                 <input type="file" id="txtFileInput" accept=".txt">
-                <button class="upload-btn" onclick="uploadFile('txt')">Upload TXT</button>
-                <button onclick="analyzeTxt()">Analyze TXT</button>
+                <button class="upload-btn" onclick="uploadFile('txt')">上传列表TXT</button>
+                <button onclick="analyzeTxt()">查看生成列表</button>
             </div>
 
             <!-- XLSX 上传容器 -->
             <div class="file-box" id="xlsxBox">
-                <p class="file-status" id="xlsxStatus">No file selected</p>
+                <p class="file-status" id="xlsxStatus">未选择文件</p>
                 <input type="file" id="xlsxFileInput" accept=".xlsx">
-                <button class="upload-btn" onclick="uploadFile('xlsx')">Upload XLSX</button>
+                <button class="upload-btn" onclick="uploadFile('xlsx')">上传码值XLSX</button>
             </div>
         </div>
 
@@ -175,18 +182,18 @@
 
         <!-- 底部按钮 -->
         <div class="action-buttons">
-            <button onclick="runScript()">Run Script</button>
-            <button onclick="downloadFile()">Download Result</button>
-            <button onclick="clearFiles()">Clear Files</button>
+            <button onclick="runScript()">合并码值文件</button>
+            <button onclick="downloadFile()">下载合并码值文件</button>
+            <button onclick="clearFiles()">点这里从头再来</button>
         </div>
     </div>
 
     <!-- 弹出窗口 -->
-    <div id="overlay" onclick="closePopup()"></div>
+    <div id="overlay"onclick="closePopup()"></div>
     <div id="popup">
-        <h3>TXT File Content</h3>
+        <h3>合并列表</h3>
         <div id="popupContent"></div>
-        <button onclick="closePopup()">Close</button>
+        <button class="close-btn" onclick="closePopup()">关闭</button>
     </div>
 
     <script>
@@ -196,36 +203,44 @@
 
         function analyzeTxt() {
             if (txtContent.length === 0) {
-                alert("Please upload a TXT file first.");
-                return;
-            }
-                const popupContent = document.getElementById('popupContent');
-                popupContent.innerHTML = txtContent.join('<br>');  // 将 TXT 文件内容插入弹窗内容区域
-                console.log("Opening popup with content:", txtContent);  // 调试输出内容
-                openPopup();  // 调用显示弹窗
-            }
-                function analyzeTxt() {
-            if (txtContent.length === 0) {
-                alert("Please upload a TXT file first.");
+                alert("请先上传合并码值清单.");
                 return;
             }
 
             const popupContent = document.getElementById('popupContent');
-            popupContent.innerHTML = txtContent.join('<br>');  // 将 TXT 文件内容插入弹窗内容区域
-            console.log("Opening popup with content:", txtContent);  // 调试输出内容
-
-            openPopup();  // 调用显示弹窗
+            popupContent.innerHTML =  txtContent.join('<br>') ;  // 插入 TXT 文件内容到弹窗
+            console.log("Opening popup with content:", txtContent);  // 确认内容加载
+            openPopup();  // 显示弹窗
         }
 
         function openPopup() {
             const overlay = document.getElementById('overlay');
             const popup = document.getElementById('popup');
-            
-            // 显示遮罩和弹窗
-            overlay.classList.add('show');
-            popup.classList.add('show', 'popup-animate-in');
-            
-            console.log("Popup should now be visible");  // 调试输出
+
+            if (overlay && popup) {
+                overlay.classList.add('visible');
+                popup.classList.add('visible');
+            } else {
+                console.error("Overlay or popup not found.");
+            }
+        }
+
+        function closePopup() {
+            const overlay = document.getElementById('overlay');
+            const popup = document.getElementById('popup');
+
+            if (overlay && popup) {
+                overlay.classList.remove('visible');
+                popup.classList.remove('visible');
+
+                // 延时移除 display:block, 等过渡完成
+                // setTimeout(() => {
+                //     overlay.classList.remove('visible');
+                //     popup.classList.remove('visible');
+                // }, 300);
+            } else {
+                console.error("Overlay or popup not found.");
+            }
         }
 
         function uploadFile(type) {
@@ -233,7 +248,7 @@
             const fileStatus = document.getElementById(type === 'txt' ? 'txtStatus' : 'xlsxStatus');
             const file = fileInput.files[0];
             if (!file) {
-                alert("Please select a file");
+                alert("请选择文件上传");
                 return;
             }
 
@@ -251,13 +266,13 @@
                         txtFilename = data.filename;
                         txtContent = data.content;  // 保存返回的文件内容
                         fileStatus.style.color = "green";
-                        fileStatus.textContent = "TXT file uploaded successfully";
-                        console.log("TXT content loaded:", txtContent);  // 确认内容加载
+                        fileStatus.textContent = "码值列表文件上传成功";
+                        console.log("列表内容加载:", txtContent);  // 确认内容加载
                     }
                     if (type === 'xlsx') {
                         xlsxFilename = data.filename;
                         fileStatus.style.color = "green";
-                        fileStatus.textContent = "XLSX file uploaded successfully";
+                        fileStatus.textContent = "XLSX码值文件上传成功";
                     }
                 } else {
                     alert(data.message);
@@ -269,7 +284,7 @@
 
         function runScript() {
             if (!txtFilename || !xlsxFilename) {
-                alert("Please upload both the TXT and XLSX files.");
+                alert("上传码值列表和码值文件才能进行下一步.");
                 return;
             }
 
@@ -294,14 +309,14 @@
             const progressFill = document.getElementById('progressFill');
             let width = 0;
             const interval = setInterval(() => {
-                if (width >= 100) {
+                if (width >= 101) {
                     clearInterval(interval);
-                    alert("Processing complete. You can download the file now.");
+                    alert("文件合并完成,点击下载合并文件."); // 确保进度条满时才弹出
                 } else {
                     width += 1;
                     progressFill.style.width = width + "%";
                 }
-            }, 50);
+            }, 50); // 控制进度速度的间隔时间，调节此值可以加快或减慢进度条动画
         }
 
         function downloadFile() {
