@@ -10,7 +10,8 @@ def process_code_mapping(table_list_file):
 
     error_log=f"error_log_{person_name}.txt" 
     #output目录拼接
-    target_file=os.path.join('output','outpub_cd_map.xlsx')
+    target_file=os.path.join('output','pub_cd_map.xlsx')
+    print(target_file)
     
     if os.path.exists(target_file):
         tgt_wb=xw.Book(target_file) 
@@ -32,7 +33,7 @@ def process_code_mapping(table_list_file):
             os.path.join('uploads',f'pub_cd_map-{person_name}.xlsm') 
             ]
         code_map_file = next((file for file in code_map_files if os.path.exists(file)),None)
-        print(code_map_files)
+        #print(code_map_files)
         if not code_map_file: 
             log_error(error_log,f"{person_name}的代码映射文件不存在.") 
             sys.exit()         
@@ -71,8 +72,6 @@ def process_code_mapping(table_list_file):
             log_error(error_log,f"处理{code_map_file}中{table_name} 表的代码映射时发生错误:{str(e)}.")
         finally:
             src_wb.close()
-            tgt_wb.save()
-            tgt_wb.close()
         processed_table_count = processed_table_count + 1
         print(f"剩余{table_list-processed_table_count}个")
     tgt_wb.save(target_file)
