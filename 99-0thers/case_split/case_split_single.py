@@ -5,9 +5,9 @@
 *    Filename   :  case_split_single.py
 *    Description:  split excel file by department
 *
-*    Version    :  1.1.2
+*    Version    :  1.1.3
 *    Created    :  2024/09/28 10:25:07
-*    updated   :  2024/10/20 10:25:07
+*    updated   :  2024/11/09 10:25:07
 *    Compiler   :  python
 *
 *    Author     :  wangmujun(解决方案部/战略规划部), 
@@ -120,12 +120,16 @@ def get_new_file_name(template_file: str, dp_name: str):
     file_name_parts = file_name.split('_')
     new_file_name = f"{file_name_parts[0]}_{dp_name}_{file_date}.xlsx"
     return new_file_name
-# 模块9: 写入特定单元格
 
-def write_to_specific_cells(file_path: str, sheet_name: str,dp_name: str):
+
+
+# 模块: 写入特定单元格
+
+def write_to_specific_cells(file_path: str, sheet_name: str, dp_name: str):
     # 打开 Excel 文件
     wb = load_workbook(file_path)
-    #如果是目录sheet页填入内容，如果不是则执行美化
+
+
     if sheet_name == "标题及目录":    
         if sheet_name not in wb.sheetnames:
             app.info_label.config(text=f"[WARNING] 工作表 '{sheet_name}' 不存在于文件中.", foreground="#DB231D")
@@ -137,40 +141,79 @@ def write_to_specific_cells(file_path: str, sheet_name: str,dp_name: str):
         ws['D4'] = dp_name
         # 写入 D5 单元格，当前时间
         ws['D5'] = datetime.now().strftime('%Y-%m-%d')
-        #写入 D6 单元格，(yyyy年mm月）
+        # 写入 D6 单元格，(yyyy年mm月）
         ws['D6'] = datetime.now().strftime('%Y年%m月')
+    
+    elif sheet_name == "部门商机明细":
+        try:
+            sheet = wb[sheet_name]
+            
+            # 获取数据，按 D 列（第 4 列）降序排序
+            data = list(sheet.iter_rows(min_row=2, min_col=1, max_col=sheet.max_column, values_only=True))
+            data.sort(key=lambda x: x[3], reverse=True)  # D 列为第 4 列
+
+            # 清空并重新写入排序后的数据
+            for row_index, row_data in enumerate(data, start=2):
+                for col_index, value in enumerate(row_data, start=1):
+                    sheet.cell(row=row_index, column=col_index, value=value)
+                    
+            app.info_label.config(text=f"[INFO] Sheet {sheet_name} 已按照 D 列降序排列.", foreground="#298073")
+
+            # 对排序后的数据执行美化处理
+            # 设置字体、边框和对齐方式
+            beautify_sheet(sheet, set_white_header=True)
+
+        except Exception as e:
+            app.info_label.config(text=f"[ERROR] 处理 sheet {sheet_name} 时发生错误: {e}")
+            #print(f"处理 sheet {sheet_name} 时发生错误: {e}")
+
+    elif sheet_name == "投标数据":
+        try:
+            sheet = wb[sheet_name]
+            
+            # 格式化 E 列为 yyyy-mm-dd
+            for cell in sheet['E']:
+                if cell.row > 1 and isinstance(cell.value, datetime):
+                    cell.number_format = 'yyyy-mm-dd'
+
+            app.info_label.config(text=f"[INFO] Sheet {sheet_name} E 列已格式化为日期.", foreground="#298073")
+
+            # 对排序后的数据执行美化处理
+            # 设置字体、边框和对齐方式
+            beautify_sheet(sheet, set_white_header=True)
+        except Exception as e:
+            app.info_label.config(text=f"[ERROR] 处理 sheet {sheet_name} 时发生错误: {e}")
+
+    elif sheet_name == "售前情况统计表":
+        try:
+            sheet = wb[sheet_name]
+            # 从 A2 单元格开始按顺序编号
+            for row_index in range(2, sheet.max_row + 1):
+                sheet[f'A{row_index}'] = row_index - 1
+
+            app.info_label.config(text=f"[INFO] Sheet {sheet_name} 已重新编号.", foreground="#298073")
+
+            # 美化并设置首行字体为白色
+            beautify_sheet(sheet, set_white_header=True)
+
+        except Exception as e:
+            app.info_label.config(text=f"[ERROR] 处理 sheet {sheet_name} 时发生错误: {e}")
+
     else:
         try:
             sheet = wb[sheet_name]
-
             # 设置字体、边框和对齐方式
-            font = Font(name='宋体', size=10)
-            border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-            alignment = Alignment(vertical='center')
-
-            # 获取当前 sheet 页的最大行和最大列
-            max_row = sheet.max_row
-            max_col = sheet.max_column
-
-            # 从 A2 开始遍历整个数据区域，添加边框，修改字体，设置垂直居中
-            for row in sheet.iter_rows(min_row=2, max_row=max_row, min_col=1, max_col=max_col):
-                for cell in row:
-                    cell.font = font
-                    cell.border = border
-                    cell.alignment = alignment
-
-            # 保存文件
-            wb.save(file_path)
-            app.info_label.config(text=f"[INFO] Sheet {sheet_name} 已美化.", foreground="#298073")
+            beautify_sheet(sheet, set_white_header=True)
+            #app.info_label.config(text=f"[INFO] Sheet {sheet_name} 已美化.", foreground="#298073")
 
         except Exception as e:
             app.info_label.config(text=f"[ERROR] 美化 sheet {sheet_name} 时发生错误: {e}")
-        finally:
-            wb.save(file_path)
-            wb.close()
+            #print(f"美化 sheet {sheet_name} 时发生错误: {e}")
+    
     # 保存更改
     wb.save(file_path)
-    app.info_label.config(text=f"[ INFO ] 文件 {os.path.basename(file_path)} 已更新首页并调格式.", foreground="#298073")
+    wb.close()
+    app.info_label.config(text=f"[ INFO ] 文件 {os.path.basename(file_path)} 已更新并格式化.", foreground="#298073")
 
 
 
@@ -186,38 +229,26 @@ def get_resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 #模块11:文件内容美化,写入标题内容
-def beautify_sheet(self, file_path, sheet_name):
-    """对指定的 sheet 页进行美化，添加边框、设置字体和垂直居中"""
-    try:
-        # 使用 openpyxl 打开文件
-        wb = openpyxl.load_workbook(file_path)
-        sheet = wb[sheet_name]
+def beautify_sheet(sheet, set_white_header=False):
+    # 设置字体、边框和对齐方式
+    font = Font(name='宋体', size=10)
+    header_font = Font(name='宋体', size=10, color="FFFFFF", bold=True) if set_white_header else font
+    border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+    alignment = Alignment(vertical='center')
 
-        # 设置字体、边框和对齐方式
-        font = Font(name='宋体', size=10)
-        border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-        alignment = Alignment(vertical='center')
+    # 获取最大行和最大列
+    max_row = sheet.max_row
+    max_col = sheet.max_column
 
-        # 获取当前 sheet 页的最大行和最大列
-        max_row = sheet.max_row
-        max_col = sheet.max_column
-
-        # 从 A2 开始遍历整个数据区域，添加边框，修改字体，设置垂直居中
-        for row in sheet.iter_rows(min_row=2, max_row=max_row, min_col=1, max_col=max_col):
-            for cell in row:
+    # 仅应用样式，不修改单元格数据
+    for row in sheet.iter_rows(min_row=1, max_row=max_row, min_col=1, max_col=max_col):
+        for cell in row:
+            if cell.row == 1 and set_white_header:  # 首行设置白色字体
+                cell.font = header_font
+            else:
                 cell.font = font
-                cell.border = border
-                cell.alignment = alignment
-
-        # 保存文件
-        wb.save(file_path)
-        self.info_label.config(text=f"[INFO] Sheet {sheet_name} 已美化.", foreground="#298073")
-
-    except Exception as e:
-        self.info_label.config(text=f"[ERROR] 美化 sheet {sheet_name} 时发生错误: {e}")
-    finally:
-        wb.save(file_path)
-        wb.close()
+            cell.border = border
+            cell.alignment = alignment
 
 #主窗口
 class App():

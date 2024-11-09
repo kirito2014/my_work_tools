@@ -20,7 +20,7 @@ def run_script(txt_path, xlsx_path, output_path):
     wb = openpyxl.load_workbook(xlsx_path)
     ws = wb.active
 
-    with open(txt_path, 'r') as f:
+    with open(txt_path, 'r',encoding='gbk') as f:
         table_names = [line.strip() for line in f]
 
     for i, table_name in enumerate(table_names, 1):
