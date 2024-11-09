@@ -98,6 +98,7 @@ def get_current_month() -> str:
 
 # 模块6: sheet页与列名对应关系
 cols_mapping = {
+    '标题及目录': '',
     '售前情况统计表': '业务部',
     '部门商机明细': '归属业务部',
     '投标数据': '归属业务部',
@@ -412,7 +413,8 @@ class App():
             self.info_label.config(text=f"[ INFO ] 拆分文件处理完成", foreground="#298073")
         except Exception as e:
             self.info_label.config(text=f"[ERROR] 处理失败: {e}", foreground="#DB231D")
-
+    
+    #执行选中部门的文件生成
     def run_selected_departments(self):
         """执行选中的部门的文件生成"""
         source_file_path = self.source_file_var.get()
@@ -453,26 +455,30 @@ class App():
             # 删除旧文件并创建新文件
             check_and_remove_file(new_file_name, output_path)
             create_new_file(target_file_path, new_file_name, output_path)
-
-            # 循环处理 cols_mapping 中的 sheet_name
+            target_file = os.path.join(output_path, new_file_name)
+            # 循环处理 目标文件 中的 sheet_name
             for sheet_name in cols_mapping.keys():
-                filter_col = get_usecols(sheet_name)
-                data = filter_department_data(source_file_path, sheet_name=sheet_name, department_name=department_name, usecols=filter_col)
-                
-                # 写入到目标文件
-                target_file = os.path.join(output_path, new_file_name)
-                with pd.ExcelWriter(target_file, mode='a', if_sheet_exists='overlay') as writer:
-                    data.to_excel(writer, sheet_name=sheet_name, index=False, startrow=0, startcol=0)
 
-                # 美化除了 "标题及目录" 之外的 sheet 页
-                # if sheet_name != "标题及目录":
-                #     self.beautify_sheet(target_file, sheet_name)
-                # 在标题及目录 sheet 中填写部门信息
-                write_to_specific_cells(target_file, sheet_name=sheet_name, dp_name=department_name)
+                if sheet_name == "标题及目录":
+                    write_to_specific_cells(target_file, sheet_name=sheet_name, dp_name=department_name)
+                else: 
+                    filter_col = get_usecols(sheet_name)
+                    data = filter_department_data(source_file_path, sheet_name=sheet_name, department_name=department_name, usecols=filter_col)
+                    
+                    # 写入到目标文件
+                    #target_file = os.path.join(output_path, new_file_name)
+                    with pd.ExcelWriter(target_file, mode='a', if_sheet_exists='overlay') as writer:
+                        data.to_excel(writer, sheet_name=sheet_name, index=False, startrow=0, startcol=0)
+
+                    # 美化除了 "标题及目录" 之外的 sheet 页
+                    # if sheet_name != "标题及目录":
+                    #     self.beautify_sheet(target_file, sheet_name)
+                    # 在标题及目录 sheet 中填写部门信息
+                    write_to_specific_cells(target_file, sheet_name=sheet_name, dp_name=department_name)
             self.info_label.config(text=f"[INFO] 文件拆分处理完成.", foreground="#298073")
         except Exception as e:
             self.info_label.config(text=f"[ERROR] 处理部门 {department_name} 时发生错误: {e}")
-
+            #print(f"处理部门 {department_name} 时发生错误: {e}")
     def process_files(self, source_file_path, target_file_path, output_directory):
         try:
             # 检查输出文件夹是否存在，没有则新建文件夹
@@ -497,25 +503,30 @@ class App():
                 create_new_file(target_file_path, new_file_name, output_path)
                 # 循环 cols_mapping 的值作为 sheet_name
                 self.info_label.config(text=f"[INFO] 正在处理 <{dp_name}> .", foreground="#298073")
+                target_file = os.path.join(output_path, new_file_name)
                 for sheet_name in cols_mapping.keys():
-                    target_file = os.path.join(output_path, new_file_name)
-                    filter_col = get_usecols(sheet_name)
-                    data = filter_department_data(source_file_path, sheet_name=sheet_name, department_name=dp_name, usecols=filter_col)
-                    # 将筛选后的数据写入目标文件的指定 sheet_name 的 A1 单元格
-                    with pd.ExcelWriter(target_file, mode='a', if_sheet_exists='overlay') as writer:
-                        data.to_excel(writer, sheet_name=sheet_name, index=False, startrow=0, startcol=0)
-                    # 填写目标文件 标题及目录 sheet 页
 
-                    # 美化除了 "标题及目录" 之外的 sheet 页
-                    # if sheet_name != "标题及目录":
-                    #     self.beautify_sheet(target_file, sheet_name)
-                    write_to_specific_cells(target_file, sheet_name=sheet_name, dp_name=dp_name)
+                    if sheet_name == "标题及目录":
+                        write_to_specific_cells(target_file, sheet_name=sheet_name, dp_name=dp_name)
+                    else:
+                        filter_col = get_usecols(sheet_name)
+                        data = filter_department_data(source_file_path, sheet_name=sheet_name, department_name=dp_name, usecols=filter_col)
+                        # 将筛选后的数据写入目标文件的指定 sheet_name 的 A1 单元格
+                        with pd.ExcelWriter(target_file, mode='a', if_sheet_exists='overlay') as writer:
+                            data.to_excel(writer, sheet_name=sheet_name, index=False, startrow=0, startcol=0)
+                        # 填写目标文件 标题及目录 sheet 页
+
+                        # 美化除了 "标题及目录" 之外的 sheet 页
+                        # if sheet_name != "标题及目录":
+                        #     self.beautify_sheet(target_file, sheet_name)
+                        write_to_specific_cells(target_file, sheet_name=sheet_name, dp_name=dp_name)
 
                 self.update_progress(step_size * (index + 1))  # 更新进度条
 
             self.info_label.config(text=f"[INFO] 文件拆分处理完成.", foreground="#298073")
         except Exception as e:
             self.info_label.config(text=f"[ERROR] 执行脚本失败: {e}", foreground="#DB231D") 
+            #print(f"执行脚本失败: {e}")
 
     def update_progress(self, value):
         """更新进度条"""
