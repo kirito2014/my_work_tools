@@ -1,0 +1,4 @@
+agl_bond_rat_info_tf
+agl_bil_pledge_dtl_tf
+agl_cmcl_acptbil_acctn_dtl_tf
+agl_pbc_loan_reloan_aftivs_dtl_tf

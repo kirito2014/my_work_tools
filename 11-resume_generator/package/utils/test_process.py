@@ -1,7 +1,7 @@
 
 import pandas as pd
 import excel_helper
-
+import logging
 #sdm_excel = excel_helper.Xlsx(file_path)
 # 假设 "数据来源" 是我们感兴趣的 sheet
 #
@@ -42,24 +42,68 @@ def data_to_frame():
     headers = [header.replace(" ", "") for header in headers]
     file_path = r"D:\github\11-resume_generator\template\人员简历汇总_20241103.xlsx"
     sdm_excel = excel_helper.Xlsx(file_path)
-    #sheet_data = sdm_excel.data["数据来源"]
     df = pd.DataFrame(sdm_excel.data["数据来源"]).iloc[1:]
     df.columns = headers[:len(df.columns)]
-    #print(df.columns)
-    #print(df)
     return df
 
 def data_keys():
-    resume_key = [
-        ["基本情况":"basic_info"]
-        ,["工作经历":"work_experience"]
-        ,["项目经历":"project_experience"]
-        ,["能力与资质":"ability_qualification"]
-    ]
-    return resume_key
+    try:
+        resume_sections = [
+            {"基本情况": "basic_info"},
+            {"工作经历": "work_experience"},
+            {"项目经历": "project_experience"},
+            {"能力与资质": "ability_qualification"}
+        ]
+    except Exception as e:
+        print(f"发生错误: {e}")
+        return []
+    
+    return resume_sections
+
+#根据data_keys 将带有相同前缀的列按照相同的后缀合并到一起，最终按照resume_sections的顺序输出，并且以填写人为key，同时保留数据种的前缀，去除填写人为None的数据
+def merge_data_by_prefix(df, resume_sections):
+    try:
+        merged_data = {}
+        for section in resume_sections:
+            section_name, section_key = list(section.items())[0]
+            merged_data[section_key] = {}
+
+            def process_row(row):
+                key = row["填写人"]
+                if key is None:
+                    return
+                if key not in merged_data[section_key]:
+                    merged_data[section_key][key] = {}
+                for column in df.columns:
+                    if column.startswith(section_name):
+                        suffix = column[len(section_name):]
+                        merged_data[section_key][key][suffix] = row[column]
+
+            df.apply(process_row, axis=1)
+        return merged_data
+    except KeyError as ke:
+        logging.error(f"键错误: {ke}，检查输入数据是否包含'填写人'列")
+        return {}
+    except TypeError as te:
+        logging.error(f"类型错误: {te}，检查输入数据类型")
+        return {}
+    except Exception as e:
+        logging.error(f"发生未知错误: {e}")
+        return {}
+
+
 
 #根据分割字段合并内容
 
 if __name__ == "__main__":
     #将数据转换为 DataFrame
-    data_to_frame()
+    df = data_to_frame()
+    #name_list= df[df.columns[0]].dropna().unique().tolist()
+    #print(' '.join(str(name) for name in name_list))
+    #print(df[df.columns[0]].dropna().unique().tolist())
+    data_keys = data_keys()
+    #print(data_keys[0])
+    merge_data = merge_data_by_prefix(df, data_keys)
+    print(merge_data["basic_info"]['于彦波'])
+    print(merge_data["work_experience"]['于彦波'])
+    print(merge_data["project_experience"]['于彦波'])
