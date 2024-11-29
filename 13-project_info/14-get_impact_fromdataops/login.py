@@ -1,5 +1,6 @@
 import requests
 import json
+import os 
 
 class LoginManager:
     def __init__(self, login_url, check_url, login_payload, headers):
@@ -48,16 +49,23 @@ class LoginManager:
         """
         try:
             # 从 txt文档 中读取 Authorization 值,如果不存在，则执行login()
+            #如果txt 不存在则为首次登录直接返回false
+            #headers 还有一个Content-Type: application/json
+
+            if not os.path.exists("authorization.txt"):
+                return False
 
             with open("authorization.txt", "r") as f:
                 self.authorization = f.read()
                 self.headers["Authorization"] = self.authorization
+
             if self.authorization:
                 print(f"当前 Authorization: {self.authorization}")
             else:
                 print("Authorization 值不存在，请先登录")
                 return False
             response = requests.get(self.check_url, headers=self.headers)
+
             if response.status_code == 200:
                 print("登录有效")
                 return True
@@ -67,6 +75,30 @@ class LoginManager:
         except Exception as e:
             print(f"检查登录状态时发生错误: {e}")
             return False
+
+    def logout(self):
+        """
+        调用登出接口登出
+        """
+        try:
+            response = requests.post(self.logout_url, headers=self.headers)
+            if response.status_code != 200:
+                print(f"登出请求失败，状态码: {response.status_code}")
+                return False
+
+            response_data = response.json()
+            return_code = response_data.get("head", {}).get("returnCode")
+            if return_code != "00000":
+                print(f"登出失败，原因: {response_data.get('head', {}).get('returnMessage', '未知错误')}")
+                return False
+
+            print("登出成功")
+            return True
+        except Exception as e:
+            print(f"登出时发生错误: {e}")
+            return False
+
+
 
     def get_authorization(self):
         """
@@ -86,6 +118,7 @@ class LoginManager:
 # 示例使用
 login_url = "https://example.com/api/login"  # 登录接口地址
 check_url = "https://example.com/api/check"  # 检查登录状态接口地址
+logout_url = "https://example.com/api/logout"  # 登出接口地址
 login_payload = {
     "username": "your_username",
     "password": "your_password"
