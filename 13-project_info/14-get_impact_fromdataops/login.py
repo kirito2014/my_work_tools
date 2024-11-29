@@ -30,6 +30,9 @@ class LoginManager:
             if self.authorization:
                 print(f"登录成功，Authorization: {self.authorization}")
                 self.headers["Authorization"] = self.authorization
+                #将 Authorization 值保存到 txt文档 中，以便后续请求使用
+                with open("authorization.txt", "w") as f:
+                    f.write(self.authorization)
                 return True
             else:
                 print("登录成功，但未返回 Authorization 值")
@@ -44,6 +47,16 @@ class LoginManager:
         检查登录状态，返回是否有效
         """
         try:
+            # 从 txt文档 中读取 Authorization 值,如果不存在，则执行login()
+
+            with open("authorization.txt", "r") as f:
+                self.authorization = f.read()
+                self.headers["Authorization"] = self.authorization
+            if self.authorization:
+                print(f"当前 Authorization: {self.authorization}")
+            else:
+                print("Authorization 值不存在，请先登录")
+                return False
             response = requests.get(self.check_url, headers=self.headers)
             if response.status_code == 200:
                 print("登录有效")
