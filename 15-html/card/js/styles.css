@@ -122,6 +122,8 @@ body {
     inset #033 0 0 0 5px,
     inset rgba(255, 255, 255, 0.5) 0 0 0 6px;
   transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  transform-style: preserve-3d;
+  perspective: 1000px;
 }
 
 .card-back {
@@ -149,6 +151,7 @@ body {
 /* 鼠标悬停时样式 */
 .card:hover .card-front,
 .card:hover .card-back {
+transition: all 0.3s ease-out;
   box-shadow: 
     var(--card-hover-shadow) 0 0 40px 5px,
     rgba(255, 255, 255, 0.4) 0 0 0 1px,
@@ -171,16 +174,16 @@ body {
     background-size: cover;
     background-image: url(https://images.unsplash.com/photo-1732525830182-b0e1a93f3679?q=80&w=3087&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D);
     pointer-events: none;
-    transition: 1s cubic-bezier(0.445, 0.05, 0.55, 0.95),
-    opacity 1s cubic-bezier(0.445, 0.05, 0.55, 0.95);
-  }
+    transform-style: preserve-3d;
+    transform-origin: center center;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+    will-change: transform;
+}
 
 /* 鼠标悬停时图片样式 */
 .card:hover .img {
   opacity: var(--img-opacity);
-  transition: 
-  0.6s cubic-bezier(0.23, 1, 0.32, 1),
-  opacity 3s cubic-bezier(0.23, 1, 0.32, 1);/* 设置鼠标悬停时图片的透明度变化时间 */
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
 }
 
 /* 修改底部一言样式 */

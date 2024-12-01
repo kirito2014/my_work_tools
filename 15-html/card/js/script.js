@@ -83,19 +83,24 @@ function generateRandomPosition() {
     return {
         x: (Math.random() - 0.5) * 10,
         y: (Math.random() - 0.5) * 10,
-        rotate: (Math.random() - 0.5) * 4
+        rotate: (Math.random() - 0.5) * 4,
+        rotateX: (Math.random() - 0.5) * 5,
+        rotateY: (Math.random() - 0.5) * 5,
+        tiltX: (Math.random() - 0.5) * 3,
+        tiltY: (Math.random() - 0.5) * 3
     };
 }
 
 // 平滑过渡到新位置
 function smoothTransition(cardInner, startPos, targetPos, duration = 2000) {
     const startTime = performance.now();
+    const isFlipped = cardInner.parentElement.classList.contains('flipped');
+    const baseRotation = isFlipped ? 180 : 0;
     
     function update(currentTime) {
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
         
-        // 使用 ease 缓动
         const easeProgress = progress < .5 ? 
             4 * progress * progress * progress : 
             1 - Math.pow(-2 * progress + 2, 3) / 2;
@@ -103,8 +108,32 @@ function smoothTransition(cardInner, startPos, targetPos, duration = 2000) {
         const x = startPos.x + (targetPos.x - startPos.x) * easeProgress;
         const y = startPos.y + (targetPos.y - startPos.y) * easeProgress;
         const rotate = startPos.rotate + (targetPos.rotate - startPos.rotate) * easeProgress;
+        const rotateX = (startPos.rotateX || 0) + ((targetPos.rotateX || 0) - (startPos.rotateX || 0)) * easeProgress;
+        const rotateY = (startPos.rotateY || 0) + ((targetPos.rotateY || 0) - (startPos.rotateY || 0)) * easeProgress;
+        const tiltX = (startPos.tiltX || 0) + ((targetPos.tiltX || 0) - (startPos.tiltX || 0)) * easeProgress;
+        const tiltY = (startPos.tiltY || 0) + ((targetPos.tiltY || 0) - (startPos.tiltY || 0)) * easeProgress;
         
-        cardInner.style.transform = `translate(${x}px, ${y}px) rotate(${rotate}deg)`;
+        // 应用变换时保持翻转状态
+        cardInner.style.transform = `
+            translate(${x}px, ${y}px)
+            rotateY(${baseRotation + rotateY + tiltY}deg)
+            rotateX(${rotateX + tiltX}deg)
+            rotate(${rotate}deg)
+        `;
+
+        // 更新图片位置
+        const frontImg = cardInner.querySelector('.card-front .img');
+        const backImg = cardInner.querySelector('.card-back .img');
+        const imgTransform = `
+            translate3d(${-x * 0.5}px, ${-y * 0.5}px, 20px)
+            rotateX(${-(rotateX + tiltX) * 0.5}deg)
+            rotateY(${-(rotateY + tiltY) * 0.5}deg)
+            rotate(${-rotate * 0.5}deg)
+            scale(1.1)
+        `;
+        
+        if (frontImg) frontImg.style.transform = imgTransform;
+        if (backImg) backImg.style.transform = imgTransform;
         
         if (progress < 1) {
             requestAnimationFrame(update);
@@ -119,7 +148,15 @@ function initializeCardEvents() {
     cards.forEach((card, index) => {
         const cardInner = cardInners[index];
         let currentState = AnimationState.RANDOM_FLOAT;
-        let currentPosition = { x: 0, y: 0, rotate: 0 };
+        let currentPosition = { 
+            x: 0, 
+            y: 0, 
+            rotate: 0,
+            rotateX: 0,
+            rotateY: 0,
+            tiltX: 0,
+            tiltY: 0
+        };
         
         // 随机浮动动画
         function startRandomFloat() {
@@ -156,15 +193,28 @@ function initializeCardEvents() {
             const baseRotation = isFlipped ? 180 : 0;
             
             // 添加图片透视效果
-            const currentImg = isFlipped 
-                ? card.querySelector('.card-back .img')
-                : card.querySelector('.card-front .img');
+            const frontImg = card.querySelector('.card-front .img');
+            const backImg = card.querySelector('.card-back .img');
+            const imgTransform = `
+                translate3d(${x * -40}px, ${y * -40}px, 20px)
+                scale(1.1)
+            `;
             
-            if (currentImg) {
-                currentImg.style.transform = `translateX(${x * -40}px) translateY(${y * -40}px)`;
+            // 平滑过渡图变换
+            if (frontImg) {
+                frontImg.style.transition = 'transform 0.3s ease-out';
+                frontImg.style.transform = imgTransform;
+            }
+            if (backImg) {
+                backImg.style.transition = 'transform 0.3s ease-out';
+                backImg.style.transform = imgTransform;
             }
             
-            cardInner.style.transform = `rotateY(${baseRotation + x * 20}deg) rotateX(${-y * 20}deg)`;
+            // 应用卡片旋转
+            cardInner.style.transform = `
+                rotateY(${baseRotation + x * 20}deg)
+                rotateX(${-y * 20}deg)
+            `;
         });
         
         // 鼠标离开
@@ -172,49 +222,65 @@ function initializeCardEvents() {
             if (currentState === AnimationState.FLIP) return;
             currentState = AnimationState.TRANSITION;
             
-            // 重置图片位置
             const frontImg = card.querySelector('.card-front .img');
             const backImg = card.querySelector('.card-back .img');
-            if (frontImg) frontImg.style.transform = 'translateX(0px) translateY(0px)';
-            if (backImg) backImg.style.transform = 'translateX(0px) translateY(0px)';
+            const resetTransform = 'translate3d(0, 0, 0) scale(1)';
             
-            // 重置位置时保持翻转状态
+            // 平滑重置图片位置
+            if (frontImg) {
+                frontImg.style.transition = 'transform 0.5s ease';
+                frontImg.style.transform = resetTransform;
+            }
+            if (backImg) {
+                backImg.style.transition = 'transform 0.5s ease';
+                backImg.style.transform = resetTransform;
+            }
+            
             const isFlipped = card.classList.contains('flipped');
-            cardInner.style.transition = 'transform 0.6s ease';
+            cardInner.style.transition = 'transform 0.5s ease';
             cardInner.style.transform = isFlipped ? 
-                'rotateY(180deg)' : 'translate(0, 0) rotate(0deg)';
+                'rotateY(180deg)' : 'translate(0, 0) rotateX(0deg) rotateY(0deg) rotate(0deg)';
             
             setTimeout(() => {
                 if (currentState === AnimationState.TRANSITION) {
                     currentState = AnimationState.RANDOM_FLOAT;
-                    currentPosition = { x: 0, y: 0, rotate: 0 };
-                    if (!isFlipped) {  // 只在非翻转状态下开始随机浮动
-                        startRandomFloat();
-                    }
+                    currentPosition = { 
+                        x: 0, y: 0, rotate: 0, 
+                        rotateX: 0, rotateY: 0, 
+                        tiltX: 0, tiltY: 0 
+                    };
+                    startRandomFloat();
                 }
-            }, 600);
+            }, 500);
         });
         
         // 点击翻转
         card.addEventListener('click', () => {
             currentState = AnimationState.FLIP;
-            cardInner.style.transition = 'transform 0.6s ease';
+            cardInner.style.transition = 'transform 0.5s ease';
             card.classList.toggle('flipped');
             
-            // 重置位置
             setTimeout(() => {
                 const isFlipped = card.classList.contains('flipped');
-                cardInner.style.transform = isFlipped ? 
-                    'rotateY(180deg)' : 'rotateY(0deg)';
+                const baseRotation = isFlipped ? 180 : 0;
                 
-                currentPosition = { x: 0, y: 0, rotate: 0 };
+                // 设置基础翻转状态
+                cardInner.style.transform = `rotateY(${baseRotation}deg)`;
+                
+                currentPosition = { 
+                    x: 0, y: 0, rotate: 0, 
+                    rotateX: 0, rotateY: 0, 
+                    tiltX: 0, tiltY: 0 
+                };
+                
                 currentState = card.matches(':hover') ? 
                     AnimationState.HOVER : AnimationState.RANDOM_FLOAT;
                 
-                if (currentState === AnimationState.RANDOM_FLOAT && !isFlipped) {
-                    startRandomFloat();  // 只在非翻转状态下开始随机浮动
+                // 移除 isFlipped 检查，让翻转后的卡片也能随机浮动
+                if (currentState === AnimationState.RANDOM_FLOAT) {
+                    startRandomFloat();
                 }
-            }, 600);
+            }, 500);
         });
         
         // 开始初始动画
