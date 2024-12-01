@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,9 +7,38 @@
   <link rel="stylesheet" href="js/styles.css">
 </head>
 <body>
-  <div class="card">
-    <div class="img"></div>
+  <div class="container">
+    <div class="card">
+      <div class="card-inner">
+        <div class="card-front">
+          <div class="img"></div>
+          <div class="loader">
+            <div class="spinner"></div>
+          </div>
+        </div>
+        <div class="card-back">
+          <div class="img"></div>
+          <div class="content">
+            <h2 class="card-title"></h2>
+            <p class="card-text"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  <div class="hitokoto-container">
+    <p id="hitokoto">
+      <a href="#" id="hitokoto_text">《诗》三百，一言以蔽之，曰：‘思无邪’ -- 《论语·为政》</a>
+    </p>
   </div>
-  <script src="js/script1.js"></script>
+
+  <div class="theme-switch">
+    <button id="themeToggle">
+      <span class="sun">🌞</span>
+      <span class="moon">🌙</span>
+    </button>
+  </div>
+
+  <script src="js/script.js"></script>
 </body>
 </html>
