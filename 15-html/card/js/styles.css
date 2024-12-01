@@ -1,0 +1,67 @@
+/* styles.css */
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f0f0;
+}
+
+/* 卡片样式 */
+.card {
+  position: relative;
+  flex: 0 0 240px;
+  width: 240px;
+  height: 320px;
+  margin: 100px;
+  background-color: #333;
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow:
+    rgba(0, 0, 0, 0.66) 0 30px 60px 1px,
+    inset #033 0 0 0 5px,
+    inset rgba(255, 255, 255, 0.5) 0 0 0 6px;
+  transition: 1s cubic-bezier(0.445, 0.05, 0.55, 0.95);
+}
+
+/* 鼠标悬停时样式 */
+.card:hover {
+  transition: 0.6s cubic-bezier(0.23, 1, 0.32, 1),
+  box-shadow 2s cubic-bezier(0.23, 1, 0.32, 1);
+  box-shadow: 
+    rgba(255, 255, 255, 0.2) 0 0 40px 5px,
+    rgba(255, 255, 255, 1) 0 0 0 1px,
+    rgba(0, 0, 0, 0.66) 0 30px 60px 0,
+    inset #033 0 0 0 5px,
+    inset white 0 0 0 6px;
+}
+
+/* 图片样式 */
+/* https://images.unsplash.com/photo-1731484396266-b80443ec385b?q=80&w=3087&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D */
+/* https://images.unsplash.com/photo-1732525830182-b0e1a93f3679?q=80&w=3087&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D */
+.img {
+  opacity: 0.7;
+  position: absolute;
+  top: -20px;
+  left: -20px;
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-image: url(https://images.unsplash.com/photo-1732525830182-b0e1a93f3679?q=80&w=3087&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D);
+  pointer-events: none;
+  transition: 1s cubic-bezier(0.445, 0.05, 0.55, 0.95),
+  opacity 5s 1s cubic-bezier(0.445, 0.05, 0.55, 0.95);
+  pointer-events: none;
+}
+
+/* 鼠标悬停时图片样式 */
+.card:hover > .img {
+  opacity: 0.5; /* 设置鼠标悬停时图片的透明度 */
+  transition: 
+  0.6s cubic-bezier(0.23, 1, 0.32, 1),
+  opacity 3s cubic-bezier(0.23, 1, 0.32, 1);/* 设置鼠标悬停时图片的透明度变化时间 */
+} 
