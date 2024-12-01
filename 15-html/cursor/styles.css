@@ -1,0 +1,252 @@
+/* styles.css */
+:root[data-theme="light"] {
+  --bg-color: #f5f5f5;
+  --card-bg: #333;
+  --card-shadow: rgba(0, 0, 0, 0.2);
+  --text-color: #fff;
+  --hitokoto-bg: rgba(0, 0, 0, 0.05);
+  --hitokoto-color: rgba(0, 0, 0, 0.8);
+  --card-hover-shadow: rgba(0, 0, 0, 0.3);
+  --img-opacity: 0.7;
+  --content-bg: rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme="dark"] {
+  --bg-color: #1a1a1a;
+  --card-bg: #333;
+  --card-shadow: rgba(0, 0, 0, 0.66);
+  --text-color: #fff;
+  --hitokoto-bg: rgba(0, 0, 0, 0.2);
+  --hitokoto-color: rgba(255, 255, 255, 0.8);
+  --card-hover-shadow: rgba(255, 255, 255, 0.2);
+  --img-opacity: 0.7;
+  --content-bg: transparent;
+}
+
+/* 主题切换按钮样式 */
+.theme-switch {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+#themeToggle {
+  background: var(--card-bg);
+  border: 1px solid var(--card-shadow);
+  box-shadow: var(--card-shadow) 0 5px 15px;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(5px);
+  transition: transform 0.3s ease;
+}
+
+#themeToggle:hover {
+  transform: scale(1.1);
+}
+
+[data-theme="light"] #themeToggle .moon {
+  display: inline-block;
+}
+
+[data-theme="light"] #themeToggle .sun {
+  display: none;
+}
+
+[data-theme="dark"] #themeToggle .moon {
+  display: none;
+}
+
+[data-theme="dark"] #themeToggle .sun {
+  display: inline-block;
+}
+
+/* 修改使用变量的样式 */
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-color);
+}
+
+/* 容器样式 */
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 40px;
+}
+
+/* 卡片样式 */
+.card {
+  position: relative;
+  flex: 0 0 240px;
+  width: 240px;
+  height: 320px;
+  perspective: 1000px;
+}
+
+.card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.6s ease;
+  --current-x: 0px;
+  --current-y: 0px;
+  --current-rotate: 0deg;
+  --target-x: 0px;
+  --target-y: 0px;
+  --target-rotate: 0deg;
+}
+
+.card.flipped .card-inner {
+  transform: rotateY(180deg);
+}
+
+.card-front, .card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  background-color: var(--card-bg);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow:
+    var(--card-shadow) 0 10px 30px 0,
+    inset #033 0 0 0 5px,
+    inset rgba(255, 255, 255, 0.5) 0 0 0 6px;
+  transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  transform-style: preserve-3d;
+  perspective: 1000px;
+}
+
+.card-back {
+  transform: rotateY(180deg);
+  position: relative;
+}
+
+.card-back .content {
+  padding: 15px;
+  color: var(--text-color);
+  text-align: center;
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  right: 5px;
+  bottom: 5px;
+  z-index: 2;
+  background: var(--content-bg);
+  border-radius: 5px;
+  backdrop-filter: blur(5px);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  opacity: 1 !important;
+}
+
+/* 鼠标悬停时样式 */
+.card:hover .card-front,
+.card:hover .card-back {
+transition: all 0.3s ease-out;
+  box-shadow: 
+    var(--card-hover-shadow) 0 0 40px 5px,
+    rgba(255, 255, 255, 0.4) 0 0 0 1px,
+    var(--card-shadow) 0 30px 60px 0,
+    inset #033 0 0 0 5px,
+    inset white 0 0 0 6px;
+}
+
+/* 图片样式 */
+.img {
+    opacity: 0.7;
+    position: absolute;
+    top: -20px;
+    left: -20px;
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-image: url(https://images.unsplash.com/photo-1556837675-f48f2f7d3882?q=80&w=2960&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D);
+    pointer-events: none;
+    transform-style: preserve-3d;
+    transform-origin: center center;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+    will-change: transform;
+}
+.second-img {
+    background-image: url(https://images.unsplash.com/photo-1672991727280-7c676d2cee9f?q=80&w=3087&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D);
+}
+
+.third-img {
+    background-image: url(https://images.unsplash.com/photo-1629662346922-50f404f92c75?q=80&w=3063&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D);
+}
+
+.fourth-img {
+    background-image: url(https://images.unsplash.com/photo-1567883251222-651d554b880c?q=80&w=2614&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D);
+}
+
+/* 鼠标悬停时图片样式 */
+.card:hover .img {
+  opacity: var(--img-opacity);
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+/* 修改底部一言样式 */
+.hitokoto-container {
+  position: fixed;
+  bottom: 50px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+#hitokoto {
+  margin: 0;
+  color: var(--hitokoto-color);
+  font-size: 16px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  padding: 10px 20px;
+  background: var(--hitokoto-bg);
+  border-radius: 20px;
+  display: inline-block;
+}
+
+#hitokoto_text {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+#hitokoto_text:hover {
+  color: #fff;
+}
+
+/* 添加卡片随机偏移动画 */
+@keyframes floatingCard {
+    0%, 100% {
+        transform: translate(var(--random-x), var(--random-y)) rotate(var(--random-rotate));
+    }
+    50% {
+        transform: translate(var(--random-x2), var(--random-y2)) rotate(var(--random-rotate2));
+    }
+}
+
+/* 修改过渡类 */
+.card-inner.transitioning {
+    animation: none !important;
+    transition: none;
+}
+
+/* 当鼠标悬停时停止随机动画 */
+.card:hover .card-inner {
+    animation: none;
+}
+
