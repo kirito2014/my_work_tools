@@ -1,18 +1,25 @@
 import os
 from tkinter import Tk, filedialog, StringVar, ttk, messagebox
+from tkinter import Radiobutton
 from ttkthemes import ThemedTk
 from openpyxl import load_workbook
 from pyecharts.charts import Line
 from pyecharts import options as opts
 import pandas as pd
 from datetime import datetime
+import matplotlib.pyplot as plt
+import numpy as np
+
+# 配置matplotlib使用微软雅黑字体
+import matplotlib
+matplotlib.rcParams['font.family'] = 'Microsoft YaHei'
 
 # 主程序逻辑
 class TrendChartApp:
     def __init__(self, root):
         self.root = root
         self.root.title("成绩单趋势生成工具")
-        self.root.geometry("600x400")
+        self.root.geometry("600x450")
         self.root.configure(bg='#f0f0f0')  # 设置背景颜色
         self.root.set_theme("arc")  # 设置主题为arc
         self.root.option_add("*Font", "黑体 10")  # 设置全局字体
@@ -21,6 +28,7 @@ class TrendChartApp:
         self.file_path = StringVar()
         self.sheet_name = StringVar()
         self.sheets = []
+        self.file_format = StringVar(value="html")  # 默认选择html格式
 
         # 文件选择框
         ttk.Label(root, text="选择要生成的工作簿:").pack(pady=10)
@@ -33,6 +41,13 @@ class TrendChartApp:
         ttk.Label(root, text="选择你要生成的工作表:").pack(pady=10)
         self.sheet_dropdown = ttk.Combobox(root, textvariable=self.sheet_name, state="readonly", width=30)
         self.sheet_dropdown.pack(pady=5)
+
+        # 选择文件格式
+        ttk.Label(root, text="选择文件格式:").pack(pady=10)
+        format_frame = ttk.Frame(root)
+        format_frame.pack(pady=5)
+        Radiobutton(format_frame, text="HTML", variable=self.file_format, value="html").pack(side="left")
+        Radiobutton(format_frame, text="PNG", variable=self.file_format, value="png").pack(side="left")
 
         # 进度条
         self.progress = ttk.Progressbar(root, orient="horizontal", length=400, mode="determinate")
@@ -91,6 +106,7 @@ class TrendChartApp:
         # 生成折线图的脚本
         excel_path = self.file_path.get()
         sheet_name = self.sheet_name.get()
+        file_format = self.file_format.get()
 
         # 加载Excel
         wb = load_workbook(excel_path)
@@ -99,20 +115,15 @@ class TrendChartApp:
         # 获取数据
         data = [row for row in ws.iter_rows(values_only=True)]
         header = data[0]  # 第一行标题
- 
         content = data[1:]  # 其余行内容
 
         # 判断是否有序号列
         if header[0] == "序号":
-            #print(111111)
             df = pd.DataFrame([row[1:] for row in content], columns=header[1:])  # 如果有序号，从第二列开始
-            #print(df)
         else:
             df = pd.DataFrame(content, columns=header)  # 否则照常处理
 
         # 配置保存目录
-        #根据所选sheet页名生成子目录
-
         output_folder = "趋势图"
         sub_folder = sheet_name
         output_folder_final = output_folder + "/" + sub_folder
@@ -133,7 +144,7 @@ class TrendChartApp:
             max_idx = scores.index(max_score)
             min_idx = scores.index(min_score)
 
-            # 绘制折线图
+            # 使用pyecharts生成折线图
             line = (
                 Line()
                 .add_xaxis(x_labels.tolist())
@@ -160,9 +171,27 @@ class TrendChartApp:
                 )
             )
 
-            # 保存图表
-            output_file = os.path.join(output_folder_final, f"{name}_成绩单_趋势_{today}.html")
-            line.render(output_file)
+            if file_format == "html":
+                # 保存为html
+                output_file_html = os.path.join(output_folder_final, f"{name}_成绩单_趋势_{today}.html")
+                line.render(output_file_html)
+            else:
+                # 使用matplotlib生成PNG图像
+                plt.figure(figsize=(10, 6))
+                plt.plot(x_labels.tolist(), scores, marker='o', linestyle='-', color='b', label="分数")
+                plt.title(f"{name} 成绩趋势")
+                plt.xlabel("单元")
+                #平滑曲线
+                plt.xticks(rotation=45)
+                plt.ylabel("分数")
+                plt.ylim(0, 100)
+                plt.grid(True)
+                plt.legend()
+                
+                # 保存为PNG
+                output_file_png = os.path.join(output_folder_final, f"{name}_成绩单_趋势_{today}.png")
+                plt.savefig(output_file_png, format='png')
+                plt.close()  # 关闭图形
 
             # 更新进度条
             self.progress["value"] += 1
