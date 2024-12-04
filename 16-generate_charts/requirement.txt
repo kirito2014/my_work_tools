@@ -1,0 +1,6 @@
+ttkthemes
+pandas
+pyecharts
+openpyxl
+
+pyinstaller --noconfirm --onefile --windowed --collect-all pyecharts --icon="tools.ico"   .\gen_grade_ui.py
