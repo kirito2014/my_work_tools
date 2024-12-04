@@ -99,17 +99,25 @@ class TrendChartApp:
         # 获取数据
         data = [row for row in ws.iter_rows(values_only=True)]
         header = data[0]  # 第一行标题
+ 
         content = data[1:]  # 其余行内容
-        
+
         # 判断是否有序号列
         if header[0] == "序号":
-            df = pd.DataFrame(content, columns=header[1:])  # 如果有序号，从第二列开始
+            #print(111111)
+            df = pd.DataFrame([row[1:] for row in content], columns=header[1:])  # 如果有序号，从第二列开始
+            #print(df)
         else:
             df = pd.DataFrame(content, columns=header)  # 否则照常处理
 
         # 配置保存目录
+        #根据所选sheet页名生成子目录
+
         output_folder = "趋势图"
+        sub_folder = sheet_name
+        output_folder_final = output_folder + "/" + sub_folder
         os.makedirs(output_folder, exist_ok=True)
+        os.makedirs(output_folder_final, exist_ok=True)
         today = datetime.now().strftime("%Y%m%d")
         total_rows = len(df)
         self.progress["maximum"] = total_rows
@@ -153,14 +161,14 @@ class TrendChartApp:
             )
 
             # 保存图表
-            output_file = os.path.join(output_folder, f"{name}_成绩单_趋势_{today}.html")
+            output_file = os.path.join(output_folder_final, f"{name}_成绩单_趋势_{today}.html")
             line.render(output_file)
 
             # 更新进度条
             self.progress["value"] += 1
             self.root.update()
 
-        messagebox.showinfo("完成", f"所有图表已生成！图表保存在文件夹: {output_folder}")
+        messagebox.showinfo("完成", f"所有图表已生成！图表保存在文件夹: {output_folder_final}")
 
 if __name__ == "__main__":
     root = ThemedTk(theme="arc")  # 使用ttkthemes美化
