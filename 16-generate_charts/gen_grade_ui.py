@@ -8,17 +8,15 @@ import pandas as pd
 from datetime import datetime
 
 # 主程序逻辑
-#pyinstaller --noconfirm --onefile --windowed --add-data "themes;themes" --icon="tools.ico" trend_chart_tool.py
-
 class TrendChartApp:
     def __init__(self, root):
         self.root = root
         self.root.title("成绩单趋势生成工具")
         self.root.geometry("600x400")
         self.root.configure(bg='#f0f0f0')  # 设置背景颜色
-        self.root.set_theme("arc") #breeze
+        self.root.set_theme("arc")  # 设置主题为arc
         self.root.option_add("*Font", "黑体 10")  # 设置全局字体
-        
+
         # 初始化变量
         self.file_path = StringVar()
         self.sheet_name = StringVar()
@@ -37,12 +35,22 @@ class TrendChartApp:
         self.sheet_dropdown.pack(pady=5)
 
         # 进度条
-        #ttk.Label(root, text="生成进度:").pack(pady=10)
         self.progress = ttk.Progressbar(root, orient="horizontal", length=400, mode="determinate")
-        self.progress.pack(pady=5)
+        self.progress.pack(pady=15)
 
-        # 执行按钮
-        ttk.Button(root, text="执行生成", command=self.generate_charts).pack(pady=20)
+        # 执行按钮和清除按钮在同一行
+        button_frame = ttk.Frame(root)
+        button_frame.pack(pady=20)
+        ttk.Button(button_frame, text="执行生成", command=self.generate_charts ).pack(side="left", padx=10)
+        ttk.Button(button_frame, text="清除", command=self.clear ).pack(side="left", padx=10)
+
+    def clear(self):
+        self.file_path.set("")
+        self.sheet_name.set("")
+        self.sheets = []
+        self.sheet_dropdown["values"] = self.sheets
+        self.progress["value"] = 0
+        self.root.update()
 
     def select_file(self):
         # 选择Excel文件
@@ -92,7 +100,12 @@ class TrendChartApp:
         data = [row for row in ws.iter_rows(values_only=True)]
         header = data[0]  # 第一行标题
         content = data[1:]  # 其余行内容
-        df = pd.DataFrame(content, columns=header)
+        
+        # 判断是否有序号列
+        if header[0] == "序号":
+            df = pd.DataFrame(content, columns=header[1:])  # 如果有序号，从第二列开始
+        else:
+            df = pd.DataFrame(content, columns=header)  # 否则照常处理
 
         # 配置保存目录
         output_folder = "趋势图"
@@ -125,7 +138,7 @@ class TrendChartApp:
                 )
                 .set_series_opts(
                     markpoint_opts=opts.MarkPointOpts(
-                        data=[
+                        data=[ 
                             opts.MarkPointItem(name="最大值", coord=[x_labels[max_idx], max_score], value=max_score),
                             opts.MarkPointItem(name="最小值", coord=[x_labels[min_idx], min_score], value=min_score),
                         ]
@@ -149,9 +162,7 @@ class TrendChartApp:
 
         messagebox.showinfo("完成", f"所有图表已生成！图表保存在文件夹: {output_folder}")
 
-
 if __name__ == "__main__":
-    root = ThemedTk(theme=False)  # 使用ttkthemes美化
+    root = ThemedTk(theme="arc")  # 使用ttkthemes美化
     app = TrendChartApp(root)
     root.mainloop()
-
