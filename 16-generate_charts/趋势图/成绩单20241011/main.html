@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>成绩单趋势图展示</title>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        #select-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        select {
+            font-size: 16px;
+            padding: 8px 15px;
+            width: 200px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+        }
+
+        #chart-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            flex-direction: column;
+        }
+
+        iframe {
+            width: 80%;
+            height: 600px;
+            border: none;
+            margin-top: 20px;
+        }
+
+        .chart-wrapper {
+            margin-bottom: 30px;
+        }
+
+        /* All charts section styling */
+        .all-charts {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-top: 40px;
+            padding-bottom: 50px;
+        }
+    </style>
+</head>
+<body>
+    <h1>成绩单趋势图展示</h1>
+
+    <!-- 日期选择框 -->
+    <div id="select-container">
+        <label for="date-select">选择日期：</label>
+        <select id="date-select" onchange="updateNames()">
+            <option value="">请选择日期</option>
+        </select>
+        <label for="name-select" style="margin-left: 20px;">选择姓名：</label>
+        <select id="name-select" onchange="updateChart()">
+            <option value="">请选择姓名</option>
+        </select>
+        <button onclick="showAllCharts()">全部展示</button>
+    </div>
+
+    <!-- 图表显示区域 -->
+    <div id="chart-container"></div>
+
+    <!-- 全部展示区域 -->
+    <div id="all-charts" class="all-charts"></div>
+
+    <script>
+        // 文件夹中的HTML文件
+        let files = [];
+
+        // 用于存储不同日期对应的文件列表
+        const dateMap = {};
+
+        // 请求后端获取文件列表
+        async function fetchFiles() {
+            try {
+                const response = await fetch('/api/get_file_list'); // 你可以在后端实现这个接口
+                const fileList = await response.json();
+                files = fileList;
+
+                // 填充日期选择框
+                fillDateSelect();
+            } catch (error) {
+                console.error("文件列表获取失败:", error);
+            }
+        }
+
+        // 填充日期选择框
+        function fillDateSelect() {
+            const dateSelect = document.getElementById('date-select');
+            const uniqueDates = [...new Set(files.map(file => file.date))];
+
+            uniqueDates.forEach(date => {
+                const option = document.createElement('option');
+                option.value = date;
+                option.textContent = date;
+                dateSelect.appendChild(option);
+                dateMap[date] = files.filter(file => file.date === date);
+            });
+        }
+
+        // 更新姓名选择框
+        function updateNames() {
+            const dateSelect = document.getElementById('date-select');
+            const nameSelect = document.getElementById('name-select');
+            const selectedDate = dateSelect.value;
+
+            nameSelect.innerHTML = '<option value="">请选择姓名</option>'; // 清空姓名选择框
+
+            if (selectedDate) {
+                const names = dateMap[selectedDate].map(file => file.name);
+                const uniqueNames = [...new Set(names)];
+
+                uniqueNames.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    nameSelect.appendChild(option);
+                });
+            }
+        }
+
+        // 展示选定的图表
+        function updateChart() {
+            const dateSelect = document.getElementById('date-select');
+            const nameSelect = document.getElementById('name-select');
+            const selectedDate = dateSelect.value;
+            const selectedName = nameSelect.value;
+
+            const chartContainer = document.getElementById('chart-container');
+            chartContainer.innerHTML = ''; // 清空现有图表
+
+            if (selectedDate && selectedName) {
+                const file = dateMap[selectedDate].find(file => file.name === selectedName);
+                if (file) {
+                    const iframe = document.createElement('iframe');
+                    iframe.src = file.file;
+                    chartContainer.appendChild(iframe);
+                }
+            }
+        }
+
+        // 展示全部图表（根据日期展示）
+        function showAllCharts() {
+            const dateSelect = document.getElementById('date-select');
+            const selectedDate = dateSelect.value;
+
+            const chartContainer = document.getElementById('all-charts');
+            chartContainer.innerHTML = ''; // 清空现有图表
+
+            if (selectedDate) {
+                const filesToShow = dateMap[selectedDate];
+                filesToShow.forEach(file => {
+                    const iframeWrapper = document.createElement('div');
+                    iframeWrapper.classList.add('chart-wrapper');
+                    const iframe = document.createElement('iframe');
+                    iframe.src = file.file;
+                    iframeWrapper.appendChild(iframe);
+                    chartContainer.appendChild(iframeWrapper);
+                });
+            }
+        }
+
+        // 初始化
+        fetchFiles();
+    </script>
+</body>
+</html>

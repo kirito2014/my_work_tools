@@ -8,7 +8,6 @@ from pyecharts import options as opts
 import pandas as pd
 from datetime import datetime
 import matplotlib.pyplot as plt
-import numpy as np
 
 # 配置matplotlib使用微软雅黑字体
 import matplotlib
