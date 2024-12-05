@@ -73,5 +73,5 @@ pip install pyinstaller
 然后运行以下命令打包：
 
 ```bash
-pyinstaller --noconfirm --onefile --windowed --collect-all pyecharts --icon="tools.ico"   .\gen_grade_ui.py
+pyinstaller --noconfirm --onefile --windowed   --collect-all pyecharts --upx-dir "path\to\upx"  --icon="tools.ico"   .\gen_grade_ui.py
 ```
