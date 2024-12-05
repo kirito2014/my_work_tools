@@ -1,0 +1,7 @@
+ttkthemes
+pandas
+pyecharts
+openpyxl
+matplotlib
+tkinter
+pyinstaller
