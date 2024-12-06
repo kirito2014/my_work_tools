@@ -195,8 +195,15 @@ function initializeCardEvents() {
             // 添加图片透视效果
             const frontImg = card.querySelector('.card-front .img');
             const backImg = card.querySelector('.card-back .img');
+            
+            // 根据卡片是否翻转来调整变换方向
+            const transformX = isFlipped ? -x * -40 : x * -40;
+            const transformY = y * -40;
+            const rotateX = -y * 20;
+            const rotateY = isFlipped ? x * 20 : x * 20;
+            
             const imgTransform = `
-                translate3d(${x * -40}px, ${y * -40}px, 20px)
+                translate3d(${transformX}px, ${transformY}px, 20px)
                 scale(1.1)
             `;
             
@@ -212,8 +219,8 @@ function initializeCardEvents() {
             
             // 应用卡片旋转
             cardInner.style.transform = `
-                rotateY(${baseRotation + x * 20}deg)
-                rotateX(${-y * 20}deg)
+                rotateY(${baseRotation + rotateY}deg)
+                rotateX(${rotateX}deg)
             `;
         });
         
