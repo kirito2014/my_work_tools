@@ -49,6 +49,7 @@ for index, row in df.iterrows():
             series_name="分数",
             y_axis=scores,
             label_opts=opts.LabelOpts(is_show=True),  # 显示数据标签
+            is_smooth=True,  # 开启平滑曲线
         )
         .set_global_opts(
             title_opts=opts.TitleOpts(title=f"{name} 成绩趋势"),
