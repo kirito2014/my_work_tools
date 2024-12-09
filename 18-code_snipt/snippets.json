@@ -1,0 +1,17 @@
+{
+  "1733734379": {
+    "code": "  def load_snippets(self):\n    try:\n      with open(\"snippets.json\", \"r\", encoding=\"utf-8\") as f:\n        return json.load(f)\n    except FileNotFoundError:\n      return {}\n      \n  def save_to_file(self):\n    with open(\"snippets.json\", \"w\", encoding=\"utf-8\") as f:\n      json.dump(self.snippets, f, ensure_ascii=False, indent=2)",
+    "category": "Python",
+    "created_at": "2024-12-09 16:52:59"
+  },
+  "1733734501": {
+    "code": "Traceback (most recent call last):\n  File \"D:\\github\\18-code_snipt\\code_sni.py\", line 79, in save_snippet\n    self.show_status(\"代码片段保存成功！\")\n    ^^^^^^^^^^^^^^^^\nAttributeError: 'SnippetManager' object has no attribute 'show_status'",
+    "category": "Python",
+    "created_at": "2024-12-09 16:55:01"
+  },
+  "1733734547": {
+    "code": "def setup_connections(self):\n    self.save_btn.clicked.connect(self.save_snippet)\n    self.copy_btn.clicked.connect(self.copy_snippet)\n    self.search_box.textChanged.connect(self.search_snippets)\n    # 初始化数据存储\n    self.snippets = self.load_snippets()",
+    "category": "Python",
+    "created_at": "2024-12-09 16:55:47"
+  }
+}
