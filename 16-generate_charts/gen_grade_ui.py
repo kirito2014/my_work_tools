@@ -8,6 +8,7 @@ from pyecharts import options as opts
 import pandas as pd
 from datetime import datetime
 import matplotlib.pyplot as plt
+import pywinstyles
 
 # 配置matplotlib使用微软雅黑字体
 import matplotlib
@@ -19,8 +20,11 @@ class TrendChartApp:
         self.root = root
         self.root.title("成绩单趋势生成工具")
         self.root.geometry("600x450")
-        self.root.configure(bg='#f0f0f0')  # 设置背景颜色
-        self.root.set_theme("arc")  # 设置主题为arc
+        self.root.configure(bg='white')  # 设置背景颜色为白色
+
+        # Set window and taskbar icon
+        icon_path = 'sunline.ico'  # Ensure this is the correct path to your icon file
+        self.root.iconbitmap(icon_path)
         self.root.option_add("*Font", "黑体 10")  # 设置全局字体
 
         # 初始化变量
