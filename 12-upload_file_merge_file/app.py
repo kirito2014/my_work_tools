@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_from_directory, jsonify
+from flask import Flask, render_template, send_file,request, send_from_directory, jsonify
 import os,sys
 from werkzeug.utils import secure_filename
 import threading
@@ -18,6 +18,11 @@ progress = 0
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
 
+
+def clear_filters(sheet):
+    """清除指定工作表的筛选器"""
+    if sheet.api.AutoFilter:
+        sheet.api.AutoFilterMode = False
 
 def run_script(txt_path, xlsx_path, output_path): 
 
@@ -40,13 +45,17 @@ def run_script(txt_path, xlsx_path, output_path):
     else: 
         tgt_wb=xw.Book()
         tgt_wb.save(target_file) 
-    
+
+    update_progress(10)  # 初始进度
+
     with open(table_list_file,'r',encoding='utf-8') as file: 
         table_names = [line.strip().upper() for line in file.readlines()]
         table_list=len(table_names) 
     print(f"本次共处理{table_list}张表") 
     processed_table_count=0 
-    
+
+    update_progress(30)  # 进度 30%
+
     for table_name in table_names: 
         print(f"正在处理<{person_name}>-<{table_name}>的码值映射。") 
         # code_map_files = [ 
@@ -64,16 +73,19 @@ def run_script(txt_path, xlsx_path, output_path):
         try: 
             src_wb=xw.Book(code_map_file)
             rem_code_map_sheet='rem-代码映射' 
+            
             if rem_code_map_sheet not in [sheet.name for sheet in src_wb.sheets]: 
                 log_error(error_log,f"{code_map_file}中未找到代码映射sheet。") 
                 src_wb.close() 
                 sys.exit()
 
             src_cm_sheet=src_wb.sheets[rem_code_map_sheet] 
+            clear_filters(src_cm_sheet)
             if rem_code_map_sheet not in [sheet.name for sheet in tgt_wb.sheets]: 
                 tgt_wb.sheets.add(rem_code_map_sheet) 
 
-            tgt_cm_sheet=tgt_wb.sheets(rem_code_map_sheet) 
+            tgt_cm_sheet=tgt_wb.sheets(rem_code_map_sheet)
+            clear_filters(tgt_cm_sheet)
             #先删除目标文件中已存在的码值映射
             tgt_cm_data=tgt_cm_sheet.range('A1').expand('table').value 
             if tgt_cm_data: 
@@ -100,31 +112,32 @@ def run_script(txt_path, xlsx_path, output_path):
         processed_table_count = processed_table_count + 1
         progress = int((processed_table_count / len(table_names)) * 100)
         print(f"剩余{table_list-processed_table_count}个")
+
+    update_progress(70)  # 进度 70%
+
     tgt_wb.save(target_file)
     tgt_wb.close()
-    progress = 100
-    print('110000101010')
 
-def log_error(log_file,message):
-    with open(log_file,'w',encoding='utf-8') as log:
+    update_progress(100)  # 完成
+
+    #print('110000101010')
+
+def log_error(log_file, message):
+    with open(log_file, 'a', encoding='utf-8') as log:  # 改为 'a' 模式
         log.write(message + '\n')
     print(message)
-
-
-def run_script1(txt_path, xlsx_path, output_path):
+def update_progress(value):
+    """更新进度"""
     global progress
-    wb = openpyxl.load_workbook(xlsx_path)
-    ws = wb.active
+    with lock:
+        progress = value
 
-    with open(txt_path, 'r',encoding='gbk') as f:
-        table_names = [line.strip() for line in f]
+def reset_progress():
+    """重置进度为0"""
+    global progress
+    with lock:
+        progress = 0
 
-    for i, table_name in enumerate(table_names, 1):
-        sleep(1)
-        progress = int((i / len(table_names)) * 100)
-    
-    wb.save(output_path)
-    progress = 100
 
 @app.route('/')
 def index():
@@ -182,7 +195,11 @@ def get_progress():
 
 @app.route('/download')
 def download():
-    return send_from_directory(app.config['OUTPUT_FOLDER'], 'pub_cd_map.xlsx', as_attachment=True)
+    #return send_from_directory(app.config['OUTPUT_FOLDER'], 'pub_cd_map.xlsx', as_attachment=True)
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'merged_pub_cd_map.xlsx')
+    if not os.path.exists(file_path):
+        return jsonify({"error": "文件尚未生成"}), 404
+    return send_file(file_path, as_attachment=True)
 
 if __name__ == '__main__':
     app.run(debug=True)
