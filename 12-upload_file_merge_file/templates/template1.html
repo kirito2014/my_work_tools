@@ -5,22 +5,39 @@
     <title>在线码值生成工具</title>
     <style>
         /* 全局字体与布局设置 */
+        :root {
+            --bg-color: #1e90ff;
+        }
+
         body {
             font-family: 'Microsoft YaHei', sans-serif;
-            background-color: #f4f6f9;
+            height: 100vh;
+            overflow: hidden;
+            background: 
+                radial-gradient(circle at bottom, #fff, transparent 80%),    
+                linear-gradient(to top, dodgerblue 0%, transparent 70%),    
+                linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.4) 70%),
+                #1e90ff;
             color: #333;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
             margin: 0;
+            animation: bg 30s infinite;
+        }
+
+        @keyframes bg {
+            0%, 100% { background-color: #1e90ff; }
+            25% { background-color: #1a279a; }
+            50% { background-color: #5b70fc; }
+            75% { background-color: #162ba4; }
         }
 
         /* 主容器样式 */
         .main-container {
             width: 650px;
             height: 400px;
-            background: #fff;
+            background: rgba(255, 255, 255, 0.85);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             border-radius: 8px;
             padding: 20px;
@@ -28,6 +45,7 @@
             flex-direction: column;
             justify-content: space-between;
             align-items: center;
+            backdrop-filter: blur(10px);
         }
 
         /* 左右文件上传容器 */
@@ -41,7 +59,7 @@
         .file-box {
             width: 44%;
             padding: 15px;
-            background: #f9f9f9;
+            background: rgba(255, 255, 255, 0.9);
             border: 1px solid #ddd;
             border-radius: 8px;
             display: flex;
@@ -49,6 +67,7 @@
             align-items: center;
             gap: 10px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(5px);
         }
 
         /* 文件选择状态样式 */
