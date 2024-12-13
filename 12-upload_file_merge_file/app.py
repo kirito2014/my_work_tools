@@ -46,7 +46,7 @@ def run_script(txt_path, xlsx_path, output_path):
         tgt_wb=xw.Book()
         tgt_wb.save(target_file) 
 
-    update_progress(10)  # 初始进度
+    update_progress(5)  # 初始进度
 
     with open(table_list_file,'r',encoding='utf-8') as file: 
         table_names = [line.strip().upper() for line in file.readlines()]
@@ -54,7 +54,7 @@ def run_script(txt_path, xlsx_path, output_path):
     print(f"本次共处理{table_list}张表") 
     processed_table_count=0 
 
-    update_progress(30)  # 进度 30%
+    #update_progress(30)  # 进度 30%
 
     for table_name in table_names: 
         print(f"正在处理<{person_name}>-<{table_name}>的码值映射。") 
@@ -96,13 +96,38 @@ def run_script(txt_path, xlsx_path, output_path):
             #读取并筛选源文件中的码值映射数据
             src_cm_data=src_cm_sheet.range('A1').expand('table').value 
             if src_cm_data: 
-                src_cm_df =pd.DataFrame(src_cm_data[1:],columns=src_cm_data[1]) 
-                filtered_src_cm_df=src_cm_df[src_cm_df['目标表英文名']==table_name] 
+                # 获取表头
+                headers = src_cm_data[1]
+                # 将数据转换为DataFrame，但保持原始格式
+                src_cm_df = pd.DataFrame(src_cm_data[1:], columns=headers)
+                # 找到需要保持文本格式的列（通常是码值相关的列）
+                code_columns = ['源代码码值']  # 根据实际列名调整
+                
+                # 对这些列进行特殊处理，确保保持文本格式
+                for col in code_columns:
+                    if col in src_cm_df.columns:
+                        src_cm_df[col] = src_cm_df[col].astype(str).apply(
+                            lambda x: f"'{x}" if x.strip() and x.strip()[0] == '0' else x
+                        )
+                #print(src_cm_df)
+                filtered_src_cm_df = src_cm_df[src_cm_df['目标表英文名']==table_name]
+                #print(filtered_src_cm_df)
+                
                 if filtered_src_cm_df.empty: 
                     log_error(error_log,f"{code_map_file}中未找到{table_name}表的代码映射.")
                 else:
                     start_row = tgt_cm_sheet.range('A1').expand('down').last_cell.row + 1
-                    tgt_cm_sheet.range(f'A{start_row}').value = filtered_src_cm_df.values.tolist()
+                    # 写入数据并设置格式
+                    target_range = tgt_cm_sheet.range(f'A{start_row}')
+                    target_range.value = filtered_src_cm_df.values.tolist()
+                    
+                    #对包含代码的列设置文本格式
+                    for col in code_columns:
+                        if col in headers:
+                            col_index = headers.index(col)
+                            code_range = target_range.offset(0, col_index).resize(len(filtered_src_cm_df))
+                            code_range.number_format = '@'  # 设置为文本格式
+
             tgt_wb.save()
         except Exception as e:
             log_error(error_log,f"处理{code_map_file}中{table_name} 表的代码映射时发生错误:{str(e)}.")
@@ -195,11 +220,11 @@ def get_progress():
 
 @app.route('/download')
 def download():
-    #return send_from_directory(app.config['OUTPUT_FOLDER'], 'pub_cd_map.xlsx', as_attachment=True)
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'merged_pub_cd_map.xlsx')
-    if not os.path.exists(file_path):
-        return jsonify({"error": "文件尚未生成"}), 404
-    return send_file(file_path, as_attachment=True)
+    return send_from_directory(app.config['OUTPUT_FOLDER'], 'pub_cd_map.xlsx', as_attachment=True)
+    # file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'pub_cd_map.xlsx')
+    # if not os.path.exists(file_path):
+    #     return jsonify({"error": "文件尚未生成"}), 404
+    # return send_from_directory(file_path, as_attachment=True)
 
 if __name__ == '__main__':
     app.run(debug=True)
