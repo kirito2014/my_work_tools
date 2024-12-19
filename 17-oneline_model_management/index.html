@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>作业管理系统</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            display: flex;
+        }
+        #sidebar {
+            width: 200px;
+            background-color: #333;
+            color: white;
+            height: 100vh; /* Full height */
+            position: fixed; /* Fixed Sidebar (stay in place on scroll) */
+            z-index: 1; /* Stay on top */
+            top: 0; /* Stay at the top */
+            left: 0;
+            overflow-x: hidden; /* Disable horizontal scroll */
+            padding-top: 20px;
+            transition: left 0.3s;
+        }
+        #sidebar .hide-btn, #sidebar .show-btn {
+            cursor: pointer;
+            padding: 10px;
+            background-color: #444;
+            text-align: center;
+        }
+        #sidebar .module {
+            padding: 10px;
+            background-color: #007BFF; /* Bootstrap primary color */
+            margin: 10px;
+            border: 2px solid white; /* White border */
+            border-radius: 10px; /* Rounded corners */
+        }
+        #main-content {
+            margin-left: 210px; /* Same as the width of the sidebar */
+            padding: 20px;
+        }
+        input[type="text"], button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            margin-bottom: 16px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        button {
+            background-color: #5c67f2;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #4a54e1;
+        }
+        .show-btn {
+            display: none; /* Initially hidden */
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 2;
+        }
+    </style>
+</head>
+<body>
+    <div class="show-btn" onclick="toggleSidebar()">展开侧边栏</div>
+    <div id="sidebar">
+        <div class="logo">LOGO</div>
+        <div class="hide-btn" onclick="toggleSidebar()">隐藏侧边栏</div>
+        <div class="module">作业管理</div>
+    </div>
+    <div id="main-content">
+        <form id="taskForm">
+            <label for="englishName">英文名:</label>
+            <input type="text" id="englishName" name="englishName"><br>
+            <label for="chineseName">中文名:</label>
+            <input type="text" id="chineseName" name="chineseName"><br>
+            <button type="submit">提交</button>
+        </form>
+    </div>
+    <script>
+        function toggleSidebar() {
+            var sidebar = document.getElementById('sidebar');
+            var showBtn = document.querySelector('.show-btn');
+            if (sidebar.style.left === '-200px') {
+                sidebar.style.left = '0';
+                showBtn.style.display = 'none';
+            } else {
+                sidebar.style.left = '-200px';
+                showBtn.style.display = 'block';
+            }
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('http://localhost:3000/tasks')
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+                document.body.append(JSON.stringify(data)); // 显示数据
+            })
+            .catch(error => console.error('Error:', error));
+        });
+        document.getElementById('taskForm').onsubmit = function(event) {
+            var englishName = document.getElementById('englishName').value;
+            var chineseName = document.getElementById('chineseName').value;
+            if (!englishName || !chineseName) {
+                alert('请填写所有必要的字段。');
+                event.preventDefault(); // 阻止表单提交
+            }
+        };
+    </script>
+</body>
+</html> 
