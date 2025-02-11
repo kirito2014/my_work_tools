@@ -51,9 +51,10 @@
             }
         ],
         "WorkAbility": {
-            "BusinessAbility": "",
-            "Certification": "",
-            "Training": ""
+            "BusinessAbility": "11111",
+            "Certification": "2222",
+            "Training": "33333",
+            "SkillTag": "44444"
         }
     }
 }
