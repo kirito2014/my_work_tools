@@ -1,37 +1,30 @@
 {
-    "PersonName": {
+    "张三": {
         "BasicInfo": {
-            "Name": "1",
-            "WorkYears": "2",
-            "GraduationTime": "3",
-            "GraduationSchool": "4",
-            "Major": "5",
-            "HighestEducation": "6",
-            "Department": "7",
-            "Title": "8",
-            "PersonalProfile": "9"
+            "Name": "张三",
+            "WorkYears": "5年",
+            "GraduationTime": "2018/06",
+            "GraduationSchool": "清华大学",
+            "Major": "计算机科学与技术",
+            "HighestEducation": "本科",
+            "Department": "技术部",
+            "Title": "高级工程师",
+            "PersonalProfile": "热爱编程，擅长Python和Java。"
         },
         "WorkExperience": [
             {
                 "StartTime": "2023/01/01",
                 "EndTime": "至今",
                 "CompanyName": "xxx1公司",
-                "Position": "xxxx职务",
-                "JobDescription": "xxxxxxxx"
+                "Position": "高级开发工程师",
+                "JobDescription": "负责核心模块开发。"
             },
             {
                 "StartTime": "2022/01/01",
                 "EndTime": "2022/12/31",
                 "CompanyName": "xxx2公司",
-                "Position": "xxxx职务",
-                "JobDescription": "xxxxxxxx"
-            },
-            {
-                "StartTime": "2021/01/01",
-                "EndTime": "2021/12/31",
-                "CompanyName": "xxx3公司",
-                "Position": "xxxx职务",
-                "JobDescription": "xxxxxxxx"
+                "Position": "开发工程师",
+                "JobDescription": "参与项目开发与维护。"
             }
         ],
         "ProjectExperience": [
@@ -39,22 +32,124 @@
                 "StartTime": "2023/01/01",
                 "EndTime": "至今",
                 "ProjectName": "xxx1项目",
-                "ProjectRole": "xxxx职务",
-                "JobDescription": "xxxxxxxx"
+                "ProjectRole": "项目经理",
+                "JobDescription": "负责项目整体规划与实施。"
             },
             {
                 "StartTime": "2022/01/01",
                 "EndTime": "2022/12/31",
                 "ProjectName": "xxx2项目",
-                "ProjectRole": "xxxx职务",
-                "JobDescription": "xxxxxxxx"
+                "ProjectRole": "开发工程师",
+                "JobDescription": "参与项目开发与测试。"
             }
         ],
         "WorkAbility": {
-            "BusinessAbility": "11111",
-            "Certification": "2222",
-            "Training": "33333",
-            "SkillTag": "44444"
+            "BusinessAbility": "熟练掌握Python、Java等编程语言。",
+            "Certification": "PMP认证",
+            "Training": "敏捷开发培训",
+            "SkillTag": "【测试】"
+        }
+    },
+    "李四": {
+        "BasicInfo": {
+            "Name": "李四",
+            "WorkYears": "5年",
+            "GraduationTime": "2018/06",
+            "GraduationSchool": "清华大学",
+            "Major": "计算机科学与技术",
+            "HighestEducation": "本科",
+            "Department": "技术部",
+            "Title": "高级工程师",
+            "PersonalProfile": "热爱编程，擅长Python和Java。"
+        },
+        "WorkExperience": [
+            {
+                "StartTime": "2023/01/01",
+                "EndTime": "至今",
+                "CompanyName": "xxx1公司",
+                "Position": "高级开发工程师",
+                "JobDescription": "负责核心模块开发。"
+            },
+            {
+                "StartTime": "2022/01/01",
+                "EndTime": "2022/12/31",
+                "CompanyName": "xxx2公司",
+                "Position": "开发工程师",
+                "JobDescription": "参与项目开发与维护。"
+            }
+        ],
+        "ProjectExperience": [
+            {
+                "StartTime": "2023/01/01",
+                "EndTime": "至今",
+                "ProjectName": "xxx1项目",
+                "ProjectRole": "项目经理",
+                "JobDescription": "负责项目整体规划与实施。"
+            },
+            {
+                "StartTime": "2022/01/01",
+                "EndTime": "2022/12/31",
+                "ProjectName": "xxx2项目",
+                "ProjectRole": "开发工程师",
+                "JobDescription": "参与项目开发与测试。"
+            }
+        ],
+        "WorkAbility": {
+            "BusinessAbility": "熟练掌握Python、Java等编程语言。",
+            "Certification": "PMP认证",
+            "Training": "敏捷开发培训",
+            "SkillTag": "【测试】"
+        }
+    },
+    "王五": {
+        "BasicInfo": {
+            "Name": "王五",
+            "WorkYears": "2.5年",
+            "GraduationTime": "2018/06",
+            "GraduationSchool": "家里蹲大学",
+            "Major": "计算机科学与技术",
+            "HighestEducation": "本科",
+            "Department": "技术部",
+            "Title": "高级工程师",
+            "PersonalProfile": "热爱编程，擅长Python和Java。"
+        },
+        "WorkExperience": [
+            {
+                "StartTime": "2023/01/01",
+                "EndTime": "至今",
+                "CompanyName": "xxx1公司",
+                "Position": "高级开发工程师",
+                "JobDescription": "负责核心模块开发。"
+            },
+            {
+                "StartTime": "2022/01/01",
+                "EndTime": "2022/12/31",
+                "CompanyName": "xxx2公司",
+                "Position": "开发工程师",
+                "JobDescription": "参与项目开发与维护。"
+            }
+        ],
+        "ProjectExperience": [
+            {
+                "StartTime": "2023/01/01",
+                "EndTime": "至今",
+                "ProjectName": "xxx1项目",
+                "ProjectRole": "项目经理",
+                "JobDescription": "负责项目整体规划与实施。"
+            },
+            {
+                "StartTime": "2022/01/01",
+                "EndTime": "2022/12/31",
+                "ProjectName": "xxx2项目",
+                "ProjectRole": "开发工程师",
+                "JobDescription": "参与项目开发与测试。"
+            }
+        ],
+        "WorkAbility": {
+            "BusinessAbility": "熟练掌握Python、Java等编程语言。",
+            "Certification": "PMP认证",
+            "Training": "敏捷开发培训",
+            "SkillTag": "【测试】"
         }
     }
 }

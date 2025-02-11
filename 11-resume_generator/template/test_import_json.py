@@ -63,24 +63,25 @@ def process_json_data(json_data, template_path, output_folder, person_names="all
     """
     try:
         # 解析JSON数据
-        data = json.loads(json_data)
+        with open(json_data, 'r',encoding='utf-8') as f:
+            data = json.load(f)
 
-        # 如果JSON为空，打印错误并退出
-        if not data:
-            print("错误: JSON数据为空。")
-            return
+            # 如果JSON为空，打印错误并退出
+            if not data:
+                print("错误: JSON数据为空。")
+                return
 
-        # 如果传入"all"，处理所有人员
-        if person_names == "all":
-            person_names = list(data.keys())
+            # 如果传入"all"，处理所有人员
+            if person_names == "all":
+                person_names = list(data.keys())
 
-        # 遍历每个人员
-        for person_name in person_names:
-            if person_name in data:
-                person_data = data[person_name]
-                generate_resume_from_json(person_data, template_path, output_folder, person_name)
-            else:
-                print(f"错误: 未找到人员 '{person_name}' 的数据。")
+            # 遍历每个人员
+            for person_name in person_names:
+                if person_name in data:
+                    person_data = data[person_name]
+                    generate_resume_from_json(person_data, template_path, output_folder, person_name)
+                else:
+                    print(f"错误: 未找到人员 '{person_name}' 的数据。")
 
     except json.JSONDecodeError:
         print("错误: JSON数据格式不正确。")
@@ -90,163 +91,7 @@ def process_json_data(json_data, template_path, output_folder, person_names="all
 # 示例调用
 if __name__ == "__main__":
     # 示例JSON数据
-    json_data = """
-    {
-        "张三": {
-            "BasicInfo": {
-                "Name": "张三",
-                "WorkYears": "5年",
-                "GraduationTime": "2018/06",
-                "GraduationSchool": "清华大学",
-                "Major": "计算机科学与技术",
-                "HighestEducation": "本科",
-                "Department": "技术部",
-                "Title": "高级工程师",
-                "PersonalProfile": "热爱编程，擅长Python和Java。"
-            },
-            "WorkExperience": [
-                {
-                    "StartTime": "2023/01/01",
-                    "EndTime": "至今",
-                    "CompanyName": "xxx1公司",
-                    "Position": "高级开发工程师",
-                    "JobDescription": "负责核心模块开发。"
-                },
-                {
-                    "StartTime": "2022/01/01",
-                    "EndTime": "2022/12/31",
-                    "CompanyName": "xxx2公司",
-                    "Position": "开发工程师",
-                    "JobDescription": "参与项目开发与维护。"
-                }
-            ],
-            "ProjectExperience": [
-                {
-                    "StartTime": "2023/01/01",
-                    "EndTime": "至今",
-                    "ProjectName": "xxx1项目",
-                    "ProjectRole": "项目经理",
-                    "JobDescription": "负责项目整体规划与实施。"
-                },
-                {
-                    "StartTime": "2022/01/01",
-                    "EndTime": "2022/12/31",
-                    "ProjectName": "xxx2项目",
-                    "ProjectRole": "开发工程师",
-                    "JobDescription": "参与项目开发与测试。"
-                }
-            ],
-            "WorkAbility": {
-                "BusinessAbility": "熟练掌握Python、Java等编程语言。",
-                "Certification": "PMP认证",
-                "Training": "敏捷开发培训",
-                "SkillTag": "【测试】"
-            }
-        },
-        "李四": {
-            "BasicInfo": {
-                "Name": "李四",
-                "WorkYears": "5年",
-                "GraduationTime": "2018/06",
-                "GraduationSchool": "清华大学",
-                "Major": "计算机科学与技术",
-                "HighestEducation": "本科",
-                "Department": "技术部",
-                "Title": "高级工程师",
-                "PersonalProfile": "热爱编程，擅长Python和Java。"
-            },
-            "WorkExperience": [
-                {
-                    "StartTime": "2023/01/01",
-                    "EndTime": "至今",
-                    "CompanyName": "xxx1公司",
-                    "Position": "高级开发工程师",
-                    "JobDescription": "负责核心模块开发。"
-                },
-                {
-                    "StartTime": "2022/01/01",
-                    "EndTime": "2022/12/31",
-                    "CompanyName": "xxx2公司",
-                    "Position": "开发工程师",
-                    "JobDescription": "参与项目开发与维护。"
-                }
-            ],
-            "ProjectExperience": [
-                {
-                    "StartTime": "2023/01/01",
-                    "EndTime": "至今",
-                    "ProjectName": "xxx1项目",
-                    "ProjectRole": "项目经理",
-                    "JobDescription": "负责项目整体规划与实施。"
-                },
-                {
-                    "StartTime": "2022/01/01",
-                    "EndTime": "2022/12/31",
-                    "ProjectName": "xxx2项目",
-                    "ProjectRole": "开发工程师",
-                    "JobDescription": "参与项目开发与测试。"
-                }
-            ],
-            "WorkAbility": {
-                "BusinessAbility": "熟练掌握Python、Java等编程语言。",
-                "Certification": "PMP认证",
-                "Training": "敏捷开发培训",
-                "SkillTag": "【测试】"
-            }
-        },
-        "王五": {
-            "BasicInfo": {
-                "Name": "王五",
-                "WorkYears": "2.5年",
-                "GraduationTime": "2018/06",
-                "GraduationSchool": "家里蹲大学",
-                "Major": "计算机科学与技术",
-                "HighestEducation": "本科",
-                "Department": "技术部",
-                "Title": "高级工程师",
-                "PersonalProfile": "热爱编程，擅长Python和Java。"
-            },
-            "WorkExperience": [
-                {
-                    "StartTime": "2023/01/01",
-                    "EndTime": "至今",
-                    "CompanyName": "xxx1公司",
-                    "Position": "高级开发工程师",
-                    "JobDescription": "负责核心模块开发。"
-                },
-                {
-                    "StartTime": "2022/01/01",
-                    "EndTime": "2022/12/31",
-                    "CompanyName": "xxx2公司",
-                    "Position": "开发工程师",
-                    "JobDescription": "参与项目开发与维护。"
-                }
-            ],
-            "ProjectExperience": [
-                {
-                    "StartTime": "2023/01/01",
-                    "EndTime": "至今",
-                    "ProjectName": "xxx1项目",
-                    "ProjectRole": "项目经理",
-                    "JobDescription": "负责项目整体规划与实施。"
-                },
-                {
-                    "StartTime": "2022/01/01",
-                    "EndTime": "2022/12/31",
-                    "ProjectName": "xxx2项目",
-                    "ProjectRole": "开发工程师",
-                    "JobDescription": "参与项目开发与测试。"
-                }
-            ],
-            "WorkAbility": {
-                "BusinessAbility": "熟练掌握Python、Java等编程语言。",
-                "Certification": "PMP认证",
-                "Training": "敏捷开发培训",
-                "SkillTag": "【测试】"
-            }
-        }
-    }
-    """
+    json_data = "template.json"
 
     # 模板文件路径
     template_path = "人员简历_模板.docx"
