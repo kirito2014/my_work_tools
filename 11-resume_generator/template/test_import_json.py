@@ -91,7 +91,7 @@ def process_json_data(json_data, template_path, output_folder, person_names="all
 # 示例调用
 if __name__ == "__main__":
     # 示例JSON数据
-    json_data = "template.json"
+    json_data = "result.json"
 
     # 模板文件路径
     template_path = "人员简历_模板.docx"
@@ -104,4 +104,4 @@ if __name__ == "__main__":
     #process_json_data(json_data, template_path, output_folder, person_names="all")
 
     # 示例2: 处理指定人员
-    process_json_data(json_data, template_path, output_folder, person_names=["李四", "王五"])
+    process_json_data(json_data, template_path, output_folder, person_names="all")

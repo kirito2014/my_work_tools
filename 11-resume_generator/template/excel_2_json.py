@@ -1,6 +1,7 @@
 import pandas as pd
 import json
 from datetime import datetime
+import test_import_json as tj
 
 def clean_data(value):
     """清洗数据，去除空值和无效数据。"""
@@ -74,15 +75,53 @@ def extract_experience(rows, prefix):
     return experience
 
 def convert_to_json(person_data, rows):
-    """转换为JSON结构。"""
-    json_data = {
+    """转换为JSON结构"""
+    def format_education(prefix):
+        """提取单个学历信息"""
+        date = format_date(person_data.get(f"{prefix}-毕业日期"))
+        school = clean_data(person_data.get(f"{prefix}-毕业学校"))
+        major = clean_data(person_data.get(f"{prefix}-专业"))
+        return (date, school, major)
+
+    # 提取各学历层级数据
+    edu_data = {
+        "最高学历": format_education("基本情况-最高学历"),
+        "第一学历": format_education("基本情况-第一学历"),
+        "第二学历": format_education("基本情况-第2学历"),
+        "第三学历": format_education("基本情况-第3学历")
+    }
+
+    # 处理每个字段的格式化逻辑
+    def process_field(field_type):
+        """通用字段处理逻辑"""
+        highest_value = edu_data["最高学历"][["date", "school", "major"].index(field_type)]
+        results = []
+        
+        # 添加最高学历（始终存在）
+        if highest_value:
+            results.append(f"【最高学历】{highest_value}")
+        
+        # 添加其他学历
+        for level in ["第一学历", "第二学历", "第三学历"]:
+            value = edu_data[level][["date", "school", "major"].index(field_type)]
+            if value and value != highest_value:
+                results.append(f"【{level}】{value}")
+        
+        return "\n".join(results) if results else None
+
+    # 构建最终字段
+    graduation_time = process_field("date")
+    graduation_school = process_field("school")
+    major = process_field("major")
+
+    return {
         "BasicInfo": {
             "Name": person_data.get("基本情况-姓名"),
             "WorkYears": person_data.get("基本情况-工作年限"),
-            "HighestEducation": person_data.get("基本情况-最高学历"),
-            "GraduationTime": format_date(person_data.get("基本情况-最高学历-毕业日期")),
-            "GraduationSchool": person_data.get("基本情况-最高学历-毕业学校"),
-            "Major": person_data.get("基本情况-最高学历-专业"),
+            "HighestEducation": clean_data(person_data.get("基本情况-最高学历")),
+            "GraduationTime": graduation_time,
+            "GraduationSchool": graduation_school,
+            "Major": major,
             "Department": person_data.get("基本情况-部门"),
             "Title": person_data.get("基本情况-职称"),
             "PersonalProfile": person_data.get("基本情况-个人简介")
@@ -96,7 +135,6 @@ def convert_to_json(person_data, rows):
             "SkillTag": person_data.get("技能标签")
         }
     }
-    return json_data
 
 def process_excel_to_json(file_path, sheet_name="数据来源"):
     """处理Excel文件并转换为JSON。"""
@@ -133,7 +171,19 @@ def process_excel_to_json(file_path, sheet_name="数据来源"):
 
 # 示例调用
 if __name__ == "__main__":
-    file_path = r"D:\github\11-resume_generator\template\人员简历汇总_20241103.xlsx"
+    file_path = "人员简历汇总_20241103.xlsx"
+    # 模板文件路径
+    template_path = "人员简历_模板.docx"
+    result_json = "result.json"
+
+    # 输出文件夹路径
+    output_folder = "output_resumes"
     result = process_excel_to_json(file_path)
+    
     if result:
-        print(json.dumps(result, ensure_ascii=False, indent=4))
+        # 将结果写入 result.json
+        with open('result.json', 'w', encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False, indent=4)
+        print("结果已保存至 result.json")
+    else:
+        print("未生成有效数据")
