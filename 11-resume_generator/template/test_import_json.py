@@ -1,7 +1,14 @@
-import os
+import os,sys
 import json
 from datetime import datetime
 from docxtpl import DocxTemplate
+
+# 导入 Excel 转 JSON 的模块（需确保两个文件在同一目录）
+try:
+    import excel_2_json as ej
+except ImportError:
+    print("错误: 未找到 excel_2_json.py 文件")
+    sys.exit(1)
 
 def generate_resume_from_json(person_data, template_path, output_folder, person_name):
     """
@@ -51,57 +58,88 @@ def create_output_folder(output_folder):
     else:
         print(f"输出文件夹已存在: {output_folder}")
 
-def process_json_data(json_data, template_path, output_folder, person_names="all"):
+def process_json_data(json_data, template_path, input_file,output_folder, person_names="all"):
     """
-    处理JSON数据，生成简历文档。
-
-    :param json_data: 包含人员信息的JSON字符串。
-    :param template_path: Word模板文件路径。
-    :param output_folder: 输出文件夹路径。
-    :param person_names: 需要处理的人员名称列表或"all"。
-    :return: None
+    修改后的处理函数：
+    1. 自动检测 JSON 文件是否存在
+    2. 若不存在则调用 Excel 转 JSON 逻辑
+    3. 新增错误处理和进度提示
     """
     try:
-        # 解析JSON数据
-        with open(json_data, 'r',encoding='utf-8') as f:
-            data = json.load(f)
+        # 第一步：检查 JSON 文件是否存在
+        if not os.path.exists(json_data):
+            print(f"检测到 {json_data} 不存在，开始自动生成...")
+            
+            # 第二步：调用 Excel 转 JSON 逻辑
+            
+            if not os.path.exists(input_file):
+                print(f"错误: 未找到Excel源文件 {input_file}")
+                return
+            
+            print(f"正在处理Excel文件: {input_file}")
+            result = ej.process_excel_to_json(input_file)
+            
+            if not result:
+                print("错误: Excel 转换 JSON 失败")
+                return
+                
+            # 第三步：保存生成的 JSON
+            with open(json_data, 'w', encoding='utf-8') as f:
+                json.dump(result, f, ensure_ascii=False, indent=4)
+            print(f"已生成 JSON 文件: {json_data}")
 
-            # 如果JSON为空，打印错误并退出
+        # 第四步：读取 JSON 数据
+        with open(json_data, 'r', encoding='utf-8') as f:
+            data = json.load(f)
             if not data:
-                print("错误: JSON数据为空。")
+                print("错误: JSON 数据为空")
                 return
 
-            # 如果传入"all"，处理所有人员
+            # 第五步：处理人员名单逻辑
             if person_names == "all":
                 person_names = list(data.keys())
+                
+            # 第六步：创建输出文件夹
+            create_output_folder(output_folder)
 
-            # 遍历每个人员
+            # 第七步：遍历生成简历
+            success_count = 0
             for person_name in person_names:
                 if person_name in data:
-                    person_data = data[person_name]
-                    generate_resume_from_json(person_data, template_path, output_folder, person_name)
+                    output_path = generate_resume_from_json(
+                        data[person_name],
+                        template_path,
+                        output_folder,
+                        person_name
+                    )
+                    if output_path: success_count += 1
                 else:
-                    print(f"错误: 未找到人员 '{person_name}' 的数据。")
+                    print(f"警告: 跳过未找到的人员 - {person_name}")
 
-    except json.JSONDecodeError:
-        print("错误: JSON数据格式不正确。")
+            # 最终统计
+            print("\n处理完成！")
+            print(f"成功生成 {success_count}/{len(person_names)} 份简历")
+            print(f"输出目录: {os.path.abspath(output_folder)}")
+
     except Exception as e:
-        print(f"处理JSON数据时出错: {e}")
+        print(f"处理过程中发生严重错误: {str(e)}")
+        sys.exit(1)
 
 # 示例调用
 if __name__ == "__main__":
-    # 示例JSON数据
-    json_data = "result.json"
+    # 配置文件路径
+    config = {
+        "json_file": "result.json",          # JSON 文件路径
+        "template_file": "人员简历_模板.docx",  # 模板文件路径
+        "output_dir": "output_resumes",       # 输出文件夹
+        "input_file": "人员简历汇总_20241103.xlsx"    # Excel 文件路径
+    }
 
-    # 模板文件路径
-    template_path = "人员简历_模板.docx"
-
-    # 输出文件夹路径
-    output_folder = "output_resumes"
-
-    # 调用函数生成简历
-    # 示例1: 处理所有人员
-    #process_json_data(json_data, template_path, output_folder, person_names="all")
-
-    # 示例2: 处理指定人员
-    process_json_data(json_data, template_path, output_folder, person_names="all")
+    # 自动处理流程
+    process_json_data(
+        json_data=config["json_file"],
+        template_path=config["template_file"],
+        input_file=config["input_file"],
+        output_folder=config["output_dir"],
+        person_names="all"  # 可改为 ["张三", "李四"] 指定特定人员
+    )
