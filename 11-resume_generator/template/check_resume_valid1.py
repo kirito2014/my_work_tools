@@ -2,7 +2,7 @@
 import pandas as pd
 import os,sys,re
 import json
-from datetime import datetime
+from datetime import datetime,timedelta
 import argparse
 from dateutil.relativedelta import relativedelta
 import excel_2_json as ej
@@ -17,8 +17,13 @@ def parse_date(date_str, is_graduation=False):
     # 处理结束时间为"至今"的情况
     if cleaned_str == "至今":
         return datetime.now()
-    
     try:
+        # 解析为当月第一天
+        #date_obj = datetime.strptime(date_str, "%Y/%m")
+        # 计算当月最后一天
+        #next_month = date_obj.replace(day=28) + timedelta(days=4)
+        #return next_month - timedelta(days=next_month.day)
+
         if is_graduation:
             return datetime.strptime(cleaned_str, "%Y年%m月")
         return datetime.strptime(cleaned_str, "%Y/%m")
@@ -45,7 +50,9 @@ def validate_work_experience(work_exp):
         # 时间顺序校验（当两个日期都有效时）
         if start and end and start > end:
             errors.append(f"【重要】工作经历第{idx}段开始时间晚于结束时间")
-    
+
+    # 工作经历日期重叠校验
+    errors += validate_work_period_overlap(work_exp)
     return errors
 
 def validate_project_experience(proj_exp, work_exp):
@@ -70,39 +77,235 @@ def validate_project_experience(proj_exp, work_exp):
         if start and end and start > end:
             errors.append(f"【重要】项目经历第{idx}段开始时间晚于结束时间")
         
-        # 增强版跨公司项目校验
-        if proj["ProjectName"] in project_map:
-            current_company = proj.get("CompanyName", "未知公司")
-            start = parse_date(proj["StartTime"])
-            end = parse_date(proj["EndTime"]) or datetime.now()  # 处理"至今"为当前时间
-            
-            for record in project_map[proj["ProjectName"]]:
+        # 精确化时间处理
+        start = parse_date(proj["StartTime"])
+        end = parse_date(proj["EndTime"]) or datetime.now()
+        current_company = proj.get("CompanyName", "未知公司").strip()
+        
+        # 标准化项目名称（去除空格和特殊字符）
+        project_name = re.sub(r'\W+', '', proj["ProjectName"].lower().strip())
+        
+        if project_name in project_map:
+            for record in project_map[project_name]:
                 company, s, e = record
-                e = e or datetime.now()  # 处理历史记录中的"至今"
+                e = e or datetime.now()  # 处理历史记录的"至今"
                 
-                # 时间重叠判断逻辑优化
+                # 精确时间重叠判断（包含边界）
                 overlap_condition = (
                     (start <= e) and  # 当前开始 <= 历史结束
-                    (end >= s)    # 当前结束 >= 历史开始
-                )
-                if current_company != company and overlap_condition:
-                    # 格式化时间显示
-                    fmt = lambda d: d.strftime("%Y/%m") if d else "至今"
-                    error_msg = (
-                        f"【重要】跨公司项目时间冲突：项目'{proj['ProjectName']}'\n"
-                        f"- 当前记录：{current_company} ({fmt(start)}~{fmt(end)})\n"
-                        f"- 冲突记录：{company} ({fmt(s)}~{fmt(e)})"
+                    (end >= s)       # 当前结束 >= 历史开始
+                ) and current_company != company.strip()
+                
+                if overlap_condition:
+                    # 格式化时间显示（精确到月）
+                    fmt = lambda d: d.strftime("%Y/%m") if isinstance(d, datetime) else str(d)
+                    error_details = (
+                        f"【重要】跨公司项目时间冲突检测：\n"
+                        f"项目名称：{proj['ProjectName']}\n"
+                        f"当前记录：{current_company} ({fmt(start)} ~ {fmt(end)})\n"
+                        f"冲突记录：{company} ({fmt(s)} ~ {fmt(e)})\n"
+                        f"重叠时段：{max(start, s).strftime('%Y/%m')} ~ {min(end, e).strftime('%Y/%m')}"
                     )
-                    errors.append(error_msg)
+                    errors.append(error_details)
 
-        # 记录当前项目信息（包含公司名称和时间范围）
-        project_map.setdefault(proj["ProjectName"], []).append((
-            proj.get("CompanyName", "未知公司"),
-            parse_date(proj["StartTime"]),
-            parse_date(proj["EndTime"])
+        # 存储标准化后的项目信息
+        project_map.setdefault(project_name, []).append((
+            current_company,
+            start,
+            end
+        ))
+        # 新增跨工作经历校验
+    errors += validate_cross_work_projects(work_exp, proj_exp)
+    errors += validate_proj_period_overlap(proj_exp)
+
+    return errors
+def validate_cross_work_projects(work_exp, proj_exp):
+    """改进的跨工作时间校验（精确边界判断）"""
+    errors = []
+
+    # 构建工作时间轴（转换为月份数值）
+    work_periods = []
+    for work in work_exp:
+        start = parse_date(work["StartTime"])
+        end = parse_date(work["EndTime"]) or datetime.now()
+        if not start or not end:
+            continue
+        end_tuple = (end.year, end.month) if end != datetime.now() else (9999, 12)
+        work_periods.append({
+            "company": work["CompanyName"].strip(),
+            "start": (start.year, start.month),
+            "end": end_tuple
+        })
+
+    # 校验每个项目
+    for proj in proj_exp:
+        proj_start = parse_date(proj["StartTime"])
+        proj_end = parse_date(proj["EndTime"]) or datetime.now()
+        company = proj.get("CompanyName", "").strip()
+        if not proj_start or not proj_end:
+            continue
+
+        proj_start_tuple = (proj_start.year, proj_start.month)
+        proj_end_tuple = (proj_end.year, proj_end.month) if proj_end != datetime.now() else (9999, 12)
+
+        # 智能匹配所属工作经历
+        matched_work = None
+        for work in work_periods:
+            # 判断是否有时间重叠
+            if not (proj_end_tuple < work["start"] or proj_start_tuple > work["end"]):
+                matched_work = work
+                break  # 优先匹配第一个重叠的工作经历
+
+        if not matched_work:
+            errors.append(f"【警告】游离项目：{proj['ProjectName']} 未匹配任何工作经历")
+            continue
+
+        # 精确边界校验
+        error_parts = []
+        if proj_start_tuple < matched_work["start"]:
+            error_parts.append(f"开始时间早于工作经历 {matched_work['company']} 的开始")
+        if proj_end_tuple > matched_work["end"]:
+            error_parts.append(f"结束时间晚于工作经历 {matched_work['company']} 的结束")
+
+        if error_parts:
+            error_msg = (
+                f"【重要】项目时间越界：{proj['ProjectName']}\n"
+                f"项目时间：{format_date_tuple(proj_start_tuple)}~{format_date_tuple(proj_end_tuple)}\n"
+                f"所属工作：{matched_work['company']} ({format_date_tuple(matched_work['start'])}~{format_date_tuple(matched_work['end'])})\n"
+                f"违规类型：{'，'.join(error_parts)}"
+            )
+            errors.append(error_msg)
+
+    return errors
+
+
+def format_date_tuple(date_tuple):
+    if date_tuple[0] == 9999:
+        return "至今"
+    return f"{date_tuple[0]}/{date_tuple[1]:02d}"
+
+# 辅助函数
+# def standardize_name(name):
+#     """标准化项目名称"""
+#     return re.sub(r'\W+', '', name.lower().strip())
+
+# def has_overlap(start1, end1, start2, end2):
+#     """判断两个时间段是否重叠（精确到天）"""
+#     return (start1 <= end2) and (end1 >= start2)
+
+# def format_conflict(current, other, original_name):
+#     """格式化冲突信息"""
+#     fmt_date = lambda d: d.strftime("%Y/%m")
+#     overlap_start = max(current["proj_start"], other["proj_start"])
+#     overlap_end = min(current["proj_end"], other["proj_end"])
+    
+#     return (
+#         f"【重要】跨工作项目冲突检测：\n"
+#         f"项目名称：{original_name}\n"
+#         f"冲突时段：{fmt_date(overlap_start)}~{fmt_date(overlap_end)}\n"
+#         f"- {current['company']} 工作期间：{fmt_date(current['work_start'])}~{fmt_date(current['work_end'])}\n"
+#         f"  项目时段：{fmt_date(current['proj_start'])}~{fmt_date(current['proj_end'])}\n"
+#         f"- {other['company']} 工作期间：{fmt_date(other['work_start'])}~{fmt_date(other['work_end'])}\n"
+#         f"  项目时段：{fmt_date(other['proj_start'])}~{fmt_date(other['proj_end'])}"
+#     )
+
+def validate_work_period_overlap(work_exp):
+    """改进的工作经历时间段重叠校验（排除衔接情况）"""
+    errors = []
+    periods = []
+    
+    # 转换时间段为日期对象
+    for idx, exp in enumerate(work_exp, 1):
+        start = parse_date(exp["StartTime"])
+        end = parse_date(exp["EndTime"]) or datetime.now()
+        
+        if not start or not end:
+            continue
+        
+        periods.append((
+            idx,
+            start,
+            end,
+            exp["CompanyName"]
         ))
     
+    # 双重循环检测实际重叠
+    for i in range(len(periods)):
+        for j in range(i+1, len(periods)):
+            idx_a, s_a, e_a, name_a = periods[i]
+            idx_b, s_b, e_b, name_b = periods[j]
+            
+            # 排除边界衔接的情况（前一段的结束=后一段的开始）
+            if e_a == s_b or e_b == s_a:
+                continue
+                
+            # 判断核心重叠逻辑（直接使用日期对象）
+            if has_overlap(s_a, e_a, s_b, e_b):
+                # 转换回可读格式
+                fmt = lambda d: d.strftime("%Y/%m") if d != datetime.now() else "至今"
+                overlap_start = max(s_a, s_b)
+                overlap_end = min(e_a, e_b)
+                
+                error_msg = (
+                    f"【重要】工作经历时间段冲突：\n"
+                    f"➤ 第{idx_a}段 {name_a} ({fmt(s_a)}~{fmt(e_a)})\n"
+                    f"➤ 第{idx_b}段 {name_b} ({fmt(s_b)}~{fmt(e_b)})\n"
+                    f"重叠时段：{fmt(overlap_start)}～{fmt(overlap_end)}"
+                )
+                errors.append(error_msg)
+    
     return errors
+
+def validate_proj_period_overlap(prj_exp):
+    """项目经历时间段重叠校验（排除衔接情况）"""
+    errors = []
+    periods = []
+    
+    # 转换时间段为日期对象
+    for idx, exp in enumerate(prj_exp, 1):
+        start = parse_date(exp["StartTime"])
+        end = parse_date(exp["EndTime"]) or datetime.now()
+        
+        if not start or not end:
+            continue
+        
+        periods.append((
+            idx,
+            start,
+            end,
+            exp["ProjectName"]
+        ))
+    
+    # 双重循环检测实际重叠
+    for i in range(len(periods)):
+        for j in range(i+1, len(periods)):
+            idx_a, s_a, e_a, name_a = periods[i]
+            idx_b, s_b, e_b, name_b = periods[j]
+            
+            # 排除边界衔接的情况（前一段的结束=后一段的开始）
+            if e_a == s_b or e_b == s_a:
+                continue
+                
+            # 判断核心重叠逻辑（直接使用日期对象）
+            if has_overlap(s_a, e_a, s_b, e_b):
+                # 转换回可读格式
+                fmt = lambda d: d.strftime("%Y/%m") if d != datetime.now() else "至今"
+                overlap_start = max(s_a, s_b)
+                overlap_end = min(e_a, e_b)
+                
+                error_msg = (
+                    f"【重要】项目经历时间段冲突：\n"
+                    f"➤ 第{idx_a}段 {name_a} ({fmt(s_a)}~{fmt(e_a)})\n"
+                    f"➤ 第{idx_b}段 {name_b} ({fmt(s_b)}~{fmt(e_b)})\n"
+                    f"重叠时段：{fmt(overlap_start)}～{fmt(overlap_end)}"
+                )
+                errors.append(error_msg)
+    
+    return errors
+
+def has_overlap(start1, end1, start2, end2):
+    """判断两个时间段是否重叠（精确到天）"""
+    return (start1 < end2) and (start2 < end1)
 
 def validate_education(person_data):
     """学历信息校验"""
@@ -168,46 +371,7 @@ def validate_work_years(person_data, work_exp):
         errors.append(f"【重要】工作年限({work_years:.0f}年)与最早工作日期推算({delta:.0f}年)不符")
     
     return errors
-# def validate_work_years(person_data, work_exp):
-#     """工作年限校验"""
-#     try:
-#         # 将工作年限中的"年"去掉，并转换为浮点数
-#         work_years = float(person_data["BasicInfo"]["WorkYears"].replace("年",""))
-#     except:
-#         # 如果转换失败，返回错误信息
-#         return ["【重要】工作年限格式错误"]
-    
-#     #获取当前日期yyyy/mm/dd
 
-#     current_date = datetime.now()
-#     #print(ej.format_date(current_date))
-#     # 获取最早的工作日期
-#     earliest_work = min([parse_date(exp["StartTime"]) for exp in work_exp if parse_date(exp["StartTime"])])
-#     #print(ej.format_date(earliest_work))
-#     # 获取毕业时间 将yyyy年月转换成datetime对象
-#     grad_date = parse_date(person_data["BasicInfo"]["GraduationTime"], True)
-#     #print(grad_date)
-
-#     # 计算工作年限
-#     work_years_calculated = (current_date - earliest_work).days / 365
-#     print(work_years_calculated)
-#     print(work_years)
-    
-#     # 如果毕业时间和最早工作日期都存在
-#     if work_years and earliest_work:
-#         print(1111)
-#         # 如果毕业时间晚于最早工作日期，返回错误信息
-#         if grad_date > earliest_work:
-#             return ["【重要】最早工作日期早于毕业时间"]
-        
-#         # 计算毕业时间和最早工作日期之间的年数差
-#         delta = relativedelta(earliest_work, grad_date).years
-#         # 如果工作年限和毕业时间推算的年数差超过1年，返回错误信息
-#         if abs(work_years - work_years_calculated) > 1:
-#             return [f"【重要】工作年限({work_years}年)与毕业时间推算({work_years_calculated}年)不符"]
-    
-#     # 如果没有错误，返回空列表
-#     return []
 
 def generate_check_results(data_source):
     """生成校验结果"""
