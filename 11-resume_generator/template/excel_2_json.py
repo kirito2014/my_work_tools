@@ -10,11 +10,16 @@ def clean_data(value):
     return str(value).strip() if isinstance(value, str) else value
 
 def format_date(date_str):
-    """格式化日期为YYYY/MM格式。"""
+    """格式化日期为YYYY/MM格式，处理'至今'情况。"""
     if not date_str:
         return None
+    # 去除首尾空格并处理"至今"的情况
+    cleaned_str = str(date_str).strip()
+    if cleaned_str == "至今":
+        return cleaned_str
+    
     try:
-        date_obj = pd.to_datetime(date_str, errors="coerce")
+        date_obj = pd.to_datetime(cleaned_str, errors="coerce")
         if pd.isna(date_obj):
             return None
         return date_obj.strftime("%Y/%m")
@@ -72,13 +77,16 @@ def extract_experience(rows, prefix):
                 }
             experience.append(entry)
         block_num += 1
+    # 按StartTime降序排序（时间最近的在前）
+    experience.sort(key=lambda x: datetime.strptime(x["StartTime"], "%Y/%m") if x["StartTime"] else datetime.min, reverse=True)
+    
     return experience
 
 def convert_to_json(person_data, rows):
     """转换为JSON结构"""
     def format_education(prefix):
         """提取单个学历信息"""
-        date = format_date(person_data.get(f"{prefix}-毕业日期"))
+        date = person_data.get(f"{prefix}-毕业日期") #基本信息的日期保留yyyy年xx月的格式
         school = clean_data(person_data.get(f"{prefix}-毕业学校"))
         major = clean_data(person_data.get(f"{prefix}-专业"))
         return (date, school, major)
