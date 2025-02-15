@@ -2,6 +2,7 @@ import pandas as pd
 import json
 from datetime import datetime
 import test_import_json as tj
+from dateutil.relativedelta import relativedelta
 
 def clean_data(value):
     """清洗数据，去除空值和无效数据。"""
@@ -77,8 +78,19 @@ def extract_experience(rows, prefix):
                 }
             experience.append(entry)
         block_num += 1
+    def sort_key(entry):
+        if entry["StartTime"] == "至今":
+            # 将"至今"视为当前日期+100年（确保排序在最前）
+            return datetime.now() + relativedelta(years=100)
+        try:
+            return datetime.strptime(entry["StartTime"], "%Y/%m")
+        except:
+            return datetime.min
+        
+    experience.sort(key=sort_key, reverse=True)
+
     # 按StartTime降序排序（时间最近的在前）
-    experience.sort(key=lambda x: datetime.strptime(x["StartTime"], "%Y/%m") if x["StartTime"] else datetime.min, reverse=True)
+    #experience.sort(key=lambda x: datetime.strptime(x["StartTime"], "%Y/%m") if x["StartTime"] else datetime.min, reverse=True)
     
     return experience
 
