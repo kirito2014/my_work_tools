@@ -120,23 +120,25 @@ def validate_project_experience(proj_exp, work_exp):
 
     return errors
 def validate_cross_work_projects(work_exp, proj_exp):
-    """改进的跨工作时间校验（精确边界判断）"""
+    """改进的跨工作时间校验（精确边界判断及跨公司检测）"""
     errors = []
-
-    # 构建工作时间轴（转换为月份数值）
+    
+    # 构建工作时间轴并排序
     work_periods = []
     for work in work_exp:
         start = parse_date(work["StartTime"])
         end = parse_date(work["EndTime"]) or datetime.now()
         if not start or not end:
             continue
-        end_tuple = (end.year, end.month) if end != datetime.now() else (9999, 12)
         work_periods.append({
             "company": work["CompanyName"].strip(),
             "start": (start.year, start.month),
-            "end": end_tuple
+            "end": (end.year, end.month) if end != datetime.now() else (9999, 12)
         })
-
+    
+    # 按开始时间升序排列工作经历
+    work_periods.sort(key=lambda x: x['start'])
+    
     # 校验每个项目
     for proj in proj_exp:
         proj_start = parse_date(proj["StartTime"])
@@ -144,42 +146,68 @@ def validate_cross_work_projects(work_exp, proj_exp):
         company = proj.get("CompanyName", "").strip()
         if not proj_start or not proj_end:
             continue
-
+        
         proj_start_tuple = (proj_start.year, proj_start.month)
         proj_end_tuple = (proj_end.year, proj_end.month) if proj_end != datetime.now() else (9999, 12)
-
-        # 智能匹配所属工作经历
+        
+        # 查找项目开始时间所属的工作经历
         matched_work = None
         for work in work_periods:
-            # 判断是否有时间重叠
-            if not (proj_end_tuple < work["start"] or proj_start_tuple > work["end"]):
+            if work['start'] <= proj_start_tuple <= work['end']:
                 matched_work = work
-                break  # 优先匹配第一个重叠的工作经历
-
+                break
+        
         if not matched_work:
             errors.append(f"【警告】游离项目：{proj['ProjectName']} 未匹配任何工作经历")
             continue
-
-        # 精确边界校验
+        
+        # 检查时间越界或跨公司
         error_parts = []
-        if proj_start_tuple < matched_work["start"]:
+        if proj_start_tuple < matched_work['start']:
             error_parts.append(f"开始时间早于工作经历 {matched_work['company']} 的开始")
-        if proj_end_tuple > matched_work["end"]:
-            error_parts.append(f"结束时间晚于工作经历 {matched_work['company']} 的结束")
-
+        
+        # 结束时间越界判断
+        if proj_end_tuple > matched_work['end']:
+            # 查找是否有其他公司包含结束时间
+            cross_work = None
+            for work in work_periods:
+                if work is matched_work:
+                    continue
+                if work['start'] <= proj_end_tuple <= work['end']:
+                    cross_work = work
+                    break
+            if cross_work:
+                error_msg = (
+                    f"【重要】项目跨公司：{proj['ProjectName']}\n"
+                    f"项目时间：{format_date_tuple(proj_start_tuple)}~{format_date_tuple(proj_end_tuple)}\n"
+                    f"开始于：{matched_work['company']} ({format_date_tuple(matched_work['start'])}~{format_date_tuple(matched_work['end'])})\n"
+                    f"结束于：{cross_work['company']} ({format_date_tuple(cross_work['start'])}~{format_date_tuple(cross_work['end'])})"
+                )
+                errors.append(error_msg)
+            else:
+                error_msg = (
+                    f"【重要】项目时间越界：{proj['ProjectName']}\n"
+                    f"项目时间：{format_date_tuple(proj_start_tuple)}~{format_date_tuple(proj_end_tuple)}\n"
+                    f"所属工作：{matched_work['company']} ({format_date_tuple(matched_work['start'])}~{format_date_tuple(matched_work['end'])})\n"
+                    f"违规类型：结束时间晚于工作经历 {matched_work['company']} 的结束且无后续工作经历"
+                )
+                errors.append(error_msg)
+        elif proj_end_tuple < matched_work['start']:
+            error_parts.append(f"结束时间早于工作经历 {matched_work['company']} 的开始")
+        
         if error_parts:
             error_msg = (
-                f"【重要】项目时间越界：{proj['ProjectName']}\n"
+                f"【重要】项目时间异常：{proj['ProjectName']}\n"
                 f"项目时间：{format_date_tuple(proj_start_tuple)}~{format_date_tuple(proj_end_tuple)}\n"
                 f"所属工作：{matched_work['company']} ({format_date_tuple(matched_work['start'])}~{format_date_tuple(matched_work['end'])})\n"
-                f"违规类型：{'，'.join(error_parts)}"
+                f"异常原因：{'，'.join(error_parts)}"
             )
             errors.append(error_msg)
-
+    
     return errors
 
-
 def format_date_tuple(date_tuple):
+    """格式化月份元组"""
     if date_tuple[0] == 9999:
         return "至今"
     return f"{date_tuple[0]}/{date_tuple[1]:02d}"
