@@ -70,14 +70,37 @@ def validate_project_experience(proj_exp, work_exp):
         if start and end and start > end:
             errors.append(f"【重要】项目经历第{idx}段开始时间晚于结束时间")
         
-        # 跨公司项目校验
+        # 增强版跨公司项目校验
         if proj["ProjectName"] in project_map:
-            for company, s, e in project_map[proj["ProjectName"]]:
-                if (start < e) and (end > s):
-                    errors.append(f"【重要】跨公司项目时间冲突：'{proj['ProjectName']}'在{company}的时间重叠")
-        project_map.setdefault(proj["ProjectName"], []).append(
-            (proj.get("CompanyName","未知公司"), start, end)
-        )
+            current_company = proj.get("CompanyName", "未知公司")
+            start = parse_date(proj["StartTime"])
+            end = parse_date(proj["EndTime"]) or datetime.now()  # 处理"至今"为当前时间
+            
+            for record in project_map[proj["ProjectName"]]:
+                company, s, e = record
+                e = e or datetime.now()  # 处理历史记录中的"至今"
+                
+                # 时间重叠判断逻辑优化
+                overlap_condition = (
+                    (start <= e) and  # 当前开始 <= 历史结束
+                    (end >= s)    # 当前结束 >= 历史开始
+                )
+                if current_company != company and overlap_condition:
+                    # 格式化时间显示
+                    fmt = lambda d: d.strftime("%Y/%m") if d else "至今"
+                    error_msg = (
+                        f"【重要】跨公司项目时间冲突：项目'{proj['ProjectName']}'\n"
+                        f"- 当前记录：{current_company} ({fmt(start)}~{fmt(end)})\n"
+                        f"- 冲突记录：{company} ({fmt(s)}~{fmt(e)})"
+                    )
+                    errors.append(error_msg)
+
+        # 记录当前项目信息（包含公司名称和时间范围）
+        project_map.setdefault(proj["ProjectName"], []).append((
+            proj.get("CompanyName", "未知公司"),
+            parse_date(proj["StartTime"]),
+            parse_date(proj["EndTime"])
+        ))
     
     return errors
 
