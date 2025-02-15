@@ -95,7 +95,7 @@ def validate_education(person_data):
             errors.append(f"【重要】{level}填写了毕业时间但未填写学校")
     
     return errors
-def validate_work_years1(person_data, work_exp):
+def validate_work_years(person_data, work_exp):
     """工作年限校验（改进版）"""
     def extract_highest_education_date(grad_time_str):
         """提取最高学历日期"""
@@ -145,46 +145,46 @@ def validate_work_years1(person_data, work_exp):
         errors.append(f"【重要】工作年限({work_years:.0f}年)与最早工作日期推算({delta:.0f}年)不符")
     
     return errors
-def validate_work_years(person_data, work_exp):
-    """工作年限校验"""
-    try:
-        # 将工作年限中的"年"去掉，并转换为浮点数
-        work_years = float(person_data["BasicInfo"]["WorkYears"].replace("年",""))
-    except:
-        # 如果转换失败，返回错误信息
-        return ["【重要】工作年限格式错误"]
+# def validate_work_years(person_data, work_exp):
+#     """工作年限校验"""
+#     try:
+#         # 将工作年限中的"年"去掉，并转换为浮点数
+#         work_years = float(person_data["BasicInfo"]["WorkYears"].replace("年",""))
+#     except:
+#         # 如果转换失败，返回错误信息
+#         return ["【重要】工作年限格式错误"]
     
-    #获取当前日期yyyy/mm/dd
+#     #获取当前日期yyyy/mm/dd
 
-    current_date = datetime.now()
-    #print(ej.format_date(current_date))
-    # 获取最早的工作日期
-    earliest_work = min([parse_date(exp["StartTime"]) for exp in work_exp if parse_date(exp["StartTime"])])
-    #print(ej.format_date(earliest_work))
-    # 获取毕业时间 将yyyy年月转换成datetime对象
-    grad_date = parse_date(person_data["BasicInfo"]["GraduationTime"], True)
-    #print(grad_date)
+#     current_date = datetime.now()
+#     #print(ej.format_date(current_date))
+#     # 获取最早的工作日期
+#     earliest_work = min([parse_date(exp["StartTime"]) for exp in work_exp if parse_date(exp["StartTime"])])
+#     #print(ej.format_date(earliest_work))
+#     # 获取毕业时间 将yyyy年月转换成datetime对象
+#     grad_date = parse_date(person_data["BasicInfo"]["GraduationTime"], True)
+#     #print(grad_date)
 
-    # 计算工作年限
-    work_years_calculated = (current_date - earliest_work).days / 365
-    print(work_years_calculated)
-    print(work_years)
+#     # 计算工作年限
+#     work_years_calculated = (current_date - earliest_work).days / 365
+#     print(work_years_calculated)
+#     print(work_years)
     
-    # 如果毕业时间和最早工作日期都存在
-    if work_years and earliest_work:
-        print(1111)
-        # 如果毕业时间晚于最早工作日期，返回错误信息
-        if grad_date > earliest_work:
-            return ["【重要】最早工作日期早于毕业时间"]
+#     # 如果毕业时间和最早工作日期都存在
+#     if work_years and earliest_work:
+#         print(1111)
+#         # 如果毕业时间晚于最早工作日期，返回错误信息
+#         if grad_date > earliest_work:
+#             return ["【重要】最早工作日期早于毕业时间"]
         
-        # 计算毕业时间和最早工作日期之间的年数差
-        delta = relativedelta(earliest_work, grad_date).years
-        # 如果工作年限和毕业时间推算的年数差超过1年，返回错误信息
-        if abs(work_years - work_years_calculated) > 1:
-            return [f"【重要】工作年限({work_years}年)与毕业时间推算({work_years_calculated}年)不符"]
+#         # 计算毕业时间和最早工作日期之间的年数差
+#         delta = relativedelta(earliest_work, grad_date).years
+#         # 如果工作年限和毕业时间推算的年数差超过1年，返回错误信息
+#         if abs(work_years - work_years_calculated) > 1:
+#             return [f"【重要】工作年限({work_years}年)与毕业时间推算({work_years_calculated}年)不符"]
     
-    # 如果没有错误，返回空列表
-    return []
+#     # 如果没有错误，返回空列表
+#     return []
 
 def generate_check_results(data_source):
     """生成校验结果"""
@@ -196,7 +196,7 @@ def generate_check_results(data_source):
         # 基本信息校验
         errors += validate_education(person_data)
         #errors += validate_work_years(person_data, person_data["WorkExperience"])
-        errors += validate_work_years1(person_data, person_data["WorkExperience"])
+        errors += validate_work_years(person_data, person_data["WorkExperience"])
         
         # 工作经历校验
         errors += validate_work_experience(person_data["WorkExperience"])
