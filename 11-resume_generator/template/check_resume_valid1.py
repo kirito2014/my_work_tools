@@ -150,10 +150,10 @@ def validate_cross_work_projects(work_exp, proj_exp):
         proj_start_tuple = (proj_start.year, proj_start.month)
         proj_end_tuple = (proj_end.year, proj_end.month) if proj_end != datetime.now() else (9999, 12)
         
-        # 查找项目开始时间所属的工作经历
+        # 查找项目开始时间所属的工作经历（使用左闭右开区间）
         matched_work = None
         for work in work_periods:
-            if work['start'] <= proj_start_tuple <= work['end']:
+            if work['start'] <= proj_start_tuple < work['end']:  # 修改为左闭右开区间
                 matched_work = work
                 break
         
@@ -173,7 +173,7 @@ def validate_cross_work_projects(work_exp, proj_exp):
             for work in work_periods:
                 if work is matched_work:
                     continue
-                if work['start'] <= proj_end_tuple <= work['end']:
+                if work['start'] <= proj_end_tuple < work['end']:  # 同样使用左闭右开区间
                     cross_work = work
                     break
             if cross_work:
