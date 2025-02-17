@@ -145,7 +145,7 @@ def convert_to_json(person_data, rows):
     return {
         "BasicInfo": {
             "Name": person_data.get("基本情况-姓名"),
-            "WorkYears": person_data.get("基本情况-工作年限"),
+            "WorkYears": person_data.get("基本情况-工作年限").replace("年",""),
             "HighestEducation": clean_data(person_data.get("基本情况-最高学历")),
             "GraduationTime": graduation_time,
             "GraduationSchool": graduation_school,
@@ -157,10 +157,10 @@ def convert_to_json(person_data, rows):
         "WorkExperience": extract_experience(rows, "工作经历"),
         "ProjectExperience": extract_experience(rows, "项目经历"),
         "WorkAbility": {
-            "BusinessAbility": person_data.get("业务与技术能力详述"),
-            "Certification": '' if person_data.get("资质认证") == "None" else person_data.get("资质认证") ,
-            "Training": '' if person_data.get("参与培训") == "None" else person_data.get("参与培训"),
-            "SkillTag": '' if person_data.get("技能标签") == "None" else person_data.get("技能标签")
+            "BusinessAbility": person_data.get("业务与技术能力详述",""),
+            "Certification": person_data.get("资质认证",""),
+            "Training":  person_data.get("参与培训",""),
+            "SkillTag":  person_data.get("技能标签","") 
         }
     }
 
@@ -199,7 +199,7 @@ def process_excel_to_json(file_path, sheet_name="数据来源"):
 
 # 示例调用
 if __name__ == "__main__":
-    file_path = "人员简历20250217.xlsx"
+    file_path = "人员简历汇总_20241103.xlsx"
     # 模板文件路径
     template_path = "人员简历_模板.docx"
     result_json = "result.json"
