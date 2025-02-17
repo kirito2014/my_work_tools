@@ -339,14 +339,40 @@ def validate_education(person_data):
     """学历信息校验"""
     errors = []
     edu_levels = ["最高学历", "第一学历", "第二学历", "第三学历"]
-    edu_data = {}
     
+    # 提取毕业时间、学校和专业字段
+    grad_time = person_data["BasicInfo"].get("GraduationTime", "")
+    grad_school = person_data["BasicInfo"].get("GraduationSchool", "")
+    major = person_data["BasicInfo"].get("Major", "")
+
+    # 检查每个学历层级的完整性
     for level in edu_levels:
-        grad_date = parse_date(person_data["BasicInfo"].get("GraduationTime"), True)
-        school = person_data["BasicInfo"].get("GraduationSchool")
-        # 学历信息完整性校验
-        if grad_date and not school:
-            errors.append(f"【重要】{level}填写了毕业时间但未填写学校")
+        # 提取当前学历的毕业时间、学校和专业
+        level_grad_time = extract_field_by_level(grad_time, level)
+        level_grad_school = extract_field_by_level(grad_school, level)
+        level_major = extract_field_by_level(major, level)
+
+        # 如果当前学历存在（即毕业时间、学校或专业有值），则检查是否未填写
+        if level_grad_time is not None or level_grad_school is not None or level_major is not None:
+            if level_grad_time == "未填写":
+                errors.append(f"【重要】{level}未填写毕业时间")
+            if level_grad_school == "未填写":
+                errors.append(f"【重要】{level}未填写学校")
+            if level_major == "未填写":
+                errors.append(f"【重要】{level}未填写专业")
+
+    return errors
+
+def extract_field_by_level(field, level):
+    """从字段中提取指定学历层级的值"""
+    if not field:
+        return None
+    # 按行分割字段
+    lines = field.split("\n")
+    for line in lines:
+        if f"【{level}】" in line:
+            return line.replace(f"【{level}】", "").strip()
+    return None
     
     return errors
 def validate_work_years(person_data, work_exp):

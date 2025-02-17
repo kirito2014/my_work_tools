@@ -98,7 +98,7 @@ def convert_to_json(person_data, rows):
     """转换为JSON结构"""
     def format_education(prefix):
         """提取单个学历信息"""
-        date = person_data.get(f"{prefix}-毕业日期") #基本信息的日期保留yyyy年xx月的格式
+        date = person_data.get(f"{prefix}-毕业日期")  # 基本信息的日期保留 yyyy年xx月 的格式
         school = clean_data(person_data.get(f"{prefix}-毕业学校"))
         major = clean_data(person_data.get(f"{prefix}-专业"))
         return (date, school, major)
@@ -117,15 +117,23 @@ def convert_to_json(person_data, rows):
         highest_value = edu_data["最高学历"][["date", "school", "major"].index(field_type)]
         results = []
         
-        # 添加最高学历（始终存在）
+        # 处理最高学历
         if highest_value:
             results.append(f"【最高学历】{highest_value}")
+        else:
+            results.append(f"【最高学历】未填写")
         
-        # 添加其他学历
+        # 处理其他学历
         for level in ["第一学历", "第二学历", "第三学历"]:
             value = edu_data[level][["date", "school", "major"].index(field_type)]
-            if value and value != highest_value:
-                results.append(f"【{level}】{value}")
+            date = edu_data[level][0]  # 当前学历的毕业时间
+            
+            # 如果当前学历的毕业时间与最高学历不同，则视为多学历
+            if date and date != edu_data["最高学历"][0]:
+                if value:  # 如果当前字段有值，则添加到结果中
+                    results.append(f"【{level}】{value}")
+                else:
+                    results.append(f"【{level}】未填写")
         
         return "\n".join(results) if results else None
 
@@ -150,9 +158,9 @@ def convert_to_json(person_data, rows):
         "ProjectExperience": extract_experience(rows, "项目经历"),
         "WorkAbility": {
             "BusinessAbility": person_data.get("业务与技术能力详述"),
-            "Certification": person_data.get("资质认证"),
-            "Training": person_data.get("参与培训"),
-            "SkillTag": person_data.get("技能标签")
+            "Certification": '' if person_data.get("资质认证") == "None" else person_data.get("资质认证") ,
+            "Training": '' if person_data.get("参与培训") == "None" else person_data.get("参与培训"),
+            "SkillTag": '' if person_data.get("技能标签") == "None" else person_data.get("技能标签")
         }
     }
 
@@ -191,7 +199,7 @@ def process_excel_to_json(file_path, sheet_name="数据来源"):
 
 # 示例调用
 if __name__ == "__main__":
-    file_path = "人员简历汇总_20241103.xlsx"
+    file_path = "人员简历20250217.xlsx"
     # 模板文件路径
     template_path = "人员简历_模板.docx"
     result_json = "result.json"
@@ -199,7 +207,7 @@ if __name__ == "__main__":
     # 输出文件夹路径
     output_folder = "output_resumes"
     result = process_excel_to_json(file_path)
-    
+
     if result:
         # 将结果写入 result.json
         with open('result.json', 'w', encoding='utf-8') as f:
