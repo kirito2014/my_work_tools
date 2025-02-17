@@ -212,30 +212,14 @@ def format_date_tuple(date_tuple):
         return "至今"
     return f"{date_tuple[0]}/{date_tuple[1]:02d}"
 
-# 辅助函数
-# def standardize_name(name):
-#     """标准化项目名称"""
-#     return re.sub(r'\W+', '', name.lower().strip())
+# '//////////////////////////项目日期时间校验是否有跨公司日期/////////////////////////////////////////////////////////////'
+# '示例：如A公司任职时间为 2020/10-2021/06 项目时间应该在此时间段中出现如2020/10-2021/09 这样的数据即为跨公司
+# '逻辑实现在每段公司任职时间判断循环中，判断每个项目的开始和结尾是否有交叉
 
-# def has_overlap(start1, end1, start2, end2):
-#     """判断两个时间段是否重叠（精确到天）"""
-#     return (start1 <= end2) and (end1 >= start2)
-
-# def format_conflict(current, other, original_name):
-#     """格式化冲突信息"""
-#     fmt_date = lambda d: d.strftime("%Y/%m")
-#     overlap_start = max(current["proj_start"], other["proj_start"])
-#     overlap_end = min(current["proj_end"], other["proj_end"])
-    
-#     return (
-#         f"【重要】跨工作项目冲突检测：\n"
-#         f"项目名称：{original_name}\n"
-#         f"冲突时段：{fmt_date(overlap_start)}~{fmt_date(overlap_end)}\n"
-#         f"- {current['company']} 工作期间：{fmt_date(current['work_start'])}~{fmt_date(current['work_end'])}\n"
-#         f"  项目时段：{fmt_date(current['proj_start'])}~{fmt_date(current['proj_end'])}\n"
-#         f"- {other['company']} 工作期间：{fmt_date(other['work_start'])}~{fmt_date(other['work_end'])}\n"
-#         f"  项目时段：{fmt_date(other['proj_start'])}~{fmt_date(other['proj_end'])}"
-#     )
+# ' 公司任职时间       |___________|________________________________________|_____________|
+# '                2020/10 A  2021/09                   B              2022/06    C    2022/09
+# '项目实施时间        |___________|___________________________________________|__________|
+# '                2020/10 A1 2021/09                  B1                    2022/07  C1 2022/09
 
 def validate_work_period_overlap(work_exp):
     """改进的工作经历时间段重叠校验（排除衔接情况）"""
