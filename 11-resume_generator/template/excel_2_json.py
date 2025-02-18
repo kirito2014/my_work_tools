@@ -1,5 +1,5 @@
 import pandas as pd
-import json
+import json,re
 from datetime import datetime
 import test_import_json as tj
 from dateutil.relativedelta import relativedelta
@@ -9,7 +9,16 @@ def clean_data(value):
     if pd.isna(value) or value in ["nan", "NaT", "", None]:
         return None
     return str(value).strip() if isinstance(value, str) else value
+def remove_english_characters(input_string):
+    # 使用正则表达式去除英文字符
+    result_string = re.sub(r'[a-zA-Z]', '', input_string)
+    
+    # 去除末尾的数字和点号
+    result_string = re.sub(r'[\d.]$', '', result_string)
 
+    result_string = result_string.replace('.','')
+    
+    return result_string
 def format_date(date_str):
     """格式化日期为YYYY/MM格式，处理'至今'情况。"""
     if not date_str:
@@ -150,7 +159,7 @@ def convert_to_json(person_data, rows):
             "GraduationTime": graduation_time,
             "GraduationSchool": graduation_school,
             "Major": major,
-            "Department": person_data.get("基本情况-部门"),
+            "Department": remove_english_characters(person_data.get("基本情况-部门")),
             "Title": person_data.get("基本情况-职称"),
             "PersonalProfile": person_data.get("基本情况-个人简介")
         },
