@@ -73,6 +73,10 @@ def process_data_dictionary(src_wb: xw.Book, table_name: str) -> pd.DataFrame:
         sheet.api.AutoFilterMode = False  # 清除筛选器
         df = sheet.range('A1').expand('table').options(pd.DataFrame, header=1).value
         df.columns = df.columns.str.strip()
+
+        # 检查并标记包含"CUST_IN_CD"的字段
+        df['is_cust_in_cd'] = df['字段英文名'].str.contains('CUST_IN_CD', case=False)
+        
         return df[df['表英文名'] == table_name.strip()]
     except Exception as e:
         logger.error(f"处理数据字典失败: {str(e)}")
@@ -128,7 +132,29 @@ def generate_field_validation_sql(table_name: str, field_name: str) -> Tuple[str
     except Exception as e:
         logger.error(f"生成字段校验SQL失败: {str(e)}")
         return "", ""
-    
+
+def generate_cust_in_cd_validation_sql(table_name: str, field_name: str) -> Tuple[str, str]:
+    """生成客户内码字段的内容和长度校验SQL"""
+    try:
+        # 内容有效性校验（以81、82、83开头）
+        content_valid_sql = f"""
+        SELECT COUNT(1) FROM AGL.{table_name}
+        WHERE PT_DT = '${{process_date}}'
+        AND NOT (LEFT({field_name}, 2) IN ('81', '82', '83'));
+        """
+        
+        # 长度有效性校验（长度为11位）
+        length_valid_sql = f"""
+        SELECT COUNT(1) FROM AGL.{table_name}
+        WHERE PT_DT = '${{process_date}}'
+        AND LENGTH({field_name}) != 11;
+        """
+        
+        return content_valid_sql.strip(), length_valid_sql.strip()
+    except Exception as e:
+        logger.error(f"生成客户内码校验SQL失败: {str(e)}")
+        return "", ""
+
 def write_to_template(sheet, data):
     try:
         last_row = sheet.range('A1').expand('down').last_cell.row
@@ -208,6 +234,29 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                         f'主表与从表关联覆盖率大于0',SYSTEM_CODE,table_cn_name,table_name,
                         field_cn_name,field_name,'2025-02-21',null_ratio_sql]
                     write_to_template(tgt_sheet, base_data_ratio)
+
+                    # 客户内码特定校验
+                    if field_row.get('is_cust_in_cd', False):
+                        # 生成内容和长度校验SQL
+                        content_valid_sql, length_valid_sql = generate_cust_in_cd_validation_sql(table_name, field_name)
+                        
+                        # 内容有效性校验
+                        base_data_content = [
+                            'A', '01-直接映射', '03-有效性', '0302-内容有效性',
+                            f'验证客户内码【{field_cn_name}】以（81，82，83）开头', SYSTEM_CODE,
+                            table_cn_name, table_name, field_name, field_cn_name,
+                            '2025-02-21', content_valid_sql
+                        ]
+                        write_to_template(tgt_sheet, base_data_content)
+                        
+                        # 长度有效性校验
+                        base_data_length = [
+                            'A', '01-直接映射', '03-有效性', '0301-长度有效性',
+                            f'统计客户内码【{field_cn_name}】长度（11位）', SYSTEM_CODE,
+                            table_cn_name, table_name, field_name, field_cn_name,
+                            '2025-02-21', length_valid_sql
+                        ]
+                        write_to_template(tgt_sheet, base_data_length)
 
                 processed_tables.append(table_name)
                 
