@@ -34,7 +34,7 @@ def extract_dev_ops(file_path):
         try:
             with open(file_path, 'r' ,encoding='utf-8') as file:
                 lines = file.readlines()
-                if len(lines) >= 19:
+                if len(lines) >= 20:
                     line_11 = lines[10]
                     if '：' in line_11:
                         #print(line_9.split('：',1)[1].strip())
@@ -140,7 +140,7 @@ def process_folder(folder_path):
                     source_table += '_PC'
                     data.append((file_name,belong_theme,table_name,source_schema,source_table,dev_ops,tab_cn_name))
             processed_files += 1
-            progress_bar(processed_files,total_files,20,'1')
+            progress_bar(processed_files,total_files,30,'1')
     print()
     return data
 
@@ -198,7 +198,7 @@ def write_to_excel1(data ,output_file ):
         sheet.cell(row=idx, column=6, value=source_table)
 
         processed_files += 1
-        progress_bar(processed_files,total_files,20,'2')
+        progress_bar(processed_files,total_files,30,'2')
     print()
     sheet.column_dimensions['A'].width = 10 
     sheet.column_dimensions['B'].width = 30     
@@ -235,9 +235,9 @@ def progress_bar(current,total,bar_length,process_type):
     block = int(bar_length * progress)
     percentage = progress * 100
     if get_process_type == '1':
-        text = f"\r---------------------- 处理文件中: [{'#' * block}{'-' * (bar_length - block)}] 【{percentage:.2f}%】 ----------------------"
+        text = f"\r---------------------- 处理文件中 | [{'#' * block}{'-' * (bar_length - block)}] |【{percentage:.2f}%】 ----------------------"
     else:
-        text = f"\r---------------------- 写入文件中: [{'#' * block}{'-' * (bar_length - block)}] 【{percentage:.2f}%】 ----------------------"
+        text = f"\r---------------------- 写入文件中 | [{'#' * block}{'-' * (bar_length - block)}] |【{percentage:.2f}%】 ----------------------"
     sys.stdout.write(text)
     sys.stdout.flush()
 

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>在线码值生成工具</title>
+    <style>
+        /* 全局字体与布局设置 */
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        /* 主容器样式 */
+        .main-container {
+            width: 650px;
+            height: 400px;
+            background: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 左右文件上传容器 */
+        .upload-container {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            
+        }
+
+        /* 单个上传文件的区域 */
+        .file-box {
+            height: 100%;
+            width: 44%;
+            padding: 15px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 4px 8px rgba(14, 15, 15, 0.1);
+        }
+
+        /* 文件选择状态样式 */
+        .file-status {
+            font-weight: bold;
+            color: red;
+        }
+
+        /* 按钮样式 */
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 4px 8px rgba(14, 15, 15, 0.1);
+        }
+
+        button.upload-btn {
+            background-color: #007bff;
+            color: white;
+        }
+        button.close-btn {
+            background-color: #47d142;
+            color: white;
+        }
+        button.upload-btn:hover {
+            background-color: #0056b3;
+        }
+
+        /* 底部按钮区域 */
+        .action-buttons {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            
+            
+        }
+
+        /* 进度条样式 */
+        .progress-bar {
+            width: 80%;
+            height: 8px;
+            background-color: #ddd;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0;
+            background-color: #007bff;
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        /* 设置遮罩背景 */
+        #overlay {
+            display: none; /* 默认隐藏 */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5); /* 半透明黑色背景 */
+            z-index: 10;
+            opacity: 0;
+            /* transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; */
+        }
+
+        /* 弹窗样式 */
+        #popup {
+            display: none; /* 默认隐藏 */
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9); /* 居中并缩放初始状态 */
+            width: 300px;
+            background: rgb(255, 255, 255); /* 白色背景 */
+            padding: 20px;
+            border-radius: 8px; /* 圆角 */
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2); /* 阴影 */
+            z-index: 11;
+            opacity: 0;
+            transition: opacity 1s ease-in-out, transform 1s ease-in-out;
+        }
+
+        /* 显示状态的类 */
+        #popup.visible,
+        #overlay.visible {
+            display: block;
+            opacity: 1;
+            /* transform: translate(-50%, -50%) scale(1) 1s ease-in-out ; */
+        }
+
+        /* 弹窗动画放大效果 */
+        #popup.animate-in {
+            transform: translate(-50%, -50%) scale(1) 1s ease-in-out ; /* 从缩小到正常尺寸 */
+        }
+        /* 根据内容高度调整弹窗高度 */
+
+        #popupContent {
+            max-height: 200px; /* 设置弹窗内容区域的最大高度 */
+            overflow-y: auto;  /* 超出内容自动出现垂直滚动条 */
+            padding: 5px;      /* 内边距，保持内容不贴边 */
+            border-radius: 8px; /* 使滚动内容区域也有圆角 */
+        }
+
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="upload-container">
+            <!-- TXT 上传容器 -->
+            <div class="file-box" id="txtBox">
+                <p class="file-status" id="txtStatus">未选择文件</p>
+                <input type="file" id="txtFileInput" accept=".txt">
+                <button class="upload-btn" onclick="uploadFile('txt')">上传列表TXT</button>
+                <button onclick="analyzeTxt()">查看生成列表</button>
+            </div>
+
+            <!-- XLSX 上传容器 -->
+            <div class="file-box" id="xlsxBox">
+                <p class="file-status" id="xlsxStatus">未选择文件</p>
+                <input type="file" id="xlsxFileInput" accept=".xlsx">
+                <button class="upload-btn" onclick="uploadFile('xlsx')">上传码值XLSX</button>
+            </div>
+        </div>
+
+        <!-- 进度条 -->
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <!-- 底部按钮 -->
+        <div class="action-buttons">
+            <button onclick="runScript()">合并码值文件</button>
+            <button onclick="downloadFile()">下载合并码值文件</button>
+            <button onclick="clearFiles()">点这里从头再来</button>
+        </div>
+    </div>
+
+    <!-- 弹出窗口 -->
+    <div id="overlay"onclick="closePopup()"></div>
+    <div id="popup">
+        <h3>合并列表</h3>
+        <div id="popupContent"></div>
+        <button class="close-btn" onclick="closePopup()">关闭</button>
+    </div>
+
+    <script>
+        let txtFilename = '';
+        let xlsxFilename = '';
+        let txtContent = [];  // 保存 TXT 内容
+
+        function analyzeTxt() {
+            if (txtContent.length === 0) {
+                alert("请先上传合并码值清单.");
+                return;
+            }
+
+            const popupContent = document.getElementById('popupContent');
+            popupContent.innerHTML =  txtContent.join('<br>') ;  // 插入 TXT 文件内容到弹窗
+            console.log("Opening popup with content:", txtContent);  // 确认内容加载
+            openPopup();  // 显示弹窗
+        }
+
+        function openPopup() {
+            const overlay = document.getElementById('overlay');
+            const popup = document.getElementById('popup');
+
+            if (overlay && popup) {
+                overlay.classList.add('visible');
+                popup.classList.add('visible');
+            } else {
+                console.error("Overlay or popup not found.");
+            }
+        }
+
+        function closePopup() {
+            const overlay = document.getElementById('overlay');
+            const popup = document.getElementById('popup');
+
+            if (overlay && popup) {
+                overlay.classList.remove('visible');
+                popup.classList.remove('visible');
+
+                // 延时移除 display:block, 等过渡完成
+                // setTimeout(() => {
+                //     overlay.classList.remove('visible');
+                //     popup.classList.remove('visible');
+                // }, 300);
+            } else {
+                console.error("Overlay or popup not found.");
+            }
+        }
+
+        function uploadFile(type) {
+            const fileInput = document.getElementById(type === 'txt' ? 'txtFileInput' : 'xlsxFileInput');
+            const fileStatus = document.getElementById(type === 'txt' ? 'txtStatus' : 'xlsxStatus');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("请选择文件上传");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    if (type === 'txt') {
+                        txtFilename = data.filename;
+                        txtContent = data.content;  // 保存返回的文件内容
+                        fileStatus.style.color = "green";
+                        fileStatus.textContent = "码值列表文件上传成功";
+                        console.log("列表内容加载:", txtContent);  // 确认内容加载
+                    }
+                    if (type === 'xlsx') {
+                        xlsxFilename = data.filename;
+                        fileStatus.style.color = "green";
+                        fileStatus.textContent = "XLSX码值文件上传成功";
+                    }
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+
+
+
+        function runScript() {
+            if (!txtFilename || !xlsxFilename) {
+                alert("上传码值列表和码值文件才能进行下一步.");
+                return;
+            }
+
+            fetch('/run', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ txt_filename: txtFilename, xlsx_filename: xlsxFilename })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    animateProgress();
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+
+        function animateProgress() {
+            const progressFill = document.getElementById('progressFill');
+            let width = 0;
+            const interval = setInterval(() => {
+                if (width >= 101) {
+                    clearInterval(interval);
+                    alert("文件合并完成,点击下载合并文件."); // 确保进度条满时才弹出
+                } else {
+                    width += 1;
+                    progressFill.style.width = width + "%";
+                }
+            }, 50); // 控制进度速度的间隔时间，调节此值可以加快或减慢进度条动画
+        }
+
+        function downloadFile() {
+            window.location.href = '/download';
+        }
+
+        function clearFiles() {
+            txtFilename = '';
+            xlsxFilename = '';
+            txtContent = [];
+            document.getElementById('txtFileInput').value = '';
+            document.getElementById('xlsxFileInput').value = '';
+            document.getElementById('txtStatus').textContent = 'No file selected';
+            document.getElementById('txtStatus').style.color = 'red';
+            document.getElementById('xlsxStatus').textContent = 'No file selected';
+            document.getElementById('xlsxStatus').style.color = 'red';
+            document.getElementById('progressFill').style.width = "0%";
+            alert("Files cleared successfully.");
+        }
+    </script>
+</body>
+</html>

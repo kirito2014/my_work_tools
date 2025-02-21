@@ -40,7 +40,22 @@ def clear_filters(sheet):
     """清除指定工作表的筛选器"""
     if sheet.api.AutoFilter:
         sheet.api.AutoFilterMode = False
+def check_vaild_excel(sheet):
+    """检查最大行是否一致如果一致则返回True，不一致则返回False"""
+    max_row_a=sheet.range('A1').expand('down').last_cell.row
+    max_row_i=sheet.range('I1').expand('down').last_cell.row
+    if max_row_a and max_row_i and max_row_i != max_row_a:
+        print(f"[ ERROR ] {sheet.name} 首列非空校验不通过.")
+        return False
+    elif max_row_a and max_row_i and max_row_i == max_row_a:
+        print(f"[ INFO ] {sheet.name} 首列非空校验通过.")
+        if sheet.name == 'rem-代码映射':
+            if sheet.range('A1').value != 'SRC_TAB_LIB_NAME' or sheet.range('A1').value == 'None':
+                print(f"[ ERROR ] {sheet.name} 首列内容校验不通过，确认是否错行缺失.")
+                return False
+        return True
 
+    
 
 def write_formula_to_excel(file_name:str):
     wb = load_workbook(file_name)
@@ -79,9 +94,9 @@ def copy_sheets_and_metadata(source_file,target_file):
     scrpits_dir = os.path.dirname(scrpits_folder_path)
     date_str = datetime.today().strftime('%Y%m%d')
     try:
-        #print(source_file)
+        
+        #获取indexsheet页符合拆分条件的数据集
         src_wb = excel_app.books.open(source_file) 
-
         index_data = pd.read_excel(source_file, sheet_name = 'index', usecols="C,D,E,F,M")
         index_data = index_data.iloc[1:] #从第2行开始
         index_data.columns = ['table_id','table_name','table_cn_name','dev_pers','enable_flag'] 
@@ -89,14 +104,42 @@ def copy_sheets_and_metadata(source_file,target_file):
         filtered_index = index_data[index_data['enable_flag'] == 'Y']
         y_count = filtered_index.shape[0]
         total_files = y_count
-        #outer = tqdm(range(total_files), desc="当前进度")
+
+
+        #检查代码映射和数据字典是否存在
+        rem_data_dict_sheet = 'rem-数据字典'
+        if rem_data_dict_sheet not in [sheet.name for sheet in src_wb.sheets]:
+            error_list.append(f"[ ERROR ] 源SDM文件未找到数据字典sheet页.\n")
+            src_wb.close()
+            sys.exit()
+        src_dd_sheet = src_wb.sheets(rem_data_dict_sheet)
+        if not check_vaild_excel(src_dd_sheet):
+            print("[ ERROR ] 数据字典 首行校验失败，存在空格，请检查.")
+            src_wb.close()
+            sys.exit()
+        clear_filters(src_dd_sheet)
+
+        rem_code_map_sheet = 'rem-代码映射'
+        if rem_code_map_sheet not in [sheet.name for sheet in src_wb.sheets]:
+            error_list.append(f"[ ERROR ] 处理源SDM文件未找到代码映射sheet页.\n")
+            src_wb.close()
+            sys.exit()
+        src_cm_sheet = src_wb.sheets(rem_code_map_sheet)
+        if not check_vaild_excel(src_cm_sheet):
+            print("[ ERROR ] 代码映射 首行校验失败，存在空格，请检查.")
+            src_wb.close()
+            sys.exit()
+        clear_filters(src_cm_sheet)
+
+
         print(f"-==========- 本次将要拆分 {total_files} 个SDM -==========-")
         processed_files = 0
-
         table_list = [f"{row['table_name']} \n" for i,row in filtered_index.iterrows()]
-        # for i in outer:
-        for _,row in filtered_index.iterrows():
 
+        
+
+        for _,row in filtered_index.iterrows():
+            
             table_name = row['table_name']
             table_cn_name = row['table_cn_name']
             dev_pers = row['dev_pers']
@@ -156,36 +199,29 @@ def copy_sheets_and_metadata(source_file,target_file):
 
 
             #复制数据字典
-            #print('1111')
-            rem_data_dict_sheet = 'rem-数据字典'
-            if rem_data_dict_sheet not in [sheet.name for sheet in src_wb.sheets]:
-                error_list.append(f"源SDM文件未找到数据字典sheet页.\n")
-            else:
-
-                src_dd_sheet = src_wb.sheets(rem_data_dict_sheet)
-                if rem_data_dict_sheet not in [sheet.name for sheet in tgt_wb.sheets]:
-                    tgt_wb.sheets.add().Name = rem_data_dict_sheet
-                tgt_dd_sheet = tgt_wb.sheets(rem_data_dict_sheet)
-                clear_filters(tgt_dd_sheet)
+            if rem_data_dict_sheet not in [sheet.name for sheet in tgt_wb.sheets]:
+                tgt_wb.sheets.add().Name = rem_data_dict_sheet
+            tgt_dd_sheet = tgt_wb.sheets(rem_data_dict_sheet)
+            clear_filters(tgt_dd_sheet)
 
 
-                tgt_dd_data = tgt_dd_sheet.range('A1').expand('table').value
-                tgt_dd_df = pd.DataFrame(tgt_dd_data)
+            tgt_dd_data = tgt_dd_sheet.range('A1').expand('table').value
+            tgt_dd_df = pd.DataFrame(tgt_dd_data)
 
-                if  tgt_dd_df.empty:
+            if  tgt_dd_df.empty:
 
-                    tgt_dd_df = pd.DataFrame(tgt_dd_data[1:],columns=tgt_dd_data[0])
-                    tgt_dd_df = tgt_dd_df[tgt_dd_df['表英文名'] != table_name]
-                    tgt_dd_sheet.clear_contents()
-                    tgt_dd_sheet.range('A1').value = [tgt_dd_data[0]] + tgt_dd_df.values.tolist()
+                tgt_dd_df = pd.DataFrame(tgt_dd_data[1:],columns=tgt_dd_data[0])
+                tgt_dd_df = tgt_dd_df[tgt_dd_df['表英文名'] != table_name]
+                tgt_dd_sheet.clear_contents()
+                tgt_dd_sheet.range('A1').value = [tgt_dd_data[0]] + tgt_dd_df.values.tolist()
 
-                data_dict_found = False
-                for row in src_dd_sheet.range('A2').expand('table').value:
-                    if row[1] == table_name:
-                        data_dict_found = True
-                        tgt_dd_sheet.range('A' + str(tgt_dd_sheet.range('A' + str(tgt_dd_sheet.cells.last_cell.row)).end('up').row +1 )).value = row
-                if not data_dict_found:
-                    error_list.append(f"{table_name} 表的数据字典未找到.\n")
+            data_dict_found = False
+            for row in src_dd_sheet.range('A2').expand('table').value:
+                if row[1] == table_name:
+                    data_dict_found = True
+                    tgt_dd_sheet.range('A' + str(tgt_dd_sheet.range('A' + str(tgt_dd_sheet.cells.last_cell.row)).end('up').row +1 )).value = row
+            if not data_dict_found:
+                error_list.append(f"{table_name} 表的数据字典未找到.\n")
 
             #复制为dataops平台格式
 
@@ -207,35 +243,31 @@ def copy_sheets_and_metadata(source_file,target_file):
             tgt_wb.save()       
 
 
-            #复制代码映射，由于码值特殊性需要对码值列设置为文本格式
-            rem_code_map_sheet = 'rem-代码映射'
-            if rem_code_map_sheet not in [sheet.name for sheet in src_wb.sheets]:
-                error_list.append(f"处理源SDM文件未找到代码映射sheet页.\n")
-                
-            else:
-                src_cm_sheet = src_wb.sheets(rem_code_map_sheet)
-                if rem_code_map_sheet not in [sheet.name for sheet in tgt_wb.sheets]:
-                    tgt_wb.sheets.add().Name = rem_code_map_sheet
-                tgt_cm_sheet = tgt_wb.sheets(rem_code_map_sheet)
-                clear_filters(tgt_cm_sheet)
+            #复制代码映射
+            if rem_code_map_sheet not in [sheet.name for sheet in tgt_wb.sheets]:
+                tgt_wb.sheets.add().Name = rem_code_map_sheet
+            tgt_cm_sheet = tgt_wb.sheets(rem_code_map_sheet)
+            clear_filters(tgt_cm_sheet)
             #先删除目标文件中已存在的代码映射
-                tgt_cm_data = tgt_cm_sheet.range('A1').expand('table').value
-                if tgt_cm_data:
-                    tgt_cm_df = pd.DataFrame(tgt_cm_data[1:],columns=tgt_cm_data[1])
-                    tgt_cm_df = tgt_cm_df[tgt_cm_df['目标表英文名'] != table_name]
-                    tgt_cm_sheet.clear_contents()
-                    tgt_cm_sheet.range('A1').value = [tgt_cm_data[0]] + tgt_cm_df.values.tolist()
+            tgt_cm_data = tgt_cm_sheet.range('A1').expand('table').value
+            if tgt_cm_data:
+                tgt_cm_df = pd.DataFrame(tgt_cm_data[1:],columns=tgt_cm_data[1])
+                tgt_cm_df = tgt_cm_df[tgt_cm_df['目标表英文名'] != table_name]
+                tgt_cm_sheet.clear_contents()
+                tgt_cm_sheet.range('A1').value = [tgt_cm_data[0]] + tgt_cm_df.values.tolist()
 
-                src_cm_data = src_cm_sheet.range('A1').expand('table').value
-                if src_cm_data:
-                    src_cm_df = pd.DataFrame(src_cm_data[1:],columns=src_cm_data[1])
-                    filtered_src_cm_df = src_cm_df[src_cm_df['目标表英文名'] == table_name]
+            src_cm_data = src_cm_sheet.range('A1').expand('table').value
+            if src_cm_data:
+                src_cm_df = pd.DataFrame(src_cm_data[1:],columns=src_cm_data[1])
+                filtered_src_cm_df = src_cm_df[src_cm_df['目标表英文名'] == table_name]
 
-                    if filtered_src_cm_df.empty:
-                        error_list.append(f"{table_name} 表的代码映射未找到(若此表无代码映射则忽略).\n")
-                    else:
-                        start_row = tgt_cm_sheet.range('A1').expand('down').last_cell.row + 1
-                        tgt_cm_sheet.range(f'A{start_row}').value = filtered_src_cm_df.values.tolist()
+                if filtered_src_cm_df.empty:
+                    error_list.append(f"{table_name} 表的代码映射未找到(若此表无代码映射则忽略).\n")
+                else:
+                    start_row = tgt_cm_sheet.range('A1').expand('down').last_cell.row + 1
+                    tgt_cm_sheet.range(f'A{start_row}').value = filtered_src_cm_df.values.tolist()
+
+            
             #复制index列内容
             rem_index_sheet = 'index'
             src_index_sheet = src_wb.sheets(rem_index_sheet)

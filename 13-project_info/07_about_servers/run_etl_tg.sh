@@ -113,9 +113,22 @@ echo "source /opt/client1101/bigdata_env"  | tee -a "$LOG_PATH"
 #tmp检查
 
 if [ "$RUN_TYPE" = "ddl" ]; then
+    echo "[INFO]    $(date +"%Y-%m-%d %H:%M:%S"): 创建ddl脚本临时文件 " | tee -a "$LOG_PATH"           
+    TMP_DIR="${HOME_DIR}/tmp"
+    if [ ! -d "$TMP_DIR" ]; then
+        mkdir -p "$TMP_DIR"
+    fi
+
+    TMP_FILE="$TMP_DIR/temp_ddl_$FILE_NAME.sql"
+    cp "$FULL_PATH" "$TMP_FILE"
+
+    #替换脚本内容
+    echo "[INFO]    $(date +"%Y-%m-%d %H:%M:%S"): 脚本替换参数 " | tee -a "$LOG_PATH"
+    sed -i "s/\${version_num}/${optional_version_num}/gi" "$TMP_FILE"
+
     echo "[INFO]   $(date +"%Y-%m-%d %H:%M:%S"): 脚本执行开始 " | tee -a "$LOG_PATH"
     echo "[INFO]   $(date +"%Y-%m-%d %H:%M:%S"): spark-beeline -f $FULL_PATH"
-     spark-beeline -f "$FULL_PATH" 2>&1 | tee -a "$LOG_PATH"
+     spark-beeline -f "$TMP_FILE" 2>&1 | tee -a "$LOG_PATH"
 
     if grep -qE "( ERROR | FAILURE | Error | FAILED | failure |Error | failed)" "$LOG_PATH"; then
         echo "[FAILED] $(date +"%Y-%m-%d %H:%M:%S"): 脚本执行失败,日志目录: $LOG_PATH " | tee -a "$LOG_PATH"
@@ -133,7 +146,7 @@ else
         mkdir -p "$TMP_DIR"
     fi
 
-    TMP_FILE="$TMP_DIR/temp_$FILE_NAME.sql"
+    TMP_FILE="$TMP_DIR/temp_dml_$FILE_NAME.sql"
     cp "$FULL_PATH" "$TMP_FILE"
 
     #替换脚本内容
@@ -179,16 +192,17 @@ else
         echo "[SUCCESS]  $(date +"%Y-%m-%d %H:%M:%S"): 查询成功 ${PROCESS_DATE} 数据量： $process_result" | tee -a "$LOG_PATH"
         #querypk
         if [[ "${FILE_NAME: -2}" == "tf" ]];then
-            pk_list=$(sed -n '11s/[^：]*：*\(.*\)/\1/p' "$TMP_FILE" )
+            pk_list=$(sed -n '11s/[^：]*：*\(.*\)/\1/p' "$TMP_FILE" | tr -d '\r' | sed 's/[[:space:]]*$//' )
         elif [[ "${FILE_NAME: -3}" == "_tg" ]];then
-            pk_list=$(sed -n '13s/[^：]*：*\(.*\)/\1/p' "$TMP_FILE" )
+            pk_list=$(sed -n '13s/[^：]*：*\(.*\)/\1/p' "$TMP_FILE" | tr -d '\r' | sed 's/[[:space:]]*$//' )
         elif [[ "${FILE_NAME: -2}" == "ta" ]];then
-            pk_list=$(sed -n '11s/[^：]*：*\(.*\)/\1/p' "$TMP_FILE" )
+            pk_list=$(sed -n '11s/[^：]*：*\(.*\)/\1/p' "$TMP_FILE" | tr -d '\r' | sed 's/[[:space:]]*$//' )
         else
             pk_list=""
         fi  
 
         if [ -n "$pk_list" ]; then
+                
                 pk_query=""
                 echo "[ INFO  ]  $(date +"%Y-%m-%d %H:%M:%S"): 获取脚本中的主键：$pk_list" | tee -a "$LOG_PATH"
                 if [[ "${FILE_NAME: -2}" == "tf" ]];then
@@ -200,7 +214,11 @@ else
                 else
                     pk_query="select count(1) from (select ${pk_list} ,count(1) from agl.${FILE_NAME} where pt_dt = '${PROCESS_DATE}' group by ${pk_list} having count(1) >1 );"
                 fi
-                echo "[SUCCESS]  $(date +"%Y-%m-%d %H:%M:%S"): 查询主键重复 -- $pk_query" 
+                echo "[SUCCESS]  $(date +"%Y-%m-%d %H:%M:%S"): 查询主键重复
+
+                $pk_query
+                
+                "  
                 pk_result=$(spark-beeline -e "${pk_query}" 2>/dev/null)
                 #echo $pk_result
                 process_result=$(echo "$pk_result" | awk '/\+/{if (++count==2) {getline; print}}' | tr -d '| ')

@@ -4,7 +4,25 @@ import os
 import pandas as pd
 import xlwings as xw
 
+def clear_filters(sheet):
+    """清除指定工作表的筛选器"""
+    if sheet.api.AutoFilter:
+        sheet.api.AutoFilterMode = False
 
+def check_vaild_excel(sheet):
+    """检查最大行是否一致如果一致则返回True，不一致则返回False"""
+    max_row_a=sheet.range('A1').expand('down').last_cell.row
+    max_row_i=sheet.range('I1').expand('down').last_cell.row
+    if max_row_a and max_row_i and max_row_i != max_row_a:
+        print("[ ERROR ] 代码映射首列非空校验不通过.")
+        return False
+    elif max_row_a and max_row_i and max_row_i == max_row_a:
+        print("[ INFO ] 代码映射首列非空校验通过.")
+        #print(sheet.range('A1').value)
+        if sheet.range('A1').value != 'SRC_TAB_LIB_NAME' or sheet.range('A1').value == 'None':
+            print(f"[ ERROR ] 代码映射首列内容校验不通过 当前值{sheet.range('A1').value}，确认是否错行缺失.")
+            return False
+        return True
 def process_code_mapping(table_list_file):
 
     excel_app = xw.App(visible=False)
@@ -14,11 +32,44 @@ def process_code_mapping(table_list_file):
 
     target_file = 'pub_cd_map.xlsx'
     if os.path.exists(target_file):
-        tgt_wb = xw.Book(target_file)
+        tgt_wb = excel_app.books.open(target_file)
     else:
         tgt_wb = xw.Book()
         tgt_wb.save(target_file)
-        
+
+
+    #校验来源文件是否通过
+    #文件是否存在
+
+    code_map_files = [
+            os.path.join('pub_cd_map',f'pub_cd_map-{person_name}.xlsx'),
+            os.path.join('pub_cd_map',f'pub_cd_map-{person_name}.xls'),
+            os.path.join('pub_cd_map',f'pub_cd_map-{person_name}.xlsm')
+        ]
+    code_map_file = next((file for file in code_map_files if os.path.exists(file)),None)
+
+    if not code_map_file:
+        log_error(error_log,f"{person_name}的代码映射文件不存在. ")
+        sys.exit()
+
+    src_wb = excel_app.books.open(code_map_file)
+    rem_code_map_sheet = 'rem-代码映射'
+
+    if rem_code_map_sheet not in [sheet.name for sheet in src_wb.sheets]:
+        log_error(error_log,f"{code_map_file}中未找到代码映射sheet.")
+        src_wb.close()
+        sys.exit()
+    
+    src_cm_sheet = src_wb.sheets[rem_code_map_sheet]
+
+    #检查来源是否符合要求
+    if not check_vaild_excel(src_cm_sheet):
+        log_error(error_log,f"校验源文件不通过，检查首列是否有空格存在. ")
+        src_wb.close()
+        sys.exit()
+
+    #全部符合要求则开始合并
+    #处理表名列表    
     with open(table_list_file,'r',encoding='utf-8') as file:
         table_names = [line.strip().upper() for line in file.readlines()]
         table_list = len(table_names)
@@ -27,30 +78,17 @@ def process_code_mapping(table_list_file):
 
     for table_name in table_names:
         print(f"正在处理 <{person_name}> - <{table_name}> 的码值映射.")
-        code_map_files = [
-            os.path.join('pub_cd_map',f'pub_cd_map-{person_name}.xlsx'),
-            os.path.join('pub_cd_map',f'pub_cd_map-{person_name}.xls'),
-            os.path.join('pub_cd_map',f'pub_cd_map-{person_name}.xlsm')
-        ]
-        code_map_file = next((file for file in code_map_files if os.path.exists(file)),None)
-
-        if not code_map_file:
-            log_error(error_log,f"{person_name}的代码映射文件不存在. ")
-            sys.exit()
+        
         try:
-            src_wb = xw.Book(code_map_file)
-            rem_code_map_sheet = 'rem-代码映射'
-
-            if rem_code_map_sheet not in [sheet.name for sheet in src_wb.sheets]:
-                log_error(error_log,f"{code_map_file}中未找到代码映射sheet.")
-                src_wb.close()
-                sys.exit()
             
-            src_cm_sheet = src_wb.sheets[rem_code_map_sheet]
+            #去除筛选
+            clear_filters(src_cm_sheet)
             if rem_code_map_sheet not in [sheet.name for sheet in tgt_wb.sheets]:
                 tgt_wb.sheets.add(rem_code_map_sheet)
                 #tgt_wb.sheets("sheet1")
             tgt_cm_sheet = tgt_wb.sheets(rem_code_map_sheet)
+            #clear_filters(tgt_cm_sheet)
+            #print(tgt_cm_sheet)
 
             #先删除目标文件中已存在的码值映射
             tgt_cm_data = tgt_cm_sheet.range('A1').expand('table').value
@@ -73,19 +111,22 @@ def process_code_mapping(table_list_file):
                     tgt_cm_sheet.range(f'A{start_row}').value = filtered_src_cm_df.values.tolist()
 
            #src_wb.close()
-            tgt_wb.save()
+            #tgt_wb.save()
 
         except Exception as e:
             log_error(error_log,f"处理{code_map_file}中{table_name} 表的代码映射时发生错误: {str(e)}.")
+            excel_app.quit()
         finally:
             #src_wb.close()
             tgt_wb.save()
-            tgt_wb.close()  
+            #tgt_wb.close()
+            #excel_app.quit() 
         processed_table_count = processed_table_count + 1
         print(f"<{table_name}> 处理完毕，剩余 {table_list-processed_table_count} 个,共{table_list} 个.") 
 
     tgt_wb.save(target_file)
     tgt_wb.close()
+    excel_app.quit() 
 def log_error(log_file,message):
     with open(log_file,'w',encoding='utf-8') as log:
         log.write(message + '\n')
