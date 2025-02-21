@@ -76,6 +76,18 @@ def process_data_dictionary(src_wb: xw.Book, table_name: str) -> pd.DataFrame:
 
         # 检查并标记包含"CUST_IN_CD"的字段
         df['is_cust_in_cd'] = df['字段英文名'].str.contains('CUST_IN_CD', case=False)
+
+        # 标记以"TELR_NO"结尾的字段
+        df['is_teller_no'] = df['字段英文名'].str.endswith('TELR_NO', case=False)
+
+        # 标记以"ORG_NO"结尾的字段
+        df['is_org_no'] = df['字段英文名'].str.endswith('ORG_NO', case=False)
+
+        # 标记以"_DT"结尾的字段
+        df['is_dt'] = df['字段英文名'].str.endswith('_DT', case=False)
+
+        # 标记以 “TM_STAMP”结尾的字段
+        df['is_tm_stamp'] = df['字段英文名'].str.endswith('TM_STAMP', case=False)
         
         return df[df['表英文名'] == table_name.strip()]
     except Exception as e:
@@ -163,6 +175,70 @@ def generate_cust_in_cd_validation_sql(table_name: str, field_name: str, templat
         logger.error(f"生成客户内码校验SQL失败: {str(e)}")
         return "", ""
 
+def generate_teller_no_validation_sql(table_name: str, field_name: str, template_flag: str) -> str:
+    """生成柜员编号字段的长度有效性校验SQL"""
+    del_condition = "AND DEL_F = '0'" if template_flag == 'AGL-PKA' else ""
+    try:
+        # 长度有效性校验（长度为6位）
+        length_valid_sql = f"""
+        SELECT COUNT(1) FROM AGL.{table_name}
+        WHERE PT_DT = '${{process_date}}'
+        {del_condition}
+        AND LENGTH({field_name}) != 6;
+        """
+        return length_valid_sql.strip()
+    except Exception as e:
+        logger.error(f"生成柜员编号校验SQL失败: {str(e)}")
+        return ""
+    
+def generate_org_no_validation_sql(table_name: str, field_name: str, template_flag: str) -> str:
+    """生成机构编号字段的长度有效性校验SQL"""
+    del_condition = "AND DEL_F = '0'" if template_flag == 'AGL-PKA' else ""
+    try:
+        # 长度有效性校验（长度为6位）
+        length_valid_sql = f"""
+        SELECT COUNT(1) FROM AGL.{table_name}
+        WHERE PT_DT = '${{process_date}}'
+        {del_condition}
+        AND LENGTH({field_name}) != 6;
+        """
+        return length_valid_sql.strip()
+    except Exception as e:
+        logger.error(f"生成机构编号校验SQL失败: {str(e)}")
+        return ""
+    
+def generate_dt_validation_sql(table_name: str, field_name: str, template_flag: str) -> str:
+    """生成日期字段的长度有效性校验SQL"""
+    del_condition = "AND DEL_F = '0'" if template_flag == 'AGL-PKA' else ""
+    try:
+        # 长度有效性校验（长度为10位）
+        length_valid_sql = f"""
+        SELECT LENGTH({field_name}),COUNT(1) FROM AGL.{table_name}
+        WHERE PT_DT = '${{process_date}}'
+        {del_condition}
+        GROUP BY LENGTH({field_name});
+        """
+        return length_valid_sql.strip()
+    except Exception as e:
+        logger.error(f"生成日期格式校验SQL失败: {str(e)}")
+        return ""
+
+def generate_tm_stamp_validation_sql(table_name: str, field_name: str, template_flag: str) -> str:
+    """生成时间戳字段的长度有效性校验SQL"""
+    del_condition = "AND DEL_F = '0'" if template_flag == 'AGL-PKA' else ""
+    try:
+        # 长度有效性校验（长度为26位）
+        length_valid_sql = f"""
+        SELECT LENGTH({field_name}),COUNT(1) FROM AGL.{table_name}
+        WHERE PT_DT = '${{process_date}}'
+        {del_condition}
+        GROUP BY LENGTH({field_name});
+        """
+        return length_valid_sql.strip()
+    except Exception as e:
+        logger.error(f"生成时间戳格式校验SQL失败: {str(e)}")
+        return ""
+    
 def write_to_template(sheet, data):
     try:
         last_row = sheet.range('A1').expand('down').last_cell.row
@@ -265,6 +341,62 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                             '2025-02-21', length_valid_sql
                         ]
                         write_to_template(tgt_sheet, base_data_length)
+                    
+                    #柜员编号长度校验
+                    if field_row.get('is_teller_no', False):
+                        # 生成长度校验SQL
+                        length_valid_sql = generate_teller_no_validation_sql(table_name, field_name,row['template_flag'])
+                        
+                        # 长度有效性校验
+                        base_data_length = [
+                            'A', '01-直接映射', '03-有效性','0301-长度有效性',
+                            f'统计柜员编号【{field_cn_name}】字段长度（6位）', SYSTEM_CODE,
+                            table_cn_name, table_name, field_name, field_cn_name,
+                            '2025-02-21', length_valid_sql
+                        ]
+                        write_to_template(tgt_sheet, base_data_length)
+
+                    #机构编号长度校验
+                    if field_row.get('is_org_no', False):
+                        # 生成长度校验SQL
+                        length_valid_sql = generate_org_no_validation_sql(table_name, field_name,row['template_flag'])
+                        
+                        # 长度有效性校验
+                        base_data_length = [
+                            'A', '01-直接映射', '03-有效性','0301-长度有效性',
+                            f'统计机构编号【{field_cn_name}】字段长度（6位）', SYSTEM_CODE,
+                            table_cn_name, table_name, field_name, field_cn_name,
+                            '2025-02-21', length_valid_sql
+                        ]
+                        write_to_template(tgt_sheet, base_data_length)
+
+                    #日期长度校验
+                    if field_row.get('is_dt', False):
+                        # 生成长度校验SQL
+                        length_valid_sql = generate_dt_validation_sql(table_name, field_name,row['template_flag'])
+                        
+                        # 长度有效性校验
+                        base_data_length = [
+                            'A', '01-直接映射', '03-有效性','0303-日期有效性',
+                            f'检查日期字段【{field_cn_name}】是否为yyyy-mm-dd 10位格式', SYSTEM_CODE,
+                            table_cn_name, table_name, field_name, field_cn_name,
+                            '2025-02-21', length_valid_sql
+                        ]
+                        write_to_template(tgt_sheet, base_data_length)             
+
+                   #时间戳长度校验
+                    if field_row.get('is_dt', False):
+                        # 生成长度校验SQL
+                        length_valid_sql = generate_dt_validation_sql(table_name, field_name,row['template_flag'])
+                        
+                        # 长度有效性校验
+                        base_data_length = [
+                            'A', '01-直接映射', '03-有效性','0303-日期有效性',
+                            f'检查时间戳字段【{field_cn_name}】是否为26位格式', SYSTEM_CODE,
+                            table_cn_name, table_name, field_name, field_cn_name,
+                            '2025-02-21', length_valid_sql
+                        ]
+                        write_to_template(tgt_sheet, base_data_length)                    
 
                 processed_tables.append(table_name)
                 
