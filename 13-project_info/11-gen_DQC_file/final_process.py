@@ -120,33 +120,41 @@ def _handle_pk(pk: str, table_name: str, template_flag: str) -> Tuple[str, str]:
     #print(pk_query)
     return pk_query,count_query
 
-def generate_field_validation_sql(table_name: str, field_name: str) -> Tuple[str, str]:
+def generate_field_validation_sql(table_name: str, field_name: str, template_flag: str) -> Tuple[str, str]:
     """生成字段非空校验和空值率统计SQL"""
+    del_condition = "AND DEL_F = '0'" if template_flag == 'AGL-PKA' else ""
     try:
         null_check_sql = f"""SELECT COUNT(1) FROM AGL.{table_name} 
-                            WHERE PT_DT = '${{process_date}}' AND {field_name} IS NULL;"""
+                            WHERE PT_DT = '${{process_date}}' 
+                            {del_condition}
+                            AND {field_name} IS NULL;"""
         null_ratio_sql = f"""SELECT ROUND(COUNT(*) / (COUNT(*) + COUNT({field_name})) * 100, 2) 
                             FROM AGL.{table_name} 
-                            WHERE PT_DT = '${{process_date}}';"""
+                            WHERE PT_DT = '${{process_date}}'
+                            {del_condition}
+                            ;"""
         return null_check_sql, null_ratio_sql
     except Exception as e:
         logger.error(f"生成字段校验SQL失败: {str(e)}")
         return "", ""
 
-def generate_cust_in_cd_validation_sql(table_name: str, field_name: str) -> Tuple[str, str]:
+def generate_cust_in_cd_validation_sql(table_name: str, field_name: str, template_flag: str) -> Tuple[str, str]:
     """生成客户内码字段的内容和长度校验SQL"""
+    del_condition = "AND DEL_F = '0'" if template_flag == 'AGL-PKA' else ""
     try:
         # 内容有效性校验（以81、82、83开头）
         content_valid_sql = f"""
         SELECT COUNT(1) FROM AGL.{table_name}
         WHERE PT_DT = '${{process_date}}'
-        AND NOT (LEFT({field_name}, 2) IN ('81', '82', '83'));
+        {del_condition}
+        AND SUBSTR({field_name}, 1,2) NOT  IN ('81', '82', '83'));
         """
         
         # 长度有效性校验（长度为11位）
         length_valid_sql = f"""
         SELECT COUNT(1) FROM AGL.{table_name}
         WHERE PT_DT = '${{process_date}}'
+        {del_condition}
         AND LENGTH({field_name}) != 11;
         """
         
@@ -221,7 +229,7 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                     field_cn_name = field_row['字段中文名']
                     
                     # 获取SQL语句
-                    null_check_sql, null_ratio_sql = generate_field_validation_sql(table_name, field_name)
+                    null_check_sql, null_ratio_sql = generate_field_validation_sql(table_name, field_name,row['template_flag'])
                     
                     # 非空校验 01-完整性	0101-非空完整性	统计字段非空值
                     base_data_null = ['A','01-直接映射','01-完整性','0101-非空完整性',
@@ -238,7 +246,7 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                     # 客户内码特定校验
                     if field_row.get('is_cust_in_cd', False):
                         # 生成内容和长度校验SQL
-                        content_valid_sql, length_valid_sql = generate_cust_in_cd_validation_sql(table_name, field_name)
+                        content_valid_sql, length_valid_sql = generate_cust_in_cd_validation_sql(table_name, field_name,row['template_flag'])
                         
                         # 内容有效性校验
                         base_data_content = [
