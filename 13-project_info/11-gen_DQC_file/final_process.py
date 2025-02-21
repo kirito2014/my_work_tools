@@ -94,6 +94,29 @@ def process_data_dictionary(src_wb: xw.Book, table_name: str) -> pd.DataFrame:
         logger.error(f"处理数据字典失败: {str(e)}")
         return pd.DataFrame()
 
+def process_code_map(src_wb: xw.Book, table_name: str) -> pd.DataFrame:
+    """处理代码映射页逻辑"""
+    try:
+        sheet = src_wb.sheets[CODE_MAP_SHEET]
+        sheet.api.AutoFilterMode = False
+        # 从第二行开始读取数据
+        df = sheet.range('A2').expand('table').options(pd.DataFrame, header=1).value
+        if df.empty:
+            logger.error(f"[{table_name}] 代码映射表没有数据")
+            return pd.DataFrame()
+        df.columns = df.columns.str.strip()
+        # 筛选出目标表英文名等于table_name的数据
+        df = df[df['目标表英文名'] == table_name.strip()]
+        if df.empty:
+            return df
+        # 组合代码值和说明
+        df['code_info'] = df.apply(lambda row: f"{row['目标代码值']}-{row['目标代码说明']}", axis=1)
+        # 按目标字段中英文名分组，合并code_info
+        grouped_df = df.groupby(['目标字段中文名', '目标字段英文名'])['code_info'].agg('\n'.join).reset_index()
+        return grouped_df
+    except Exception as e:
+        logger.error(f"处理代码映射失败: {str(e)}")
+        return pd.DataFrame()
 
 def _clean_index_data(df: pd.DataFrame) -> pd.DataFrame:
     """清洗index页数据"""
@@ -239,6 +262,22 @@ def generate_tm_stamp_validation_sql(table_name: str, field_name: str, template_
         logger.error(f"生成时间戳格式校验SQL失败: {str(e)}")
         return ""
     
+def generate_code_validation_sql(table_name: str, field_name: str, template_flag: str) -> str:
+    """码值映射校验SQL"""
+    del_condition = "AND DEL_F = '0'" if template_flag == 'AGL-PKA' else ""
+    try:
+        # 码值映射校验
+        code_valid_sql = f"""
+        SELECT {field_name},COUNT(1) FROM AGL.{table_name}
+        WHERE PT_DT = '${{process_date}}'
+        {del_condition}
+        GROUP BY  {field_name};
+        """
+        return code_valid_sql.strip()
+    except Exception as e:
+        logger.error(f"生成码值映射校验SQL失败: {str(e)}")
+        return ""
+
 def write_to_template(sheet, data):
     try:
         last_row = sheet.range('A1').expand('down').last_cell.row
@@ -298,6 +337,25 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                 ]
 
                 write_to_template(tgt_sheet, base_data)
+
+                # 处理代码映射
+                cm_data = process_code_map(src_wb, table_name)
+                if not cm_data.empty:
+                    # 生成枚举值有效性校验规则
+                    for _, cm_row in cm_data.iterrows():
+                        field_cn = cm_row['目标字段中文名']
+                        field_en = cm_row['目标字段英文名']
+                        code_info = cm_row['code_info']
+                        
+                        code_check_sql = generate_code_validation_sql(table_name, field_en, row['template_flag'])
+                        # 生成校验规则
+                        code_rule_sql = [
+                            'A', '01-直接映射', '03-有效性', '0304-枚举值有效性',
+                            f'检查字段【{field_cn}】的代码值是否在代码表中', SYSTEM_CODE,
+                            table_cn_name, table_name, field_cn, field_en,
+                            '2025-02-21', code_check_sql,"",code_info
+                        ]
+                        write_to_template(tgt_sheet, code_rule_sql)
 
                 # 生成字段非空校验和空值率统计
                 for _, field_row in dd_data.iterrows():
