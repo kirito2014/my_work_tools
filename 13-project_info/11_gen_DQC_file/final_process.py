@@ -75,19 +75,19 @@ def process_data_dictionary(src_wb: xw.Book, table_name: str) -> pd.DataFrame:
         df.columns = df.columns.str.strip()
 
         # 检查并标记包含"CUST_IN_CD"的字段
-        df['is_cust_in_cd'] = df['字段英文名'].str.contains('CUST_IN_CD', case=False)
+        df['is_cust_in_cd'] = df['字段英文名'].str.upper().str.contains('CUST_IN_CD')
 
         # 标记以"TELR_NO"结尾的字段
-        df['is_teller_no'] = df['字段英文名'].str.endswith('TELR_NO', case=False)
+        df['is_teller_no'] = df['字段英文名'].str.upper().str.endswith('TELR_NO')
 
         # 标记以"ORG_NO"结尾的字段
-        df['is_org_no'] = df['字段英文名'].str.endswith('ORG_NO', case=False)
+        df['is_org_no'] = df['字段英文名'].str.upper().str.endswith('ORG_NO')
 
         # 标记以"_DT"结尾的字段
-        df['is_dt'] = df['字段英文名'].str.endswith('_DT', case=False)
+        df['is_dt'] = df['字段英文名'].str.upper().str.endswith('_DT')
 
         # 标记以 “TM_STAMP”结尾的字段
-        df['is_tm_stamp'] = df['字段英文名'].str.endswith('TM_STAMP', case=False)
+        df['is_tm_stamp'] = df['字段英文名'].str.upper().str.endswith('TM_STAMP')
         
         return df[df['表英文名'] == table_name.strip()]
     except Exception as e:
@@ -110,7 +110,7 @@ def process_code_map(src_wb: xw.Book, table_name: str) -> pd.DataFrame:
         if df.empty:
             return df
         # 组合代码值和说明
-        df['code_info'] = df.apply(lambda row: f"{row['目标代码值']}-{row['目标代码说明']}", axis=1)
+        df['code_info'] = df.apply(lambda row: f"{row['目标代码码值']}-{row['目标代码说明']}", axis=1)
         # 按目标字段中英文名分组，合并code_info
         grouped_df = df.groupby(['目标字段中文名', '目标字段英文名'])['code_info'].agg('\n'.join).reset_index()
         return grouped_df
@@ -302,7 +302,7 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
             index_data = pd.read_excel(source_file, sheet_name='index', usecols="C,D,E,M,N,P")
             index_data = _clean_index_data(index_data)
 
-            print(index_data)
+            #print(index_data)
 
             for _, row in index_data.iterrows():
                 table_name = row['table_name']
