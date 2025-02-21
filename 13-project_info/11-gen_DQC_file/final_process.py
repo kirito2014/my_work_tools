@@ -116,6 +116,19 @@ def _handle_pk(pk: str, table_name: str, template_flag: str) -> Tuple[str, str]:
     #print(pk_query)
     return pk_query,count_query
 
+def generate_field_validation_sql(table_name: str, field_name: str) -> Tuple[str, str]:
+    """生成字段非空校验和空值率统计SQL"""
+    try:
+        null_check_sql = f"""SELECT COUNT(1) FROM AGL.{table_name} 
+                            WHERE PT_DT = '${{process_date}}' AND {field_name} IS NULL;"""
+        null_ratio_sql = f"""SELECT ROUND(COUNT(*) / (COUNT(*) + COUNT({field_name})) * 100, 2) 
+                            FROM AGL.{table_name} 
+                            WHERE PT_DT = '${{process_date}}';"""
+        return null_check_sql, null_ratio_sql
+    except Exception as e:
+        logger.error(f"生成字段校验SQL失败: {str(e)}")
+        return "", ""
+    
 def write_to_template(sheet, data):
     try:
         last_row = sheet.range('A1').expand('down').last_cell.row
@@ -165,17 +178,36 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                 #主键唯一性 检查
                 base_data = ['A','01-直接映射','02-唯一性','0201-主键唯一性',
                     '检查主键是否重复',SYSTEM_CODE,table_cn_name,table_name,
-                    pk_list,pk_list_cn,'2025-02-21',p_qry
+                    pk_list_cn,pk_list,'2025-02-21',p_qry
                 ]
                 write_to_template(tgt_sheet, base_data)
                 #实体唯一性 检查
                 base_data = ['A','01-直接映射','02-唯一性','0202-实体唯一性',
                     '检查非空字段是否为空',SYSTEM_CODE,table_cn_name,table_name,
-                    pk_list,pk_list_cn,'2025-02-21',c_qry
+                    pk_list_cn,pk_list,'2025-02-21',c_qry
                 ]
 
                 write_to_template(tgt_sheet, base_data)
 
+                # 生成字段非空校验和空值率统计
+                for _, field_row in dd_data.iterrows():
+                    field_name = field_row['字段英文名']
+                    field_cn_name = field_row['字段中文名']
+                    
+                    # 获取SQL语句
+                    null_check_sql, null_ratio_sql = generate_field_validation_sql(table_name, field_name)
+                    
+                    # 非空校验 01-完整性	0101-非空完整性	统计字段非空值
+                    base_data_null = ['A','01-直接映射','01-完整性','0101-非空完整性',
+                        f'统计字段【{field_cn_name}】非空数量',SYSTEM_CODE,table_cn_name,table_name,
+                        field_cn_name,field_name,'2025-02-21',null_check_sql]
+                    write_to_template(tgt_sheet, base_data_null)
+                    
+                    # 空值率统计 02-关联处理	01-完整性	0404-参照一致性	主表与从表关联覆盖率大于0
+                    base_data_ratio = ['A','02-关联处理','01-完整性','0404-参照一致性',
+                        f'主表与从表关联覆盖率大于0',SYSTEM_CODE,table_cn_name,table_name,
+                        field_cn_name,field_name,'2025-02-21',null_ratio_sql]
+                    write_to_template(tgt_sheet, base_data_ratio)
 
                 processed_tables.append(table_name)
                 
