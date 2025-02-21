@@ -92,10 +92,10 @@ def generate_pk_query(pk_list: List[str], table_name: str, template_flag: str) -
         if len(pk_list) >= 1:
             return _handle_pk(pk_list, table_name, template_flag)
         else:
-            return "无主键,无需检查"
+            return "无主键,无需检查",""
     except Exception as e:
         logger.error(f"生成主键查询失败: {str(e)}")
-        return ""
+        return "",""
 
 def _handle_pk(pk: str, table_name: str, template_flag: str) -> Tuple[str, str]:
     """处理单主键逻辑"""
@@ -109,8 +109,12 @@ def _handle_pk(pk: str, table_name: str, template_flag: str) -> Tuple[str, str]:
                         GROUP BY {pk} 
                         HAVING COUNT(1) >1
                         );"""
+    count_query = f"""SELECT COUNT(1) FROM  AGL.{table_name}
+                        WHERE PT_DT = '${{process_date}}' 
+                        {del_condition}
+                        ;"""
     #print(pk_query)
-    return pk_query
+    return pk_query,count_query
 
 def write_to_template(sheet, data):
     try:
@@ -145,22 +149,29 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                 
                 # 数据字典处理
                 dd_data = process_data_dictionary(src_wb, table_name)
+                #print(dd_data)
                 if dd_data.empty:
                     errors.append(f"[{table_name}] 数据字典缺失")
                     continue
                 
                 # 主键处理
                 pk_list = ','.join(dd_data[dd_data['是否主键'] == 'Y']['字段英文名'])
-                #pk_list_a = pk_list.split(',')
                 pk_list_cn = ','.join(dd_data[dd_data['是否主键'] == 'Y']['字段中文名'])
-                #pk_list_b = pk_list_cn.split(',')
-                #pk_list = dd_data[dd_data['是否主键'] == 'Y']['字段英文名'].tolist()
-                qry = generate_pk_query(pk_list, table_name, row['template_flag'])
+                p_qry,c_qry = generate_pk_query(pk_list, table_name, row['template_flag'])
+
+                #
                 
-                # # 构建写入数据
+                #构建写入数据
+                #主键唯一性 检查
                 base_data = ['A','01-直接映射','02-唯一性','0201-主键唯一性',
                     '检查主键是否重复',SYSTEM_CODE,table_cn_name,table_name,
-                    pk_list,pk_list_cn,'2025-02-21',qry
+                    pk_list,pk_list_cn,'2025-02-21',p_qry
+                ]
+                write_to_template(tgt_sheet, base_data)
+                #实体唯一性 检查
+                base_data = ['A','01-直接映射','02-唯一性','0202-实体唯一性',
+                    '检查非空字段是否为空',SYSTEM_CODE,table_cn_name,table_name,
+                    pk_list,pk_list_cn,'2025-02-21',c_qry
                 ]
 
                 write_to_template(tgt_sheet, base_data)
