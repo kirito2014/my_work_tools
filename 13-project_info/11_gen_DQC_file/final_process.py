@@ -533,3 +533,4 @@ if __name__ == "__main__":
     new_file = copy_excel_template(target_file, person_name)
     clear_excel_data(new_file)
     copy_sheets_and_metadata(source_file, new_file)
+    logger.info("Excel文件处理完成！")
