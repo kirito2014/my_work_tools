@@ -49,13 +49,13 @@ def check_vaild_excel(sheet: xw.Sheet) -> bool:
     max_row_a=sheet.range('A1').expand('down').last_cell.row
     max_row_i=sheet.range('I1').expand('down').last_cell.row
     if max_row_a and max_row_i and max_row_i != max_row_a:
-        logger.error(f"{sheet.name} 首列非空校验不通过.\n")
+        logger.error(f"{sheet.name} 首列非空校验不通过.")
         return False
     elif max_row_a and max_row_i and max_row_i == max_row_a:
-        logger.error(f"{sheet.name} 首列非空校验通过.\n")
+        logger.info(f"{sheet.name} 首列非空校验通过.")
         if sheet.name == 'rem-代码映射':
             if sheet.range('A1').value != 'SRC_TAB_LIB_NAME' or sheet.range('A1').value == 'None':
-                logger.error(f"{sheet.name} 首列内容校验不通过，确认是否错行缺失.\n")
+                logger.error(f"{sheet.name} 首列内容校验不通过，确认是否错行缺失.")
                 return False
         return True
 def copy_excel_template(target_file: str, person_name: str) -> str:
