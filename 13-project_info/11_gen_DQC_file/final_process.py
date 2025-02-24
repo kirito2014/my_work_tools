@@ -1,21 +1,19 @@
 """
 文件名(File Name)               :gen_chk_file.py
 作者(Author)                    :wangmujun@Sunline
-编写时间(CreateTime)            :2024-05-01
-版本号(Version)                 :V1.2.1
+编写时间(CreateTime)            :2025-02-21
+版本号(Version)                 :V1.0.0
 使用方法(Usage)                 :python gen_chk_file.py <元数据文件> <模板文件> <生成人员/版本信息>
 功能描述(Descriptions)          :
     本脚本主要用于实现以下功能:
-    1、根据通用SDM模板生成DQC质量检核平台的导入模板
+    1、根据通用SDM模板生成校验规则下的excel文件
     2、
 依赖库(Dependences):
     - pandas >= 2.2.3
     - xlwings >= 0.33.4
 修改历史(Histories):
-    v1.0.0 - 2024-05-01 - 初始版本
-    v1.1.0 - 2024-11-03 - 修复生成后缺失部分文件的错误，补充了检查文件合法性的代码语句
-    v1.2.0 - 2025-02-05 - 修改生成模板，根据质量平台最新模板调整生成语句及插入字段的顺序,调整代码检查语句增加主键PK
-    v1.2.1 - 2025-02-08 - 优化打印输出格式，优化首行判断合法性
+    v1.0.0 - 2025-02-21 - 初始版本
+    
 """
 
 
@@ -41,6 +39,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def clear_filters(sheet):
+    """清除指定工作表的筛选器"""
+    if sheet.api.AutoFilter:
+        sheet.api.AutoFilterMode = False
+
+def check_vaild_excel(sheet: xw.Sheet) -> bool:
+    """检查最大行是否一致如果一致则返回True，不一致则返回False"""
+    max_row_a=sheet.range('A1').expand('down').last_cell.row
+    max_row_i=sheet.range('I1').expand('down').last_cell.row
+    if max_row_a and max_row_i and max_row_i != max_row_a:
+        logger.error(f"{sheet.name} 首列非空校验不通过.\n")
+        return False
+    elif max_row_a and max_row_i and max_row_i == max_row_a:
+        logger.error(f"{sheet.name} 首列非空校验通过.\n")
+        if sheet.name == 'rem-代码映射':
+            if sheet.range('A1').value != 'SRC_TAB_LIB_NAME' or sheet.range('A1').value == 'None':
+                logger.error(f"{sheet.name} 首列内容校验不通过，确认是否错行缺失.\n")
+                return False
+        return True
 def copy_excel_template(target_file: str, person_name: str) -> str:
     """复制模板文件并返回新路径"""
     if not os.path.isfile(target_file):
@@ -323,7 +340,20 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
             index_data = pd.read_excel(source_file, sheet_name='index', usecols="C,D,E,M,N,P")
             index_data = _clean_index_data(index_data)
 
-            #print(index_data)
+            #检查首行
+
+            src_data_sheet = src_wb.sheets[DATA_DICT_SHEET]
+            src_code_sheet = src_wb.sheets[CODE_MAP_SHEET]
+
+            if not check_vaild_excel(src_data_sheet) or not check_vaild_excel(src_code_sheet): 
+                errors.append("首行校验失败")
+                tgt_wb.close()
+                src_wb.close()
+                sys.exit()
+            else:
+                clear_filters(src_data_sheet)
+                clear_filters(src_code_sheet)
+
 
             for _, row in index_data.iterrows():
                 table_name = row['table_name']
@@ -491,9 +521,13 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        print("Usage: python main.py <source_file> <target_file> <person_name>")
+        sys.exit(1)
     source_file = sys.argv[1]
     target_file = sys.argv[2]
-    #person_name = sys.argv[3]
-    #new_file = copy_excel_template(target_file, person_name)
-    #clear_excel_data(new_file)
-    copy_sheets_and_metadata(source_file, target_file)
+    person_name = sys.argv[3]
+
+    new_file = copy_excel_template(target_file, person_name)
+    clear_excel_data(new_file)
+    copy_sheets_and_metadata(source_file, new_file)
