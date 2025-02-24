@@ -1,3 +1,24 @@
+"""
+文件名(File Name)               :gen_chk_file.py
+作者(Author)                    :wangmujun@Sunline
+编写时间(CreateTime)            :2024-05-01
+版本号(Version)                 :V1.2.1
+使用方法(Usage)                 :python gen_chk_file.py <元数据文件> <模板文件> <生成人员/版本信息>
+功能描述(Descriptions)          :
+    本脚本主要用于实现以下功能:
+    1、根据通用SDM模板生成DQC质量检核平台的导入模板
+    2、
+依赖库(Dependences):
+    - pandas >= 2.2.3
+    - xlwings >= 0.33.4
+修改历史(Histories):
+    v1.0.0 - 2024-05-01 - 初始版本
+    v1.1.0 - 2024-11-03 - 修复生成后缺失部分文件的错误，补充了检查文件合法性的代码语句
+    v1.2.0 - 2025-02-05 - 修改生成模板，根据质量平台最新模板调整生成语句及插入字段的顺序,调整代码检查语句增加主键PK
+    v1.2.1 - 2025-02-08 - 优化打印输出格式，优化首行判断合法性
+"""
+
+
 import sys
 import os
 import logging

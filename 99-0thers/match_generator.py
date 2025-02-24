@@ -1,5 +1,8 @@
 import random
- 
+from pyecharts import options as opts
+from pyecharts.charts import Tree
+
+
 # 示例数据
 participants = [
     {"Name": "王穆军", "Seeded": False},
@@ -66,3 +69,53 @@ schedule = create_match_schedule(group_a, group_b)
 print("Match Schedule:")
 for match in schedule:
     print(f"{match[0]} vs {match[1]}")
+
+# 示例数据
+group_a_names = [p["Name"] for p in group_a]
+group_b_names = [p["Name"] for p in group_b]
+schedule = create_match_schedule(group_a, group_b)
+
+# 构造树状图数据
+root = {
+    "name": "比赛分组",
+    "children": [
+        {
+            "name": "Group A",
+            "children": [{"name": name} for name in group_a_names],
+        },
+        {
+            "name": "Group B",
+            "children": [{"name": name} for name in group_b_names],
+        },
+        {
+            "name": "Match Schedule",
+            "children": [
+                {"name": f"{match[0]} vs {match[1]}"} for match in schedule
+            ],
+        },
+    ],
+}
+
+# 创建树状图
+def create_tree_diagram(data):
+    tree = (
+        Tree()
+        .add(
+            "",
+            [data],
+            collapse_interval=2,
+            symbol="roundRect",
+            symbol_size=14,
+        )
+        .set_global_opts(
+            title_opts=opts.TitleOpts(title="比赛分组与赛程"),
+            tooltip_opts=opts.TooltipOpts(trigger="item", formatter="{b}"),
+        )
+    )
+    return tree
+
+# 生成图表
+diagram = create_tree_diagram(root)
+diagram.render("tree_diagram.html")
+
+print("树状图已保存为 tree_diagram.html，打开浏览器查看。")
