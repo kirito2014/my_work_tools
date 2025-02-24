@@ -143,6 +143,8 @@ def process_code_map(src_wb: xw.Book, table_name: str) -> pd.DataFrame:
             logger.error(f"[{table_name}] 代码映射表没有数据")
             return pd.DataFrame()
         df.columns = df.columns.str.strip()
+        df['目标代码码值'] = df['目标代码码值'].fillna('').astype(str).str.strip()
+        df['目标代码说明'] = df['目标代码说明'].fillna('').astype(str).str.strip()
         # 筛选出目标表英文名等于table_name的数据
         df = df[df['目标表英文名'] == table_name.strip()]
         if df.empty:
@@ -200,8 +202,8 @@ def generate_field_validation_sql(table_name: str, field_name: str, template_fla
         null_check_sql = f"""SELECT COUNT(1) FROM AGL.{table_name} 
                             WHERE PT_DT = '${{process_date}}' 
                             {del_condition}
-                            AND {field_name} IS NULL;"""
-        null_ratio_sql = f"""SELECT ROUND(COUNT(*) / (COUNT(*) + COUNT({field_name})) * 100, 2) 
+                            AND ({field_name} IS NULL OR {field_name} = '');"""
+        null_ratio_sql = f"""SELECT ROUND( CAST(SUM( CASE WHEN {field_name} IS NULL OR {field_name} = '' THEN 1 ELSE 0 END) AS FLOAT ) / NULLIF(COUNT(*),0) * 100, 2) AS null_ratio
                             FROM AGL.{table_name} 
                             WHERE PT_DT = '${{process_date}}'
                             {del_condition}
@@ -437,7 +439,7 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                         base_data_content = [
                             'A', '01-直接映射', '03-有效性', '0302-内容有效性',
                             f'验证客户内码【{field_cn_name}】以（81，82，83）开头', SYSTEM_CODE,
-                            table_cn_name, table_name, field_name, field_cn_name,
+                            table_cn_name, table_name, field_cn_name,field_name,
                             '2025-02-21', content_valid_sql
                         ]
                         write_to_template(tgt_sheet, base_data_content)
@@ -446,7 +448,7 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                         base_data_length = [
                             'A', '01-直接映射', '03-有效性', '0301-长度有效性',
                             f'统计客户内码【{field_cn_name}】长度（11位）', SYSTEM_CODE,
-                            table_cn_name, table_name, field_name, field_cn_name,
+                            table_cn_name, table_name, field_cn_name,field_name,
                             '2025-02-21', length_valid_sql
                         ]
                         write_to_template(tgt_sheet, base_data_length)
@@ -460,7 +462,7 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                         base_data_length = [
                             'A', '01-直接映射', '03-有效性','0301-长度有效性',
                             f'统计柜员编号【{field_cn_name}】字段长度（6位）', SYSTEM_CODE,
-                            table_cn_name, table_name, field_name, field_cn_name,
+                            table_cn_name, table_name, field_cn_name,field_name,
                             '2025-02-21', length_valid_sql
                         ]
                         write_to_template(tgt_sheet, base_data_length)
@@ -474,7 +476,7 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                         base_data_length = [
                             'A', '01-直接映射', '03-有效性','0301-长度有效性',
                             f'统计机构编号【{field_cn_name}】字段长度（6位）', SYSTEM_CODE,
-                            table_cn_name, table_name, field_name, field_cn_name,
+                            table_cn_name, table_name, field_cn_name,field_name,
                             '2025-02-21', length_valid_sql
                         ]
                         write_to_template(tgt_sheet, base_data_length)
@@ -488,7 +490,7 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                         base_data_length = [
                             'A', '01-直接映射', '03-有效性','0303-日期有效性',
                             f'检查日期字段【{field_cn_name}】是否为yyyy-mm-dd 10位格式', SYSTEM_CODE,
-                            table_cn_name, table_name, field_name, field_cn_name,
+                            table_cn_name, table_name, field_cn_name,field_name,
                             '2025-02-21', length_valid_sql
                         ]
                         write_to_template(tgt_sheet, base_data_length)             
@@ -502,7 +504,7 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                         base_data_length = [
                             'A', '01-直接映射', '03-有效性','0303-日期有效性',
                             f'检查时间戳字段【{field_cn_name}】是否为26位格式', SYSTEM_CODE,
-                            table_cn_name, table_name, field_name, field_cn_name,
+                            table_cn_name, table_name, field_cn_name,field_name,
                             '2025-02-21', length_valid_sql
                         ]
                         write_to_template(tgt_sheet, base_data_length)                    
