@@ -385,7 +385,7 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                 write_to_template(tgt_sheet, base_data)
                 #实体唯一性 检查
                 base_data = ['A','01-直接映射','02-唯一性','0202-实体唯一性',
-                    '检查非空字段是否为空',SYSTEM_CODE,table_cn_name,table_name,
+                    '数据量是否与源表一致',SYSTEM_CODE,table_cn_name,table_name,
                     pk_list_cn,pk_list,'2025-02-21',c_qry
                 ]
 
