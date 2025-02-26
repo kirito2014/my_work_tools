@@ -143,8 +143,8 @@ def process_code_map(src_wb: xw.Book, table_name: str) -> pd.DataFrame:
             logger.error(f"[{table_name}] 代码映射表没有数据")
             return pd.DataFrame()
         df.columns = df.columns.str.strip()
-        df['目标代码码值'] = df['目标代码码值'].fillna('').astype(str).str.strip()
-        df['目标代码说明'] = df['目标代码说明'].fillna('').astype(str).str.strip()
+        df['目标代码码值'] = df['目标代码码值'].fillna('').astype(str).str.strip().dropduplicates()
+        df['目标代码说明'] = df['目标代码说明'].fillna('').astype(str).str.strip().dropduplicates()
         # 筛选出目标表英文名等于table_name的数据
         df = df[df['目标表英文名'] == table_name.strip()]
         if df.empty:
@@ -199,7 +199,7 @@ def generate_field_validation_sql(table_name: str, field_name: str, template_fla
     """生成字段非空校验和空值率统计SQL"""
     del_condition = "AND DEL_F = '0'" if template_flag == 'AGL-PKA' else ""
     try:
-        null_check_sql = f"""SELECT '{field_name} ',COUNT(1) FROM AGL.{table_name} 
+        null_check_sql = f"""SELECT '{field_name}',COUNT(1) FROM AGL.{table_name} 
                             WHERE PT_DT = '${{process_date}}' 
                             {del_condition}
                             AND COALESCE(TRIM({field_name}), '') = '' 
@@ -405,8 +405,8 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                 if not cm_data.empty:
                     # 生成枚举值有效性校验规则
                     for _, cm_row in cm_data.iterrows():
-                        field_cn = cm_row['目标字段中文名']
-                        field_en = cm_row['目标字段英文名']
+                        field_cn = cm_row['目标字段中文名'].strip()
+                        field_en = cm_row['目标字段英文名'].strip()
                         code_info = cm_row['code_info']
                         
                         code_check_sql = generate_code_validation_sql(table_name, field_en, row['template_flag'])
@@ -421,8 +421,8 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
 
                 # 生成字段非空校验和空值率统计
                 for _, field_row in dd_data.iterrows():
-                    field_name = field_row['字段英文名']
-                    field_cn_name = field_row['字段中文名']
+                    field_name = field_row['字段英文名'].strip()
+                    field_cn_name = field_row['字段中文名'].strip()
                     
                     # 获取SQL语句
                     null_check_sql, null_ratio_sql = generate_field_validation_sql(table_name, field_name,row['template_flag'])
@@ -505,7 +505,7 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                         write_to_template(tgt_sheet, base_data_length)             
 
                    #时间戳长度校验
-                    if field_row.get('is_dt', False):
+                    if field_row.get('is_tm_stamp', False):
                         # 生成长度校验SQL
                         length_valid_sql = generate_tm_stamp_validation_sql(table_name, field_name,row['template_flag'])
                         
