@@ -143,8 +143,8 @@ def process_code_map(src_wb: xw.Book, table_name: str) -> pd.DataFrame:
             logger.error(f"[{table_name}] 代码映射表没有数据")
             return pd.DataFrame()
         df.columns = df.columns.str.strip()
-        df['目标代码码值'] = df['目标代码码值'].fillna('').astype(str).str.strip().dropduplicates()
-        df['目标代码说明'] = df['目标代码说明'].fillna('').astype(str).str.strip().dropduplicates()
+        df['目标代码码值'] = df['目标代码码值'].fillna('').astype(str).str.strip()
+        df['目标代码说明'] = df['目标代码说明'].fillna('').astype(str).str.strip()
         # 筛选出目标表英文名等于table_name的数据
         df = df[df['目标表英文名'] == table_name.strip()]
         if df.empty:
