@@ -204,7 +204,7 @@ def generate_field_validation_sql(table_name: str, field_name: str, template_fla
                             {del_condition}
                             AND COALESCE(TRIM({field_name}), '') = '' 
                             UNION ALL"""
-        null_ratio_sql = f"""SELECT '{field_name}',ROUND( CAST(SUM( CASE WHEN COALESCE(TRIM({field_name}),'')='' THEN 1 ELSE 0 END) AS FLOAT ) / NULLIF(COUNT(*),0) * 100, 2) AS null_ratio
+        null_ratio_sql = f"""SELECT '{field_name}',ROUND( CAST(SUM( CASE WHEN COALESCE(TRIM({field_name}), '') = '' THEN 1 ELSE 0 END) AS FLOAT ) / NULLIF(COUNT(*),0) * 100, 2) AS null_ratio
                             FROM AGL.{table_name} 
                             WHERE PT_DT = '${{process_date}}'
                             {del_condition}
