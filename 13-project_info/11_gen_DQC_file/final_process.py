@@ -180,7 +180,7 @@ def _handle_pk(pk: str, table_name: str, template_flag: str) -> Tuple[str, str]:
     """处理单主键逻辑"""
     del_condition = "AND DEL_F = '0'" if template_flag == 'AGL-PKA' else ""
     
-    pk_query = f"""SELECT COUNT(1) FROM (
+    pk_query = f"""SELECT '{table_name}',COUNT(1) FROM (
                         SELECT {pk},COUNT(1) 
                         FROM AGL.{table_name}
                         WHERE PT_DT = '${{process_date}}' 
@@ -188,7 +188,7 @@ def _handle_pk(pk: str, table_name: str, template_flag: str) -> Tuple[str, str]:
                         GROUP BY {pk} 
                         HAVING COUNT(1) >1
                         );"""
-    count_query = f"""SELECT COUNT(1) FROM  AGL.{table_name}
+    count_query = f"""SELECT '{table_name}',COUNT(1) FROM  AGL.{table_name}
                         WHERE PT_DT = '${{process_date}}' 
                         {del_condition}
                         ;"""
@@ -199,14 +199,16 @@ def generate_field_validation_sql(table_name: str, field_name: str, template_fla
     """生成字段非空校验和空值率统计SQL"""
     del_condition = "AND DEL_F = '0'" if template_flag == 'AGL-PKA' else ""
     try:
-        null_check_sql = f"""SELECT COUNT(1) FROM AGL.{table_name} 
+        null_check_sql = f"""SELECT '{field_name} ',COUNT(1) FROM AGL.{table_name} 
                             WHERE PT_DT = '${{process_date}}' 
                             {del_condition}
-                            AND ({field_name} IS NULL OR {field_name} = '');"""
-        null_ratio_sql = f"""SELECT ROUND( CAST(SUM( CASE WHEN {field_name} IS NULL OR {field_name} = '' THEN 1 ELSE 0 END) AS FLOAT ) / NULLIF(COUNT(*),0) * 100, 2) AS null_ratio
+                            AND COALESCE(TRIM({field_name}), '') = '' 
+                            UNION ALL"""
+        null_ratio_sql = f"""SELECT '{field_name}',ROUND( CAST(SUM( CASE WHEN COALESCE(TRIM({field_name}),'')='' THEN 1 ELSE 0 END) AS FLOAT ) / NULLIF(COUNT(*),0) * 100, 2) AS null_ratio
                             FROM AGL.{table_name} 
                             WHERE PT_DT = '${{process_date}}'
                             {del_condition}
+                            UNION ALL
                             ;"""
         return null_check_sql, null_ratio_sql
     except Exception as e:
@@ -219,18 +221,20 @@ def generate_cust_in_cd_validation_sql(table_name: str, field_name: str, templat
     try:
         # 内容有效性校验（以81、82、83开头）
         content_valid_sql = f"""
-        SELECT COUNT(1) FROM AGL.{table_name}
+        SELECT '{field_name}',COUNT(1) FROM AGL.{table_name}
         WHERE PT_DT = '${{process_date}}'
         {del_condition}
-        AND SUBSTR({field_name}, 1,2) NOT  IN ('81', '82', '83'));
+        AND SUBSTR({field_name}, 1,2) NOT  IN ('81', '82', '83')
+        UNION ALL
         """
         
         # 长度有效性校验（长度为11位）
         length_valid_sql = f"""
-        SELECT COUNT(1) FROM AGL.{table_name}
+        SELECT '{field_name}',LENGTH({field_name}),COUNT(1) FROM AGL.{table_name}
         WHERE PT_DT = '${{process_date}}'
         {del_condition}
-        AND LENGTH({field_name}) != 11;
+        GROUP BY LENGTH({field_name}) 
+        UNION ALL
         """
         
         return content_valid_sql.strip(), length_valid_sql.strip()
@@ -244,10 +248,11 @@ def generate_teller_no_validation_sql(table_name: str, field_name: str, template
     try:
         # 长度有效性校验（长度为6位）
         length_valid_sql = f"""
-        SELECT COUNT(1) FROM AGL.{table_name}
+        SELECT '{field_name}',LENGTH({field_name}),COUNT(1) FROM AGL.{table_name}
         WHERE PT_DT = '${{process_date}}'
         {del_condition}
-        AND LENGTH({field_name}) != 6;
+        GROUP BY LENGTH({field_name}) 
+        UNION ALL
         """
         return length_valid_sql.strip()
     except Exception as e:
@@ -260,10 +265,11 @@ def generate_org_no_validation_sql(table_name: str, field_name: str, template_fl
     try:
         # 长度有效性校验（长度为6位）
         length_valid_sql = f"""
-        SELECT COUNT(1) FROM AGL.{table_name}
+        SELECT '{field_name}',LENGTH({field_name}),COUNT(1) FROM AGL.{table_name}
         WHERE PT_DT = '${{process_date}}'
         {del_condition}
-        AND LENGTH({field_name}) != 6;
+        GROUP BY  LENGTH({field_name})
+        UNION ALL
         """
         return length_valid_sql.strip()
     except Exception as e:
@@ -276,10 +282,11 @@ def generate_dt_validation_sql(table_name: str, field_name: str, template_flag: 
     try:
         # 长度有效性校验（长度为10位）
         length_valid_sql = f"""
-        SELECT LENGTH({field_name}),COUNT(1) FROM AGL.{table_name}
+        SELECT '{field_name}',LENGTH({field_name}),COUNT(1) FROM AGL.{table_name}
         WHERE PT_DT = '${{process_date}}'
         {del_condition}
-        GROUP BY LENGTH({field_name});
+        GROUP BY LENGTH({field_name})
+        UNION ALL
         """
         return length_valid_sql.strip()
     except Exception as e:
@@ -292,10 +299,11 @@ def generate_tm_stamp_validation_sql(table_name: str, field_name: str, template_
     try:
         # 长度有效性校验（长度为26位）
         length_valid_sql = f"""
-        SELECT LENGTH({field_name}),COUNT(1) FROM AGL.{table_name}
+        SELECT '{field_name}',LENGTH({field_name}),COUNT(1) FROM AGL.{table_name}
         WHERE PT_DT = '${{process_date}}'
         {del_condition}
-        GROUP BY LENGTH({field_name});
+        GROUP BY LENGTH({field_name})
+        UNION ALL
         """
         return length_valid_sql.strip()
     except Exception as e:
@@ -308,10 +316,11 @@ def generate_code_validation_sql(table_name: str, field_name: str, template_flag
     try:
         # 码值映射校验
         code_valid_sql = f"""
-        SELECT {field_name},COUNT(1) FROM AGL.{table_name}
+        SELECT '{field_name}',{field_name},COUNT(1) FROM AGL.{table_name}
         WHERE PT_DT = '${{process_date}}'
         {del_condition}
-        GROUP BY  {field_name};
+        GROUP BY  {field_name}
+        UNION ALL
         """
         return code_valid_sql.strip()
     except Exception as e:
@@ -498,7 +507,7 @@ def copy_sheets_and_metadata(source_file: str, target_file: str) -> Tuple[List[s
                    #时间戳长度校验
                     if field_row.get('is_dt', False):
                         # 生成长度校验SQL
-                        length_valid_sql = generate_dt_validation_sql(table_name, field_name,row['template_flag'])
+                        length_valid_sql = generate_tm_stamp_validation_sql(table_name, field_name,row['template_flag'])
                         
                         # 长度有效性校验
                         base_data_length = [
