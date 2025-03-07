@@ -5,9 +5,9 @@
 *    Filename   :  case_split_single.py
 *    Description:  split excel file by department
 *
-*    Version    :  1.1.3
+*    Version    :  1.1.4
 *    Created    :  2024/09/28 10:25:07
-*    updated   :  2024/11/09 10:25:07
+*    updated   :  2025/03/08 12:15:07
 *    Compiler   :  python
 *
 *    Author     :  wangmujun(解决方案部/战略规划部), 
@@ -32,6 +32,7 @@ from openpyxl import load_workbook
 from datetime import datetime
 from PIL import Image, ImageTk
 import openpyxl
+from dateutil.relativedelta import relativedelta 
 from openpyxl.styles import Font, Border, Side, Alignment
 
 #pyinstaller --onefile --noconsole --add-data "res;res" --icon=sunline.ico case_split.py  # 打包命令
@@ -142,8 +143,9 @@ def write_to_specific_cells(file_path: str, sheet_name: str, dp_name: str):
         ws['D4'] = dp_name
         # 写入 D5 单元格，当前时间
         ws['D5'] = datetime.now().strftime('%Y-%m-%d')
-        # 写入 D6 单元格，(yyyy年mm月）
-        ws['D6'] = datetime.now().strftime('%Y年%m月')
+        # 写入 D6 单元格，(yyyy年mm月）-1月 20250307 mod by wmj 修改日期周期
+        ws['D6'] = (datetime.now() - relativedelta(months=1)).strftime('%Y年%m月')
+        #ws['D6'] = datetime.now().strftime('%Y年%m月')
     
     elif sheet_name == "部门商机明细":
         try:
