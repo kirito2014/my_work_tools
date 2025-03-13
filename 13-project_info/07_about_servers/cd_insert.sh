@@ -71,12 +71,14 @@ for context1 in `spark-beeline -e "desc table AGL.${TABLE_NAME_UPPER}"`;  do
     if [ "${colname}" == "" -o "${coltype}" == "" -o "${colname:0:2}" == "  " -o "${colname:0:2}" == " #" ];then
         continue  
     fi
+    
     colname=`echo "${colname}"|awk '$1=$1'`
     coltype=`echo "${coltype}"|awk '$1=$1'`
+    #coltype 大写
+    coltype=$(echo "$coltype" | tr '[:lower:]' '[:upper:]')
 
-    if [[ "$coltype" == *","* ]]; then
-        coltype="\"$coltype\""
-    fi
+
+
 
     colremk=`echo "${colremk}"|awk '$1=$1'`
     colremk=$(echo "${colremk}" | sed 's/ //g') 

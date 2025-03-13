@@ -36,7 +36,7 @@ from dateutil.relativedelta import relativedelta
 from openpyxl.styles import Font, Border, Side, Alignment
 
 #pyinstaller --onefile --noconsole --add-data "res;res" --icon=sunline.ico case_split.py  # 打包命令
-#nuitka --onefile --windows-console-mode=disable  --include-data-dir="D:\github\99-0thers\case_split\res=res" --windows-icon-from-ico='D:\github\99-0thers\case_split\res\sunline.ico' --output-dir=out .\case_split_single.py
+#nuitka --onefile --windows-console-mode=disable  --enable-plugin=tk-inter --include-data-dir="D:\github\99-0thers\case_split\res=res" --windows-icon-from-ico='D:\github\99-0thers\case_split\res\sunline.ico' --output-dir=out .\case_split_single.py
 # 模块1: 读取文件并提取部门信息,用于获取部门列表 方便循环操作
 def get_unique_departments(source_file: str, sheet_name: str, usecols:str) -> list:
     """从源文件中读取部门信息并去重"""
