@@ -90,9 +90,24 @@ def process_file(file_path):
     if data:
         file_name = os.path.basename(file_path)
         last_modified_time = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime('%Y-%m-%d')
-        batch_number = file_name.split('-')[0] if '-' in file_name else " "
-        batch_group = file_name.split('-')[1] if '-' in file_name else " "
+        #如果batch_number为“第”开头，则取batch_number为“第”开头的部分 否则为""
+        # 解析文件名结构
+        parts = file_name.split('-')
+        batch_number = " "
+        batch_group = " "
+
+        if parts:
+            # 检查第一个部分是否是批次号（以"第"开头且包含"批"）
+            if parts[0].startswith('第') and '批' in parts[0]:
+                batch_number = parts[0]
+                # 组别为第二个部分（如果存在）
+                batch_group = parts[1] if len(parts) >= 2 else " "
+            else:
+                # 没有批次号时，组别为第一个部分
+                batch_group = parts[0]
+
         name = extract_name_from_filename(file_name)
+        
         return (
             file_name,
             data.get("theme_object"), #主题对象
