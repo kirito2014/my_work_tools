@@ -5,7 +5,7 @@
 *    Filename   :  case_collector.py
 *    Description:  join all the case files into one file
 *
-*    Version    :  1.0
+*    Version    :  1.3.0
 *    Created    :  2024/08/01 10:25:07
 *    Revision   :  none
 *    Compiler   :  python
@@ -470,22 +470,27 @@ def get_max_non_empty_row(sheet):
 
 #将处理好的数据加载到目标表中
 def load_data_to_target_file(data, target_file_path,source_file_path):
+    import datetime
     try:
         workbook = openpyxl.load_workbook(target_file_path)
     except Exception as e:
         log_message(f"[ ERROR ] 无法加载目标文件: {e}","#DB231D")
         return
 
-    sheets_to_check = ["案例清单", "通用补充信息", "数据应用类补充信息","客户清单"]
+    sheets_to_check = ["案例清单"]
     cust_list = ''
+    modified_time = os.path.getmtime(source_file_path)
+    modified_date = datetime.datetime.fromtimestamp(modified_time).strftime('%Y-%m-%d')
+
+    #print(modified_date)
 
     #判断basic数据是否存在，判断客户名称是否为/
 
     #提前准备合同名称是所有sheet页的“主键”
     #数据加载
     basic_info = data.get("basic_info", None)
+    #print(basic_info)
     project_info = data.get("project_info", None)
-    #print(project_info)
     class_data = data.get("class_data", None)
     supply_data = data.get("supply_data", None)
     other_data = data.get("other_data", None)
@@ -506,7 +511,6 @@ def load_data_to_target_file(data, target_file_path,source_file_path):
             if sheet_name in workbook.sheetnames:
                 sheet = workbook[sheet_name]
                 max_non_empty_row = get_max_non_empty_row(sheet)
-                #print(max_non_empty_row)
                 
                 # 确保最大非空行数 =3
                 if max_non_empty_row >= 3:
@@ -514,148 +518,170 @@ def load_data_to_target_file(data, target_file_path,source_file_path):
 
                     if sheet_name == "案例清单":
                         #基本信息
-                        project_scale  = basic_info.get("project_scale", None)
-                        contract_year   = basic_info.get("contract_year", None)
-                        is_outsourced   = basic_info.get("is_outsourced", None)
-                        cust_contact    = basic_info.get("cust_contact", None)
-                        is_new_cust     = basic_info.get("is_new_cust", None)
-                        hd_managedp     = basic_info.get("hd_managedp", None)
-                        asi_managedp    = basic_info.get("asi_managedp", None)
-                        project_manager = basic_info.get("project_manager", None)
-                        sale_area       = basic_info.get("sale_area", None)
-                        project_period  = basic_info.get("project_period", None)
-                        project_status  = basic_info.get("project_status", None)
+                        project_scale  = basic_info.get("project_scale", None)  
+                        contract_year   = basic_info.get("contract_year", None) #合同年份
+                        is_outsourced   = basic_info.get("is_outsourced", None) #是否人力外包
+                        cust_contact    = basic_info.get("cust_contact", None) #客户联系方式
+                        is_new_cust     = basic_info.get("is_new_cust", None) #是否新开业
+                        hd_managedp     = basic_info.get("hd_managedp", None) #主管系统部门
+                        asi_managedp    = basic_info.get("asi_managedp", None) #分管系统部门
+                        project_manager = basic_info.get("project_manager", None) #项目经理
+                        sale_area       = basic_info.get("sale_area", None) #销售区域
+                        project_period  = basic_info.get("project_period", None) #实施周期
+                        project_status  = basic_info.get("project_status", None) #项目状态
 
                         #项目实施内容
                         project_info = project_info.get("project_info", None)
-                        #print(project_info)
+                        #如果为示例：\n开头 则替换删除
+
+                        project_info = project_info.replace("示例：\n","")
 
                         #分类信息
-                        consulting_plan 	= class_data.get("consulting_plan", None)
-                        data_platform       = class_data.get("data_platform", None)
-                        product_implement   = class_data.get("product_implement", None)
-                        platform_implement  = class_data.get("platform_implement", None)
-                        busi_consult        = class_data.get("busi_consult", None)
-                        line_market         = class_data.get("line_market", None)
-                        indicator           = class_data.get("indicator", None)
-                        data_service        = class_data.get("data_service", None)
-                        operate_analysis    = class_data.get("operate_analysis", None)
-                        customer_management = class_data.get("customer_management", None)
-                        risk_management     = class_data.get("risk_management", None)
-                        supervisory_report  = class_data.get("supervisory_report", None)
-                        business_platform   = class_data.get("business_platform", None)
-                        agency_sales        = class_data.get("agency_sales", None)
-                        others              = class_data.get("others", None)
+                        consulting_plan 	= class_data.get("consulting_plan", None) #咨询规划类
+                        data_platform       = class_data.get("data_platform", None) #数据平台类
+                        product_implement   = class_data.get("product_implement", None) #配套产品实施
+                        platform_implement  = class_data.get("platform_implement", None) #平台实施
+                        busi_consult        = class_data.get("busi_consult", None) #咨询
+                        line_market         = class_data.get("line_market", None) #条线集市
+                        indicator           = class_data.get("indicator", None) #指标
+                        data_service        = class_data.get("data_service", None) #数据服务
+                        operate_analysis    = class_data.get("operate_analysis", None) #经营分析类
+                        customer_management = class_data.get("customer_management", None) #客户管理
+                        risk_management     = class_data.get("risk_management", None) #风险管理
+                        supervisory_report  = class_data.get("supervisory_report", None) #监管报送
+                        business_platform   = class_data.get("business_platform", None) #业务系统
+                        agency_sales        = class_data.get("agency_sales", None) #代销 
+                        others              = class_data.get("others", None) #其他
+                        #log_message(f"[SUCCESS] 写入 {os.path.basename(source_file_path)} 的数据到 <{sheet_name}> ","#298073")
+                        #print(f"写入 {os.path.basename(source_file_path)} 的数据到 {sheet_name} ")
+                        
+                        #通用补充信息
+
+                        supply_application        = other_data.get("supply_application", None)  #支撑应用
+                        core_transformation       = other_data.get("core_transformation", None) #配合新核心改造
+                        migration_flag            = other_data.get("migration_flag", None) #是否迁移
+                        mig_distnation            = other_data.get("mig_distnation", None) #迁移目标
+                        migration_period          = other_data.get("migration_period", None) #迁移周期
+                        migration_progress        = other_data.get("migration_progress", None) #迁移进展
+                        innovation_flag           = other_data.get("innovation_flag", None) #是否信创
+                        database_type	      = supply_data.get("database_type", None) #数据库类型
+                        database_version      = supply_data.get("database_version", None) #数据库版本号
+                        node_number           = supply_data.get("node_number", None) #节点数
+                        agent_corpration      = supply_data.get("agent_corpration", None) #代理厂商
+                        bi_tool               = supply_data.get("bi_tool", None) #bi工具
+                        scheduling_platform   = supply_data.get("scheduling_platform", None) #调度平台工具 
+                        data_development      = supply_data.get("data_development", None) #开发平台产品
+                        data_exchange         = supply_data.get("data_exchange", None) #交换平台产品
+                        dataassest_product    = supply_data.get("dataassest_product", None) #数据资产产品
+                        model_product         = supply_data.get("model_product", None) #模型管理产品
+                        server_model          = supply_data.get("server_model", None) #服务器产品型号
+                        operation_version     = supply_data.get("operation_version", None) #操作系统版本号
+                        middleware_version    = supply_data.get("middleware_version", None) #中间件版本号
+                        
+                        #数据应用类补充信息
+
+                        data_source               = other_data.get("data_source", None)  #数据源
+                        bi_tool_1                 = other_data.get("bi_tool", None) #报表工具
+                        agent_bi_tool             = other_data.get("agent_bi_tool", None)  #是否代理报表工具
+                        bi_tool_nodes             = other_data.get("bi_tool_nodes", None) #报表工具节点数
+                        bi_tool_database          = other_data.get("bi_tool_database", None)  #报表工具知识库
+                        original_implementation   = other_data.get("original_implementation", None) #原实施厂商
 
                         #写入数据
+                        #print(target_row)
+                        #sheet.cell(row=target_row, column=1, value="111")
+
                         sheet.cell(row=target_row, column=1, value=contract_name)
                         sheet.cell(row=target_row, column=2, value=project_scale)
                         sheet.cell(row=target_row, column=3, value=contract_year)
                         sheet.cell(row=target_row, column=4, value=is_outsourced)
                         sheet.cell(row=target_row, column=5, value=cust_abb)
-                        sheet.cell(row=target_row, column=35, value=cust_contact)
-                        sheet.cell(row=target_row, column=37, value=is_new_cust)
-                        sheet.cell(row=target_row, column=10, value=hd_managedp)
-                        sheet.cell(row=target_row, column=11, value=asi_managedp)
-                        sheet.cell(row=target_row, column=12, value=project_manager)
-                        sheet.cell(row=target_row, column=34, value=sale_area)
-                        sheet.cell(row=target_row, column=29, value=project_period)
-                        sheet.cell(row=target_row, column=30, value=project_status)
-                        sheet.cell(row=target_row, column=28, value=project_info)
 
-                        sheet.cell(row=target_row, column=14, value=consulting_plan)
-                        sheet.cell(row=target_row, column=15, value=data_platform)
-                        sheet.cell(row=target_row, column=16, value=product_implement)
-                        sheet.cell(row=target_row, column=17, value=platform_implement)
-                        sheet.cell(row=target_row, column=18, value=busi_consult)
-                        sheet.cell(row=target_row, column=19, value=line_market)
-                        sheet.cell(row=target_row, column=20, value=indicator)
-                        sheet.cell(row=target_row, column=21, value=data_service)
-                        sheet.cell(row=target_row, column=22, value=operate_analysis)
-                        sheet.cell(row=target_row, column=23, value=customer_management)
-                        sheet.cell(row=target_row, column=24, value=risk_management)
-                        sheet.cell(row=target_row, column=25, value=supervisory_report)
-                        sheet.cell(row=target_row, column=26, value=business_platform)
-                        sheet.cell(row=target_row, column=27, value=agency_sales)
-                        sheet.cell(row=target_row, column=36, value=others)
-                        #填充公式
-
+                        #客户信息
                         sheet.cell(row=target_row, column=6, value=f'=IFERROR(VLOOKUP($E{target_row},客户清单!B:G,2,0),"")')
                         sheet.cell(row=target_row, column=7, value=f'=IFERROR(VLOOKUP($E{target_row},客户清单!B:G,3,0),"")')
                         sheet.cell(row=target_row, column=8, value=f'=IFERROR(VLOOKUP($E{target_row},客户清单!B:G,4,0),"")')
                         sheet.cell(row=target_row, column=9, value=f'=IF(VLOOKUP($E{target_row},客户清单!B:G,6,0)=0,"<暂未更新>",VLOOKUP($E{target_row},客户清单!B:G,6,0))')
-                        sheet.cell(row=target_row, column=31, value=f'=IFERROR(HYPERLINK("#\'通用补充信息\'!A"&MATCH(A{target_row}, 通用补充信息!A:A, 0), ">>>通用补充信息<<<"), ">>>暂无补充<<<")')
-                        sheet.cell(row=target_row, column=32, value=f'=IFERROR(HYPERLINK("#\'数据应用类补充信息\'!A"&MATCH(A{target_row}, 数据应用类补充信息!A:A, 0), ">>>数据应用类补充信息<<<"), ">>>暂无补充<<<")')
-
-                        log_message(f"[SUCCESS] 写入 {os.path.basename(source_file_path)} 的数据到 <{sheet_name}> ","#298073")
-                        #print(f"写入 {os.path.basename(source_file_path)} 的数据到 {sheet_name} ")
-                    elif sheet_name == "通用补充信息":
-
-                        supply_application        = other_data.get("supply_application", None) 
-                        core_transformation       = other_data.get("core_transformation", None) 
-                        migration_flag            = other_data.get("migration_flag", None) 
-                        mig_distnation            = other_data.get("mig_distnation", None) 
-                        migration_period          = other_data.get("migration_period", None) 
-                        migration_progress        = other_data.get("migration_progress", None) 
-                        innovation_flag           = other_data.get("innovation_flag", None) 
-                        database_type	      = supply_data.get("database_type", None) 
-                        database_version      = supply_data.get("database_version", None) 
-                        node_number           = supply_data.get("node_number", None) 
-                        agent_corpration      = supply_data.get("agent_corpration", None) 
-                        bi_tool               = supply_data.get("bi_tool", None) 
-                        scheduling_platform   = supply_data.get("scheduling_platform", None) 
-                        data_development      = supply_data.get("data_development", None) 
-                        data_exchange         = supply_data.get("data_exchange", None) 
-                        dataassest_product    = supply_data.get("dataassest_product", None) 
-                        model_product         = supply_data.get("model_product", None) 
-                        server_model          = supply_data.get("server_model", None) 
-                        operation_version     = supply_data.get("operation_version", None) 
-                        middleware_version    = supply_data.get("middleware_version", None) 
+                        sheet.cell(row=target_row, column=10, value=f'=SUBSTITUTE(SUBSTITUTE(K{target_row}&IF(ISBLANK(K{target_row}),"",",")&L{target_row}&IF(ISBLANK(L{target_row}),"",",")&M{target_row}&IF(ISBLANK(M{target_row}),"",",")\
+                                   &N{target_row}&IF(ISBLANK(N{target_row}),"",",")&O{target_row}&IF(ISBLANK(O{target_row}),"",",")&P{target_row}&IF(ISBLANK(P{target_row}),"",",")&Q{target_row}&IF(ISBLANK(Q{target_row}),"",",")&R{target_row}&IF(ISBLANK(R{target_row}),"",",")\
+                                    &S{target_row}&IF(ISBLANK(S{target_row}),"",",")&T{target_row}&IF(ISBLANK(T{target_row}),"",",")&U{target_row}&IF(ISBLANK(U{target_row}),"",",")&V{target_row}&IF(ISBLANK(V{target_row}),"",",")&W{target_row}&IF(ISBLANK(W{target_row}),"",",")&X{target_row},"/,",""),",/","")')
+                        #解决方案分类 向前移3位
+                        sheet.cell(row=target_row, column=11, value=consulting_plan)
+                        sheet.cell(row=target_row, column=12, value=data_platform)
+                        sheet.cell(row=target_row, column=13, value=product_implement)
+                        sheet.cell(row=target_row, column=14, value=platform_implement)
+                        sheet.cell(row=target_row, column=15, value=busi_consult)
+                        sheet.cell(row=target_row, column=16, value=line_market)
+                        sheet.cell(row=target_row, column=17, value=indicator)
+                        sheet.cell(row=target_row, column=18, value=data_service)
+                        sheet.cell(row=target_row, column=19, value=operate_analysis)
+                        sheet.cell(row=target_row, column=20, value=customer_management)
+                        sheet.cell(row=target_row, column=21, value=risk_management)
+                        sheet.cell(row=target_row, column=22, value=supervisory_report)
+                        sheet.cell(row=target_row, column=23, value=business_platform)
+                        sheet.cell(row=target_row, column=24, value=agency_sales)
 
 
+                        #项目补充信息
+                        sheet.cell(row=target_row, column=25, value=project_info)
+                        sheet.cell(row=target_row, column=26, value=project_period)
+                        sheet.cell(row=target_row, column=27, value=cust_contact)
+                        sheet.cell(row=target_row, column=28, value=project_status)
 
+                        #归属信息
+                        sheet.cell(row=target_row, column=29, value=hd_managedp)
+                        sheet.cell(row=target_row, column=30, value=asi_managedp)
+                        sheet.cell(row=target_row, column=31, value=project_manager)
 
-                        sheet.cell(row=target_row, column=1, value=contract_name)
-                        sheet.cell(row=target_row, column=16, value=supply_application)
-                        sheet.cell(row=target_row, column=17, value=core_transformation)
-                        sheet.cell(row=target_row, column=18, value=migration_flag)
-                        sheet.cell(row=target_row, column=19, value=mig_distnation)
-                        sheet.cell(row=target_row, column=20, value=migration_period)
-                        sheet.cell(row=target_row, column=21, value=migration_progress)
-                        sheet.cell(row=target_row, column=22, value=innovation_flag)
+                        #其他补充信息-通用补充信息
+                        #软硬件信息
+                        sheet.cell(row=target_row, column=32, value=database_type)
+                        sheet.cell(row=target_row, column=33, value=database_version)
+                        sheet.cell(row=target_row, column=34, value=node_number)
+                        sheet.cell(row=target_row, column=35, value=agent_corpration)
+                        sheet.cell(row=target_row, column=36, value=bi_tool)
+                        sheet.cell(row=target_row, column=37, value=scheduling_platform)
+                        sheet.cell(row=target_row, column=38, value=data_development)
+                        sheet.cell(row=target_row, column=39, value=data_exchange)
+                        sheet.cell(row=target_row, column=40, value=dataassest_product)
+                        sheet.cell(row=target_row, column=41, value=model_product)
+                        sheet.cell(row=target_row, column=42, value=server_model)
+                        sheet.cell(row=target_row, column=43, value=operation_version)
+                        sheet.cell(row=target_row, column=44, value=middleware_version)
+                        sheet.cell(row=target_row, column=45, value='/')
 
-                        sheet.cell(row=target_row, column=2, value=database_type)
-                        sheet.cell(row=target_row, column=3, value=database_version)
-                        sheet.cell(row=target_row, column=4, value=node_number)
-                        sheet.cell(row=target_row, column=5, value=agent_corpration)
-                        sheet.cell(row=target_row, column=6, value=bi_tool)
-                        sheet.cell(row=target_row, column=7, value=scheduling_platform)
-                        sheet.cell(row=target_row, column=8, value=data_development)
-                        sheet.cell(row=target_row, column=9, value=data_exchange)
-                        sheet.cell(row=target_row, column=10, value=dataassest_product)
-                        sheet.cell(row=target_row, column=11, value=model_product)
-                        sheet.cell(row=target_row, column=12, value=server_model)
-                        sheet.cell(row=target_row, column=13, value=operation_version)
-                        sheet.cell(row=target_row, column=14, value=middleware_version)
-                        sheet.cell(row=target_row, column=14, value='/')
+                        #上下游信息
+                        sheet.cell(row=target_row, column=46, value=supply_application)
+                        sheet.cell(row=target_row, column=47, value=core_transformation)
+                        sheet.cell(row=target_row, column=48, value=migration_flag)
+                        sheet.cell(row=target_row, column=49, value=mig_distnation)
+                        sheet.cell(row=target_row, column=50, value=migration_period)
+                        sheet.cell(row=target_row, column=51, value=migration_progress)
+                        
+                        #数据应用类补充信息
+                        #软硬件
+                        sheet.cell(row=target_row, column=53, value=bi_tool_1)#
+                        sheet.cell(row=target_row, column=54, value=agent_bi_tool)#
+                        sheet.cell(row=target_row, column=55, value=bi_tool_nodes)#
+                        sheet.cell(row=target_row, column=56, value=bi_tool_database)#
+                        sheet.cell(row=target_row, column=57, value=data_source) #
+                        sheet.cell(row=target_row, column=58, value=original_implementation)#
+                        
+                        #销售信息
+                        #销售片区 无
+                        sheet.cell(row=target_row, column=61, value=sale_area)
+                        sheet.cell(row=target_row, column=62, value=others)
+                        sheet.cell(row=target_row, column=63, value=is_new_cust)
 
-                        log_message(f"[SUCCESS] 写入 {os.path.basename(source_file_path)} 的数据到 <{sheet_name}> ","#298073")
-                    elif sheet_name == "数据应用类补充信息":
+                        #未归类信息
+                        sheet.cell(row=target_row, column=66, value=innovation_flag)
+                        sheet.cell(row=target_row, column=67, value=modified_date) #更新日期
 
-                        data_source               = other_data.get("data_source", None)  #
-                        bi_tool                   = other_data.get("bi_tool", None) #
-                        agent_bi_tool             = other_data.get("agent_bi_tool", None)  #
-                        bi_tool_nodes             = other_data.get("bi_tool_nodes", None) #
-                        bi_tool_database          = other_data.get("bi_tool_database", None)  #
-                        original_implementation   = other_data.get("original_implementation", None) #
+                        #填充公式
 
-                        sheet.cell(row=target_row, column=1, value=contract_name)
-                        sheet.cell(row=target_row, column=2, value=bi_tool)#
-                        sheet.cell(row=target_row, column=3, value=agent_bi_tool)#
-                        sheet.cell(row=target_row, column=4, value=bi_tool_nodes)#
-                        sheet.cell(row=target_row, column=5, value=bi_tool_database)#
-                        sheet.cell(row=target_row, column=6, value=data_source) #
-                        sheet.cell(row=target_row, column=7, value=original_implementation)#
+                        #sheet.cell(row=target_row, column=31, value=f'=IFERROR(HYPERLINK("#\'通用补充信息\'!A"&MATCH(A{target_row}, 通用补充信息!A:A, 0), ">>>通用补充信息<<<"), ">>>暂无补充<<<")')
+                        #sheet.cell(row=target_row, column=32, value=f'=IFERROR(HYPERLINK("#\'数据应用类补充信息\'!A"&MATCH(A{target_row}, 数据应用类补充信息!A:A, 0), ">>>数据应用类补充信息<<<"), ">>>暂无补充<<<")')
+                        #todo 案例更新日期获取文件最后更新日期
 
                         log_message(f"[SUCCESS] 写入 {os.path.basename(source_file_path)} 的数据到 <{sheet_name}> ","#298073")
 
@@ -663,7 +689,7 @@ def load_data_to_target_file(data, target_file_path,source_file_path):
                 log_message(f"[ ERROR ]目标文件中缺少 <{sheet_name}> 页，请检查","#DB231D")
                 continue
     else:
-        log_message(f"[  INFO ]{os.path.basename(source_file_path)} 中contract_name 为空或为 '/'，跳过处理","#348888")
+        log_message(f"[  INFO ]{os.path.basename(source_file_path)} 中未填写合同名称或填写为 '/'，跳过处理","#DB231D")
         
 
     #保存文件
@@ -723,8 +749,8 @@ def update_customer_list(cust_list, target_file_path):
 
 #清除目标文件信息
 def clear_target_file(target_file_path):
-    sheet_names_to_check = ["案例清单", "通用补充信息", "数据应用类补充信息", "客户清单"]
-    error_log = f"error_log.txt"
+    sheet_names_to_check = ["案例清单"]
+    #error_log = f"error_log.txt"
     try:
         workbook = openpyxl.load_workbook(target_file_path)
     except Exception as e:
@@ -786,13 +812,15 @@ def process_files_in_folder(folder_path, target_file_path):
         log_message(f"[  INFO ] 处理文件: <{os.path.basename(source_file_name)}>","#298073")
         #info_display.insert(tk.END, f"[  INFO ] 处理文件: <{os.path.basename(source_file_name)}>\n","highlight")
         final_data = check_and_process_file(source_file_path)
+        #print(final_data)
         cust_name = load_data_to_target_file(final_data, target_file_path, source_file_path)
         cust_list.append(cust_name)
 
     #print(cust_list)
     # 更新客户清单
-    log_message(f"[  INFO ] 处理客户清单.", "#298073")
-    update_customer_list(cust_list, target_file_path)
+    #log_message(f"[  INFO ] 处理客户清单.", "#298073")
+    #update_customer_list(cust_list, target_file_path)
+    beautify_target_file(target_file_path)
 
 
 def get_resource_path(relative_path):
@@ -805,6 +833,48 @@ def get_resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
+def beautify_target_file(target_file_path):
+    sheet_names_to_check = ["案例清单"]
+    #error_ log = f"error_log.txt"
+    try:
+        workbook = openpyxl.load_workbook(target_file_path)
+    except Exception as e:
+        log_message( f"[ ERROR ]无法加载目标文件: {e}","#DB231D")
+        return
+    
+    for sheet_name in sheet_names_to_check:
+        if sheet_name in workbook.sheetnames:
+            if sheet_name != "客户清单":  
+                sheet = workbook[sheet_name]
+                #添加表格边框
+                thin_border = openpyxl.styles.Border(
+                    left=openpyxl.styles.Side(style='thin', color='000000'),
+                    right=openpyxl.styles.Side(style='thin', color='000000'),
+                    top=openpyxl.styles.Side(style='thin', color='000000'),
+                    bottom=openpyxl.styles.Side(style='thin', color='000000')
+                )
+
+                for row in sheet.iter_rows(min_row=4, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column):
+                    for cell in row:
+                        #当为A J Y 列的时候，设置为左对齐
+                        cell.border = thin_border
+                        if cell.column_letter in ['A', 'J', 'Y']:
+                            cell.alignment = openpyxl.styles.Alignment(horizontal='left', vertical='center')
+                        else:
+                            cell.alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+                        cell.font = openpyxl.styles.Font(size=10, name='黑体')
+                        cell.fill = openpyxl.styles.PatternFill(start_color='FFFFFF', end_color='FFFFFF', fill_type='solid')
+
+        else:
+            log_message( f"[ ERROR ]目标文件中缺少 <{sheet_name}> 页，请检查","#DB231D")
+    
+    try:
+        workbook.save(target_file_path)
+    except Exception as e:
+        log_message( f"[ ERROR ]无法保存目标文件: {e}","#DB231D")
+    finally:
+        log_message(f"[  INFO ] 目标文件美化完成.","#298073")
+        workbook.close()
 
 class App():
     def __init__(self, root):
@@ -917,7 +987,7 @@ class App():
             log_message(f"[  INFO ] 正在合并请稍后.", "#298073")
             process_files_in_folder(folder_path, target_file_path)
             
-            log_message(f"[  INFO ] 文件合并处理完成，若某一模块下客户未填写信息，请检查修改后再执行.", "#298073")
+            log_message(f"[  INFO ] 文件合并处理完成，若某一模块下客户未填写信息，请检查修改后再执行.", "#344EE2")
         except Exception as e:
             log_message(f"[ ERROR] 执行脚本失败: {e}","#DB231D")
 
@@ -936,27 +1006,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"出现错误: {e}")
         input("按任意键退出...")
-
-
-'''
-if __name__ == "__main__":
-    # 设定文件夹路径和目标文件路径
-    #folder_path = 'D:\github\99-0thers\case_collector\第二季度案例收集\第二季度的案例收集_bak'
-    #target_file_path = 'D:/github/99-0thers/case_collector/1111.xlsx'
-    #传入folder_path，target_file_path参数 并校验个数
-    if len(sys.argv) != 3:
-        print("Usage: python test.py <folder_path> <target_file_path>")
-        sys.exit(1)
-
-    folder_path = sys.argv[1]
-    target_file_path = sys.argv[2]
-    if not os.path.isdir(folder_path):
-        print(f"[ ERROR ] <{folder_path}> 不是一个有效的文件夹路径。")
-        sys.exit(1)
-
-    #处理文件夹下的文件名，去除空格
-    rename_file(folder_path)
-    print('[  INFO ] 文件名处理完成')
-    # 调用函数处理文件夹中的文件
-    process_files_in_folder(folder_path, target_file_path)
-'''
