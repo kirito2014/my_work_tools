@@ -20,7 +20,7 @@
 ********************************************************************
 """
 
-#pyinstaller --onefile --add-data "res;res" --icon=your_icon.ico case_collector.py
+#pyinstaller --onefile --add-data   "res;res" --icon=sunline.ico case_collector.py
 
 import os,sys,re
 import glob
