@@ -63,7 +63,7 @@ done
 # 删除其他所有文件（除了.git目录和表名文件）
 echo "正在删除不需要的文件..."
 git ls-files | grep -v -E "^\.git/" | \
-  grep -v -f <(awk -F'|' '{print "createtable/createtable_agl_" substr($1, 5) "\.hql"}' "$TEMP_FILE") | \
+grep -v -f <(awk -F'|' '{print "createtable/createtable_" tolower($1) "\.hql"}' "$TEMP_FILE") | \
   grep -v -f <(awk -F'|' '{print "config/" $2 "\.csv"}' "$TEMP_FILE") | \
   grep -v -f <(awk -F'|' '{print "pgm/hql/" $2 "/"}' "$TEMP_FILE") | \
   while read -r file; do git rm -rf --cached "$file"; done
