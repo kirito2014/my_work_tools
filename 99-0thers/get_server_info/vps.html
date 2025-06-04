@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>服务器状态监控</title>
+    <link href="https://fonts.googleapis.com/css2?family=Microsoft+YaHei:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 15px 20px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .control-panel {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .info-panel {
+            padding: 20px;
+            min-height: 300px;
+        }
+        
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-family: 'Microsoft YaHei', sans-serif;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background-color: #2980b9;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .info-card {
+            display: none;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .info-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        
+        .info-icon {
+            width: 40px;
+            height: 40px;
+            background-color: #3498db;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        
+        .info-content {
+            flex-grow: 1;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        
+        .info-value {
+            background-color: #f5f5f5;
+            padding: 8px 12px;
+            border-radius: 4px;
+            word-break: break-all;
+        }
+        
+        .ip-addresses {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .ip-item {
+            background-color: #f5f5f5;
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .ip-icon {
+            background-color: #e74c3c;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 8px;
+            font-size: 12px;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            color: #e74c3c;
+            padding: 15px;
+            background-color: #fdecea;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <i class="fas fa-server"></i> 服务器状态监控
+        </div>
+        
+        <div class="control-panel">
+            <button id="getStatusBtn" class="btn">
+                <i class="fas fa-sync-alt"></i> 获取服务器状态
+            </button>
+        </div>
+        
+        <div class="info-panel">
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>正在获取服务器信息...</p>
+            </div>
+            
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+            
+            <div id="infoCard" class="info-card">
+                <!-- 动态内容将通过JavaScript填充 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('getStatusBtn').addEventListener('click', async function() {
+            const loading = document.getElementById('loading');
+            const infoCard = document.getElementById('infoCard');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            // 显示加载状态
+            loading.style.display = 'block';
+            infoCard.style.display = 'none';
+            errorMessage.style.display = 'none';
+            
+            try {
+                // 调用我们的后端API
+                const response = await fetch('http://localhost:5000/api/server-status');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP错误: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // 检查API错误
+                if (data.error) {
+                    throw new Error(data.message);
+                }
+                
+                // 更新UI
+                updateServerInfo(data);
+                
+                // 显示信息卡片
+                infoCard.style.display = 'block';
+            } catch (error) {
+                errorMessage.textContent = `错误: ${error.message}`;
+                errorMessage.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+        
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+            
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+        
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleString();
+        }
+        
+        function updateServerInfo(data) {
+            const infoCard = document.getElementById('infoCard');
+            
+            // 清空现有内容
+            infoCard.innerHTML = '';
+            
+            // 创建信息项
+            function createInfoItem(icon, label, value) {
+                const item = document.createElement('div');
+                item.className = 'info-item';
+                
+                item.innerHTML = `
+                    <div class="info-icon">
+                        <i class="fas fa-${icon}"></i>
+                    </div>
+                    <div class="info-content">
+                        <div class="info-label">${label}</div>
+                        <div class="info-value">${value}</div>
+                    </div>
+                `;
+                
+                return item;
+            }
+            
+            // 添加各个信息项
+            infoCard.appendChild(createInfoItem(
+                'desktop',
+                '主机名',
+                `${data.hostname || 'N/A'} (${data.node_alias || 'N/A'})`
+            ));
+            
+            infoCard.appendChild(createInfoItem(
+                'map-marker-alt',
+                '节点位置',
+                data.node_location || 'N/A'
+            ));
+            
+            infoCard.appendChild(createInfoItem(
+                'box',
+                '套餐信息',
+                `${data.plan || 'N/A'} (${data.os || 'N/A'})`
+            ));
+            
+            infoCard.appendChild(createInfoItem(
+                'memory',
+                '内存/磁盘',
+                `内存: ${formatBytes(data.plan_ram)} | 交换空间: ${formatBytes(data.plan_swap)} | 磁盘: ${formatBytes(data.plan_disk)}`
+            ));
+            
+            infoCard.appendChild(createInfoItem(
+                'database',
+                '数据使用',
+                `已用: ${formatBytes(data.data_counter)} / ${formatBytes(data.plan_monthly_data)} | 重置日期: ${formatTimestamp(data.data_next_reset)}`
+            ));
+
+            infoCard.appendChild(createInfoItem(
+                'database',
+                '操作系统',
+                `操作系统: ${data.os || 'N/A'}`
+            ));
+            
+            // IP地址特殊处理
+            const ipItem = document.createElement('div');
+            ipItem.className = 'info-item';
+            
+            ipItem.innerHTML = `
+                <div class="info-icon">
+                    <i class="fas fa-network-wired"></i>
+                </div>
+                <div class="info-content">
+                    <div class="info-label">IP地址</div>
+                    <div class="ip-addresses" id="ip-addresses"></div>
+                </div>
+            `;
+            
+            infoCard.appendChild(ipItem);
+            
+            const ipContainer = document.getElementById('ip-addresses');
+            if (data.ip_addresses && data.ip_addresses.length > 0) {
+                data.ip_addresses.forEach(ip => {
+                    const ipItem = document.createElement('div');
+                    ipItem.className = 'ip-item';
+                    
+                    ipItem.innerHTML = `
+                        <div class="ip-icon">
+                            <i class="fas fa-globe"></i>
+                        </div>
+                        <div>
+                            ${ip} ${data.ptr && data.ptr[ip] ? `(${data.ptr[ip]})` : ''}
+                        </div>
+                    `;
+                    
+                    ipContainer.appendChild(ipItem);
+                });
+            } else {
+                ipContainer.innerHTML = '无IP地址信息';
+            }
+            
+            infoCard.appendChild(createInfoItem(
+                'envelope',
+                '联系邮箱',
+                data.email || 'N/A'
+            ));
+        }
+    </script>
+</body>
+</html>
