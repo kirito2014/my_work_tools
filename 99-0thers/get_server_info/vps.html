@@ -264,7 +264,7 @@
             
             try {
                 // 调用我们的后端API
-                const response = await fetch('http://localhost:5000/api/server-status');
+                const response = await fetch('http://localhost:5100/api/server-status');
                 
                 if (!response.ok) {
                     throw new Error(`HTTP错误: ${response.status}`);
@@ -447,7 +447,7 @@
                 loading.style.display = 'block';
                 errorMessage.style.display = 'none';
                 
-                const response = await fetch(`http://localhost:5000/api/${route}`, {
+                const response = await fetch(`http://localhost:5100/api/${route}`, {
                     method: 'POST'
                 });
                 
