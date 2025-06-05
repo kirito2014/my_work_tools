@@ -363,11 +363,17 @@
             ));
 
             infoCard.appendChild(createInfoItem(
-                'database',
+                'server',
                 '操作系统',
                 `操作系统: ${data.os || 'N/A'}`
             ));
-            
+
+            infoCard.appendChild(createInfoItem(
+                'exclamation-triangle',
+                '可疑状态',
+                data.suspended || '否'
+            ));
+
             // IP地址特殊处理
             const ipItem = document.createElement('div');
             ipItem.className = 'info-item';
@@ -404,7 +410,15 @@
             } else {
                 ipContainer.innerHTML = '无IP地址信息';
             }
-            
+
+            infoCard.appendChild(createInfoItem(
+                'plug',
+                '支持ipv6',
+                //如果是true则支持否则为不支持
+                data.location_ipv6_ready ? '支持' : '不支持'
+            ));
+
+
             infoCard.appendChild(createInfoItem(
                 'envelope',
                 '联系邮箱',
