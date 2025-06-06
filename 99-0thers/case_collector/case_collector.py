@@ -5,7 +5,7 @@
 *    Filename   :  case_collector.py
 *    Description:  join all the case files into one file
 *
-*    Version    :  1.3.0
+*    Version    :  1.3.1
 *    Created    :  2024/08/01 10:25:07
 *    Revision   :  none
 *    Compiler   :  python
@@ -19,6 +19,22 @@
 *
 ********************************************************************
 """
+
+"""
+更新日志
+    v1.0.0 2024/07/05 创建
+    v1.1.0 2024/07/06 添加案例清单功能
+    v1.2.0 2024/07/07 添加案例更新
+    v1.2.0 2024/08/01 优化图形界面，执行速度
+    v1.3.0 2025/05/22   1、根据合并模板文件调整了代码，去除了通用补充信息和其他补充信息的代码，合并到案例清单中
+                        2、补充了解决方案清单公式信息
+                        3、添加了案例更新日期，从excel文件获取文件最后更新日期
+                        4、去除了更新客户清单的功能
+                        5、优化了错误提示的功能，如果文件有错误会以红色标记；最后完成后提示蓝色信息
+                        6、添加了表格美化的功能，默认添加表格边框，长文本左对齐处理
+    v1.3.1 2025/6/6 修改模板 新增一列 售前方案分类
+"""
+
 
 #pyinstaller --onefile --add-data   "res;res" --icon=sunline.ico case_collector.py
 
@@ -674,14 +690,13 @@ def load_data_to_target_file(data, target_file_path,source_file_path):
                         sheet.cell(row=target_row, column=63, value=is_new_cust)
 
                         #未归类信息
-                        sheet.cell(row=target_row, column=66, value=innovation_flag)
-                        sheet.cell(row=target_row, column=67, value=modified_date) #更新日期
+                        sheet.cell(row=target_row, column=67, value=innovation_flag) #信创标志
+                        sheet.cell(row=target_row, column=68, value=modified_date) #更新日期
 
                         #填充公式
 
                         #sheet.cell(row=target_row, column=31, value=f'=IFERROR(HYPERLINK("#\'通用补充信息\'!A"&MATCH(A{target_row}, 通用补充信息!A:A, 0), ">>>通用补充信息<<<"), ">>>暂无补充<<<")')
                         #sheet.cell(row=target_row, column=32, value=f'=IFERROR(HYPERLINK("#\'数据应用类补充信息\'!A"&MATCH(A{target_row}, 数据应用类补充信息!A:A, 0), ">>>数据应用类补充信息<<<"), ">>>暂无补充<<<")')
-                        #todo 案例更新日期获取文件最后更新日期
 
                         log_message(f"[SUCCESS] 写入 {os.path.basename(source_file_path)} 的数据到 <{sheet_name}> ","#298073")
 
@@ -750,7 +765,6 @@ def update_customer_list(cust_list, target_file_path):
 #清除目标文件信息
 def clear_target_file(target_file_path):
     sheet_names_to_check = ["案例清单"]
-    #error_log = f"error_log.txt"
     try:
         workbook = openpyxl.load_workbook(target_file_path)
     except Exception as e:
@@ -897,14 +911,14 @@ class App():
         # 布局
         frame = tk.Frame(self.root, bg='#f0f0f0')
         frame.pack(pady=30, padx=50, anchor="e")
-        
-        ttk.Button(frame, text="选择要合并的文件夹", command=self.select_folder, width=20).grid(row=0, column=1, padx=10, pady=5)
-        ttk.Button(frame, text="选择目标文件", command=self.select_target_file,width=20).grid(row=1, column=1, padx=10, pady=5)
-        ttk.Button(frame, text="确认合并案例", command=self.run_script, width=20).grid(row=2, column=1, padx=10, pady=5)
-        ttk.Button(frame, text="清除信息", command=self.clear_info, width=20).grid(row=3, column=1, padx=10, pady=5)
+
+        ttk.Button(frame, text="1.选择要合并的文件夹", command=self.select_folder, width=20).grid(row=0, column=1, padx=10, pady=5) 
+        ttk.Button(frame, text="2.选择目标文件", command=self.select_target_file,width=20).grid(row=1, column=1, padx=10, pady=5)
+        ttk.Button(frame, text="3.确认合并案例", command=self.run_script, width=20).grid(row=2, column=1, padx=10, pady=5)
+        ttk.Button(frame, text="4.清除信息", command=self.clear_info, width=20).grid(row=3, column=1, padx=10, pady=5)
         
         # 创建自定义样式并应用字体
-        style = ttk.Style()  #, style="Bold.TButton"
+        style = ttk.Style()  
         style.configure("Bold.TButton", font=bold_font)
 
         self.info_display = scrolledtext.ScrolledText(
