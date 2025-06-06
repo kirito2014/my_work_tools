@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>服务器状态查询</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #result { background: #f5f5f5; padding: 15px; margin-top: 20px; border-radius: 5px; }
+        .btn { 
+            background: #3498db; color: white; border: none; 
+            padding: 10px 15px; border-radius: 5px; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>服务器状态查询</h1>
+    <button class="btn" onclick="getServerStatus()">获取状态</button>
+    <div id="result">点击按钮获取服务器状态...</div>
+
+    <script>
+        function getServerStatus() {
+            const veid = "1632978";
+            const apiKey = "private_HgVQsmwXZrpIOTTUFvKaCtsN";
+            const resultDiv = document.getElementById('result');
+            
+            resultDiv.innerHTML = "正在请求数据...";
+            
+            // 尝试JSONP方法（仅当API支持时才有效）
+            const script = document.createElement('script');
+            script.src = `https://api.64clouds.com/v1/getServiceInfo?veid=${veid}&api_key=${apiKey}&callback=handleResponse`;
+            document.body.appendChild(script);
+            
+            // 5秒后超时处理
+            setTimeout(() => {
+                if (!window.handleResponseCalled) {
+                    resultDiv.innerHTML = "请求超时，可能是API不支持JSONP或CORS限制";
+                    document.body.removeChild(script);
+                }
+            }, 5000);
+        }
+        
+        // 定义回调函数
+        window.handleResponse = function(data) {
+            window.handleResponseCalled = true;
+            document.getElementById('result').innerHTML = 
+                `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        };
+    </script>
+</body>
+</html>

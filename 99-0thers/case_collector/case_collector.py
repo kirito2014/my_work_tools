@@ -41,7 +41,7 @@
 """
 
 
-#pyinstaller --onefile --add-data   "res;res" --icon=sunline.ico case_collector.py
+#pyinstaller --onefile --windowed --add-data   "res;res" --icon=sunline.ico case_collector.py
 
 import os,sys,re
 import glob
@@ -899,7 +899,7 @@ class App():
     def __init__(self, root):
         # 使用主题
         self.root = root
-        self.root.title("解决方案部-案例合并工具")
+        self.root.title("解决方案部-案例合并工具V1.3.1")
         self.root.geometry('500x600')
         self.root.configure(bg='#f0f0f0')  # 设置背景颜色
         self.root.set_theme("arc") #breeze
@@ -1020,6 +1020,7 @@ class App():
 if __name__ == "__main__":
     try:
         root = ThemedTk(theme=False)
+        root.iconbitmap(r"D:\github\99-0thers\case_collector\res\sunline.ico")
         app = App(root)
         root.mainloop()
     except Exception as e:
