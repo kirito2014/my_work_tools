@@ -1020,7 +1020,6 @@ class App():
 if __name__ == "__main__":
     try:
         root = ThemedTk(theme=False)
-        root.iconbitmap(r"D:\github\99-0thers\case_collector\res\sunline.ico")
         app = App(root)
         root.mainloop()
     except Exception as e:
