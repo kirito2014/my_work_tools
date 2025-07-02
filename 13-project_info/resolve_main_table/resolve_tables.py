@@ -1,11 +1,21 @@
 import os
 import re
 from typing import List, Dict, Tuple
+import pandas as pd
+from openpyxl import load_workbook
 
-def process_hql_files(folder_path: str):
+def process_hql_files(folder_path: str, output_file: str = "resolve_main_table.xlsx"):
     """
-    处理指定文件夹中以agl_开头_pc.hql结尾的文件
+    处理指定文件夹中以agl_开头_pc.hql结尾的文件，并将结果保存到Excel
     """
+    # 检查并删除已存在的输出文件
+    if os.path.exists(output_file):
+        os.remove(output_file)
+        print(f"已删除已存在的输出文件: {output_file}")
+    
+    # 准备结果DataFrame
+    results = []
+    
     for filename in os.listdir(folder_path):
         if filename.startswith("agl_") and filename.endswith("_pc.hql"):
             file_path = os.path.join(folder_path, filename)
@@ -26,8 +36,26 @@ def process_hql_files(folder_path: str):
                 print("Main tables found:")
                 for block, tables in main_tables.items():
                     print(f"  Code block {block}: {', '.join(tables)}")
+                    # 将结果添加到列表中
+                    for table in tables:
+                        results.append({
+                            "table_en_name": table_en_name,
+                            "加工组别": "AGL",  # 固定为AGL
+                            "加工主表": table
+                        })
             else:
                 print("No main tables found.")
+    
+    # 将结果保存到Excel
+    if results:
+        df = pd.DataFrame(results)
+        # 按table_en_name排序
+        df = df.sort_values(by="table_en_name")
+        # 保存到Excel
+        df.to_excel(output_file, index=False, engine='openpyxl')
+        print(f"\n结果已保存到: {output_file}")
+    else:
+        print("\n没有找到任何主表信息，未生成输出文件。")
 
 def analyze_main_tables(content: str, table_en_name: str) -> Dict[int, List[str]]:
     """
