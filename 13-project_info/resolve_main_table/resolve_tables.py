@@ -45,20 +45,17 @@ def analyze_main_tables(content: str, table_en_name: str) -> Dict[int, List[str]
     
     # 获取开始行(下一行)和结束行(上一行)
     start_pos = content.find('\n', start_match.end()) + 1
-    #print(start_pos)
     end_pos = content.rfind('\n', 0, end_match.start())
-    #print(end_pos)
     
     if start_pos == -1 or end_pos == -1 or start_pos >= end_pos:
         return {}
     
     code_section = content[start_pos:end_pos].strip()
-    #print(code_section)
     
     # 按INSERT INTO分割代码块
     insert_blocks = []
     current_pos = 0
-    insert_pattern = re.compile(r"INSERT\s+INTO\s+(?:TABLE\s+)?([^\s;]+)", re.IGNORECASE)
+    insert_pattern = re.compile(r"INSERT\s+INTO\s+(?:TABLE\s+)?([^\s;(]+)", re.IGNORECASE)
     
     while True:
         match = insert_pattern.search(code_section, current_pos)
@@ -73,89 +70,157 @@ def analyze_main_tables(content: str, table_en_name: str) -> Dict[int, List[str]
             block_content = code_section[match.end():].strip()
         
         insert_blocks.append((match.group(0), block_content))
-        #print(insert_blocks)
         current_pos = match.end()
     
     main_tables = {}
     current_block = 0
     
     for insert_line, block_content in insert_blocks:
-        # 检查是否是目标表 (table_en_name_TM)
-        target_table_match = re.search(r"INSERT\s+INTO\s+(?:TABLE\s+)?([^\s;]+)", insert_line, re.IGNORECASE)
+        # 只处理目标临时表 (AGL.AGLXXXXX_TM)
+        target_table_match = re.search(r"INSERT\s+INTO\s+(?:TABLE\s+)?([^\s;(]+)", insert_line, re.IGNORECASE)
         if not target_table_match:
             continue
             
-        target_table = target_table_match.group(1).upper().replace("(", "")
-        print(target_table)
+        target_table = target_table_match.group(1).upper()
         if not target_table.endswith(f"{table_en_name}_TM"):
             continue
             
         # 处理代码块内容
         tables_in_block = find_main_tables_in_block(block_content)
         
-        # 检查是否需要递归查找AGL表
+        # 递归解析主表
         final_tables = []
         for table in tables_in_block:
-            resolved_tables = resolve_agl_tables(table, insert_blocks, table_en_name)
-            final_tables.extend(resolved_tables)
+            if table.startswith("AGL."):
+                # 递归查找AGL表的主表
+                resolved_tables = resolve_agl_tables(table, insert_blocks, table_en_name)
+                final_tables.extend(resolved_tables)
+            else:
+                # 非AGL表直接计入
+                final_tables.append(table)
         
         if final_tables:
-            main_tables[current_block] = list(set(final_tables))  # 去重
-            current_block += 1
+            # 去重并确保只保留最终主表（非AGL表）
+            filtered_tables = [t for t in set(final_tables) if not t.startswith("AGL.")]
+            if filtered_tables:
+                main_tables[current_block] = filtered_tables
+                current_block += 1
+            else:
+                # 如果所有解析后的表仍然是AGL表，则保留最初的AGL表
+                main_tables[current_block] = list(set(final_tables))
+                current_block += 1
     
     return main_tables
 
 def find_main_tables_in_block(block_content: str) -> List[str]:
     """
-    在代码块中查找主表，忽略子查询中的表
+    在代码块中查找主表，处理子查询情况，忽略LEFT JOIN的表
     """
     tables = []
     
-    # 标准化代码块，去除注释和换行
-    cleaned_content = re.sub(r"--.*?$", "", block_content, flags=re.MULTILINE)  # 去除行注释
-    cleaned_content = re.sub(r"/\*.*?\*/", "", cleaned_content, flags=re.DOTALL)  # 去除块注释
-    cleaned_content = re.sub(r"\s+", " ", cleaned_content).strip()  # 标准化空格
+    # 标准化代码块，去除注释但保留原始结构
+    cleaned_content = re.sub(r"--.*?$", "", block_content, flags=re.MULTILINE)
+    cleaned_content = re.sub(r"/\*.*?\*/", "", cleaned_content, flags=re.DOTALL)
     
-    # 查找FROM后的第一个表（不在子查询中）
-    from_pos = 0
-    while True:
-        from_match = re.search(r"\bFROM\b", cleaned_content[from_pos:], re.IGNORECASE)
-        if not from_match:
-            break
-            
-        from_pos += from_match.end()
-        
-        # 检查是否在子查询中
-        subquery_count = cleaned_content[:from_pos].count("(") - cleaned_content[:from_pos].count(")")
-        if subquery_count > 0:
-            continue
-            
-        # 获取FROM后的表
-        table_match = re.search(r"([^\s,(;]+)", cleaned_content[from_pos:])
+    # 查找FROM后的内容（可能直接是表或子查询）
+    from_match = re.search(r"\bFROM\b", cleaned_content, re.IGNORECASE)
+    if not from_match:
+        return tables
+    
+    from_pos = from_match.end()
+    remaining_content = cleaned_content[from_pos:]
+    
+    # 检查是否在子查询中（FROM后是括号）
+    if remaining_content.lstrip().startswith("("):
+        # 找到子查询的结束括号
+        subquery = extract_balanced_parentheses(remaining_content.lstrip())
+        if subquery:
+            # 从子查询中提取主表
+            subquery_tables = extract_tables_from_subquery(subquery[1:-1])  # 去掉外层的括号
+            tables.extend(subquery_tables)
+    else:
+        # 直接是表的情况
+        table_match = re.search(r"([^\s,(;]+)", remaining_content)
         if table_match:
             table = table_match.group(1).upper()
-            if "." in table:  # 确保是schema.table格式
+            if "." in table:
                 tables.append(table)
     
-    # 查找INNER JOIN后的表（不在子查询中）
-    join_pos = 0
+    return list(set(tables))  # 去重
+
+def extract_balanced_parentheses(content: str) -> str:
+    """
+    提取完整的括号内容，包括嵌套括号
+    """
+    if not content.startswith("("):
+        return ""
+    
+    balance = 1
+    end_pos = 1
+    while balance > 0 and end_pos < len(content):
+        if content[end_pos] == "(":
+            balance += 1
+        elif content[end_pos] == ")":
+            balance -= 1
+        end_pos += 1
+    
+    return content[:end_pos] if balance == 0 else ""
+
+def extract_tables_from_subquery(subquery: str) -> List[str]:
+    """
+    从子查询中提取FROM后的主表
+    """
+    tables = []
+    # 去除换行和多余空格
+    cleaned_subquery = re.sub(r"\s+", " ", subquery).strip()
+    
+    # 查找子查询中的第一个FROM
+    from_match = re.search(r"\bFROM\b", cleaned_subquery, re.IGNORECASE)
+    if not from_match:
+        return tables
+    
+    from_pos = from_match.end()
+    remaining = cleaned_subquery[from_pos:]
+    
+    # 检查子查询中的FROM后是否是括号
+    if remaining.lstrip().startswith("("):
+        nested_subquery = extract_balanced_parentheses(remaining.lstrip())
+        if nested_subquery:
+            return extract_tables_from_subquery(nested_subquery[1:-1])
+    
+    # 获取FROM后的表名（直到下一个空格或逗号等分隔符）
+    table_match = re.search(r"([^\s,(;]+)", remaining)
+    if table_match:
+        table = table_match.group(1).upper()
+        if "." in table:
+            tables.append(table)
+    
+    return tables
+
+
+def find_join_tables(content: str) -> List[str]:
+    """
+    查找INNER JOIN的表（不在子查询中）
+    """
+    tables = []
+    pos = 0
     while True:
-        join_match = re.search(r"\bINNER\s+JOIN\b", cleaned_content[join_pos:], re.IGNORECASE)
+        join_match = re.search(r"\bINNER\s+JOIN\b", content[pos:], re.IGNORECASE)
         if not join_match:
             break
             
-        join_pos += join_match.end()
+        pos += join_match.end()
+        remaining = content[pos:]
         
         # 检查是否在子查询中
-        subquery_count = cleaned_content[:join_pos].count("(") - cleaned_content[:join_pos].count(")")
-        if subquery_count > 0:
+        if remaining.lstrip().startswith("("):
             continue
             
-        # 获取INNER JOIN后的表
-        table_match = re.search(r"([^\s,(;]+)", cleaned_content[join_pos:])
+        # 获取JOIN后的表名
+        table_match = re.search(r"([^\s,(;]+)", remaining)
         if table_match:
             table = table_match.group(1).upper()
-            if "." in table:  # 确保是schema.table格式
+            if "." in table:
                 tables.append(table)
     
     return tables
@@ -164,12 +229,11 @@ def resolve_agl_tables(table: str, all_blocks: List[Tuple[str, str]], table_en_n
     """
     递归解析AGL开头的表，找到最终的主表
     """
-    if not table.startswith("AGL_"):
-        return [table]
+    resolved_tables = []
     
     # 查找包含这个AGL表的INSERT INTO块
     for insert_line, block_content in all_blocks:
-        target_table_match = re.search(r"INSERT\s+INTO\s+(?:TABLE\s+)?([^\s;]+)", insert_line, re.IGNORECASE)
+        target_table_match = re.search(r"INSERT\s+INTO\s+(?:TABLE\s+)?([^\s;(]+)", insert_line, re.IGNORECASE)
         if not target_table_match:
             continue
             
@@ -179,13 +243,15 @@ def resolve_agl_tables(table: str, all_blocks: List[Tuple[str, str]], table_en_n
             new_tables = find_main_tables_in_block(block_content)
             
             # 递归解析
-            resolved_tables = []
             for new_table in new_tables:
-                resolved_tables.extend(resolve_agl_tables(new_table, all_blocks, table_en_name))
+                if new_table.startswith("AGL."):
+                    resolved_tables.extend(resolve_agl_tables(new_table, all_blocks, table_en_name))
+                else:
+                    resolved_tables.append(new_table)
             
-            return resolved_tables
+            return resolved_tables if resolved_tables else [table]  # 如果找不到非AGL表，返回原表
     
-    return []
+    return [table]  # 如果找不到对应的INSERT块，返回原表
 
 if __name__ == "__main__":
     import sys
