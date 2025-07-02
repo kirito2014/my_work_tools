@@ -1,3 +1,34 @@
+# -*- coding: utf-8 -*-
+"""
+********************************************************************
+*
+*    Filename   :  resolve_tables.py
+*    Description:  解析HQL脚本中的主表信息并生成Excel文件
+*
+*    Version    :  1.0.1
+*    Created    :  2025/07/01 10:25:07
+*    Revision   :  none
+*    Compiler   :  python
+*
+*    Author     :  wangmujun(解决方案部/战略规划部), 
+*    Company    :  深圳市长亮科技股份有限公司
+*    E-mail     :  wangmujun@sunline.cn
+*    License    :  GPL
+*
+*    Copyright (c) 2024, Sunline Corporation. All rights reserved.
+*
+********************************************************************
+"""
+
+"""
+更新日志
+    v1.0.0 2025/07/01 创建脚本
+
+"""
+
+
+
+
 import os
 import re
 from typing import List, Dict, Tuple
