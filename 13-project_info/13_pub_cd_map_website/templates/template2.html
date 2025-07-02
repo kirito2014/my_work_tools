@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线码值合并工具</title>
+    <script src="https://cdn.tailwindcss.com/3.3.3"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #2d3748;
+        }
+
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 28px 0 rgba(31, 38, 135, 0.2);
+        }
+
+        .progress-bar {
+            height: 8px;
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0;
+            background: linear-gradient(90deg, #3b82f6, #6366f1);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        #overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.95);
+            width: 90%;
+            max-width: 400px;
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            z-index: 11;
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        }
+
+        #popup.visible {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        #popupContent {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 16px 0;
+            padding: 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #3b82f6;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .file-label:hover {
+            background-color: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .file-status {
+            font-weight: 600;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background-color: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #059669;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background-color: #6b7280;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #4b5563;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #dc2626;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <div class="glassmorphism w-full max-w-3xl mx-4 p-6 md:p-8 card-hover">
+        <h1 class="text-2xl md:text-3xl font-bold text-center mb-6 text-gray-800">
+            <i class="fas fa-code mr-2 text-blue-500"></i>在线码值合并工具
+        </h1>
+
+        <div class="flex flex-col md:flex-row gap-6 mb-8">
+            <!-- TXT 上传容器 -->
+            <div class="glassmorphism p-6 flex-1 card-hover">
+                <div class="flex flex-col items-center">
+                    <p class="file-status text-red-500" id="txtStatus">未选择文件</p>
+                    <label for="txtFileInput" class="file-label mb-4">
+                        <i class="fas fa-file-alt mr-2"></i>选择TXT文件
+                    </label>
+                    <input type="file" id="txtFileInput" class="file-input" accept=".txt">
+                    <div class="flex gap-2">
+                        <button class="btn btn-primary" onclick="uploadFile('txt')">
+                            <i class="fas fa-upload mr-2"></i>上传
+                        </button>
+                        <button class="btn btn-secondary" onclick="analyzeTxt()">
+                            <i class="fas fa-eye mr-2"></i>查看
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- XLSX 上传容器 -->
+            <div class="glassmorphism p-6 flex-1 card-hover">
+                <div class="flex flex-col items-center">
+                    <p class="file-status text-red-500" id="xlsxStatus">未选择文件</p>
+                    <label for="xlsxFileInput" class="file-label mb-4">
+                        <i class="fas fa-file-excel mr-2"></i>选择XLSX文件
+                    </label>
+                    <input type="file" id="xlsxFileInput" class="file-input" accept=".xlsx">
+                    <button class="btn btn-primary" onclick="uploadFile('xlsx')">
+                        <i class="fas fa-upload mr-2"></i>上传
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 进度条 -->
+        <div class="mb-8">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+
+        <!-- 底部按钮 -->
+        <div class="flex flex-wrap justify-center gap-3">
+            <button class="btn btn-success" onclick="runScript()">
+                <i class="fas fa-cogs mr-2"></i>合并码值文件
+            </button>
+            <button class="btn btn-primary" onclick="downloadFile()">
+                <i class="fas fa-download mr-2"></i>下载合并文件
+            </button>
+            <button class="btn btn-danger" onclick="clearFiles()">
+                <i class="fas fa-redo mr-2"></i>重新开始
+            </button>
+        </div>
+    </div>
+
+    <!-- 弹出窗口 -->
+    <div id="overlay" onclick="closePopup()"></div>
+    <div id="popup">
+        <h3 class="text-xl font-bold mb-4 text-gray-800">
+            <i class="fas fa-list mr-2 text-blue-500"></i>合并列表
+        </h3>
+        <div id="popupContent" class="text-sm"></div>
+        <div class="mt-4 text-center">
+            <button class="btn btn-success" onclick="closePopup()">
+                <i class="fas fa-check mr-2"></i>关闭
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let txtFilename = '';
+        let xlsxFilename = '';
+        let txtContent = [];  // 保存 TXT 内容
+
+        // 文件选择事件监听
+        document.getElementById('txtFileInput').addEventListener('change', function(e) {
+            const status = document.getElementById('txtStatus');
+            if (this.files.length > 0) {
+                status.textContent = "已选择: " + this.files[0].name;
+                status.style.color = "#6b7280";
+            } else {
+                status.textContent = "未选择文件";
+                status.style.color = "#ef4444";
+            }
+        });
+
+        document.getElementById('xlsxFileInput').addEventListener('change', function(e) {
+            const status = document.getElementById('xlsxStatus');
+            if (this.files.length > 0) {
+                status.textContent = "已选择: " + this.files[0].name;
+                status.style.color = "#6b7280";
+            } else {
+                status.textContent = "未选择文件";
+                status.style.color = "#ef4444";
+            }
+        });
+
+        function analyzeTxt() {
+            if (txtContent.length === 0) {
+                alert("请先上传合并码值清单.");
+                return;
+            }
+
+            const popupContent = document.getElementById('popupContent');
+            popupContent.innerHTML = txtContent.join('<br>');
+            openPopup();
+        }
+
+        function openPopup() {
+            const overlay = document.getElementById('overlay');
+            const popup = document.getElementById('popup');
+
+            overlay.classList.add('visible');
+            popup.classList.add('visible');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closePopup() {
+            const overlay = document.getElementById('overlay');
+            const popup = document.getElementById('popup');
+
+            overlay.classList.remove('visible');
+            popup.classList.remove('visible');
+            document.body.style.overflow = '';
+        }
+
+        function uploadFile(type) {
+            const fileInput = document.getElementById(type === 'txt' ? 'txtFileInput' : 'xlsxFileInput');
+            const fileStatus = document.getElementById(type === 'txt' ? 'txtStatus' : 'xlsxStatus');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert("请选择文件上传");
+                return;
+            }
+
+            // 模拟上传进度
+            fileStatus.textContent = "上传中...";
+            fileStatus.style.color = "#3b82f6";
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // 模拟上传延迟
+            setTimeout(() => {
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        if (type === 'txt') {
+                            txtFilename = data.filename;
+                            txtContent = data.content;
+                            fileStatus.textContent = "上传成功";
+                            fileStatus.style.color = "#10b981";
+                        }
+                        if (type === 'xlsx') {
+                            xlsxFilename = data.filename;
+                            fileStatus.textContent = "上传成功";
+                            fileStatus.style.color = "#10b981";
+                        }
+                    } else {
+                        fileStatus.textContent = "上传失败";
+                        fileStatus.style.color = "#ef4444";
+                        alert(data.message);
+                    }
+                })
+                .catch(() => {
+                    fileStatus.textContent = "上传失败";
+                    fileStatus.style.color = "#ef4444";
+                    alert("上传过程中发生错误");
+                });
+            }, 800);
+        }
+
+        function runScript() {
+            if (!txtFilename || !xlsxFilename) {
+                alert("上传码值列表和码值文件才能进行下一步.");
+                return;
+            }
+
+            fetch('/run', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ txt_filename: txtFilename, xlsx_filename: xlsxFilename })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    animateProgress();
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+
+        function animateProgress() {
+            const progressFill = document.getElementById('progressFill');
+            let width = 0;
+            const interval = setInterval(() => {
+                if (width >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        alert("文件合并完成,点击下载合并文件.");
+                    }, 300);
+                } else {
+                    width += 1;
+                    progressFill.style.width = width + "%";
+                }
+            }, 30);
+        }
+
+        function downloadFile() {
+            window.location.href = '/download';
+        }
+
+        function clearFiles() {
+            txtFilename = '';
+            xlsxFilename = '';
+            txtContent = [];
+            document.getElementById('txtFileInput').value = '';
+            document.getElementById('xlsxFileInput').value = '';
+            document.getElementById('txtStatus').textContent = '未选择文件';
+            document.getElementById('txtStatus').style.color = '#ef4444';
+            document.getElementById('xlsxStatus').textContent = '未选择文件';
+            document.getElementById('xlsxStatus').style.color = '#ef4444';
+            document.getElementById('progressFill').style.width = "0%";
+            alert("已重置所有文件");
+        }
+    </script>
+</body>
+</html>
