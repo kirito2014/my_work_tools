@@ -20,8 +20,9 @@ def process_hql_files(folder_path: str, output_file: str = "resolve_main_table.x
         if filename.startswith("agl_") and filename.endswith("_pc.hql"):
             file_path = os.path.join(folder_path, filename)
             table_en_name = filename[:-7].upper()  # 去掉'_pc.hql'并大写
-            print(f"\nProcessing file: {filename}")
-            print(f"Table EN Name: {table_en_name}")
+            print("\n=============================================")
+            print(f"\n处理文件: {filename}")
+            print(f"表英文名: {table_en_name}")
             
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
@@ -33,9 +34,9 @@ def process_hql_files(folder_path: str, output_file: str = "resolve_main_table.x
             main_tables = analyze_main_tables(content, table_en_name)
             
             if main_tables:
-                print("Main tables found:")
+                print("已解析到主表:")
                 for block, tables in main_tables.items():
-                    print(f"  加工组别 {block+1}: {', '.join(tables)}")
+                    print(f"  第{block+1}组: {', '.join(tables)}")
                     # 将结果添加到列表中
                     for table in tables:
                         results.append({
@@ -45,7 +46,7 @@ def process_hql_files(folder_path: str, output_file: str = "resolve_main_table.x
                             "加工主表": table
                         })
             else:
-                print("No main tables found.")
+                print("未解析到任何主表.")
     
     # 将结果保存到Excel
     if results:
@@ -285,12 +286,14 @@ def resolve_agl_tables(table: str, all_blocks: List[Tuple[str, str]], table_en_n
 if __name__ == "__main__":
     import sys
     if len(sys.argv) != 2:
-        print("Usage: python script.py <folder_path>")
+        print("用法: python resolve_tables.py <脚本路径>")
         sys.exit(1)
     
     folder_path = sys.argv[1]
     if not os.path.isdir(folder_path):
-        print(f"Error: {folder_path} is not a valid directory")
+        print(f"Error: {folder_path} 不是一个有效目录.")
         sys.exit(1)
     
+    print("=================处理开始====================")
     process_hql_files(folder_path)
+    print("\n=================处理结束====================")
