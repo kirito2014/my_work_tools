@@ -35,14 +35,14 @@ def process_hql_files(folder_path: str, output_file: str = "resolve_main_table.x
             if main_tables:
                 print("Main tables found:")
                 for block, tables in main_tables.items():
-                    print(f"  第{block+1}组加工主表: {', '.join(tables)}")
+                    print(f"  加工组别 {block+1}: {', '.join(tables)}")
                     # 将结果添加到列表中
                     for table in tables:
                         results.append({
                             "库名": "AGL",  # 固定为AGL
-                            "组别序号": f"第{block+1}组",  # 组别序号
-                            "加工主表": table,
-                            "table_en_name": table_en_name
+                            "聚合表名": table_en_name,
+                            "加工组别": f"第{block+1}组",  # 加工组别
+                            "加工主表": table
                         })
             else:
                 print("No main tables found.")
@@ -50,10 +50,8 @@ def process_hql_files(folder_path: str, output_file: str = "resolve_main_table.x
     # 将结果保存到Excel
     if results:
         df = pd.DataFrame(results)
-        # 按table_en_name和组别序号排序
-        df = df.sort_values(by=["table_en_name", "组别序号"])
-        # 调整列顺序
-        df = df[["库名", "组别序号", "加工主表", "table_en_name"]]
+        # 调整列顺序（不排序）
+        df = df[["库名", "聚合表名", "加工组别", "加工主表"]]
         # 保存到Excel
         df.to_excel(output_file, index=False, engine='openpyxl')
         print(f"\n结果已保存到: {output_file}")
