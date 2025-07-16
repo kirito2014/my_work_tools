@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电商运营数据大屏</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36CFC9',
+                        accent: '#FF7D00',
+                        dark: '#0F172A',
+                        light: '#F8FAFC',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+            }
+            .card-glass {
+                background: rgba(15, 23, 42, 0.7);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                min-width: 0;
+            }
+            .card-glass-light {
+                background: rgba(255, 255, 255, 0.7);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(0, 0, 0, 0.1);
+                min-width: 0;
+            }
+            .chart-container {
+                width: 100% !important;
+                height: 300px !important;
+                min-width: 0;
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            }
+            .grid-dashboard {
+                display: grid;
+                grid-template-columns: repeat(12, minmax(0, 1fr));
+                grid-template-rows: auto 1fr 1fr;
+                gap: 1rem;
+                height: 100vh;
+            }
+            .scrollbar-hidden::-webkit-scrollbar {
+                display: none;
+            }
+            .scrollbar-hidden {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-dark to-slate-900 text-light font-inter overflow-hidden">
+    <!-- 顶部导航 -->
+    <header class="grid-dashboard-cols-12 p-4 flex items-center justify-between border-b border-slate-800">
+        <div class="flex items-center space-x-2">
+            <i class="fa fa-line-chart text-primary text-2xl"></i>
+            <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-shadow">电商运营数据大屏</h1>
+        </div>
+        <div class="flex items-center space-x-6">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-clock-o text-primary"></i>
+                <span id="current-time" class="text-sm"></span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-refresh text-secondary"></i>
+                <span id="update-status" class="text-sm">数据更新中...</span>
+            </div>
+            <button id="theme-toggle" class="p-2 rounded-full hover:bg-slate-800 transition-colors">
+                <i class="fa fa-moon-o"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- 数据概览 -->
+    <div class="grid-dashboard-cols-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4">
+        <div class="card-glass rounded-xl p-4 transform hover:scale-[1.02] transition-transform">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-slate-400 text-sm">今日销售额</p>
+                    <h3 class="text-2xl font-bold mt-1" id="today-sales">¥ 128,456</h3>
+                    <p class="text-green-500 text-sm mt-1 flex items-center">
+                        <i class="fa fa-arrow-up mr-1"></i> 12.5% <span class="text-slate-400 ml-1">vs 昨日</span>
+                    </p>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <i class="fa fa-shopping-bag text-primary"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-glass rounded-xl p-4 transform hover:scale-[1.02] transition-transform">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-slate-400 text-sm">今日订单数</p>
+                    <h3 class="text-2xl font-bold mt-1" id="today-orders">1,256</h3>
+                    <p class="text-green-500 text-sm mt-1 flex items-center">
+                        <i class="fa fa-arrow-up mr-1"></i> 8.2% <span class="text-slate-400 ml-1">vs 昨日</span>
+                    </p>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center">
+                    <i class="fa fa-file-text-o text-secondary"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-glass rounded-xl p-4 transform hover:scale-[1.02] transition-transform">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-slate-400 text-sm">活跃用户</p>
+                    <h3 class="text-2xl font-bold mt-1" id="active-users">8,542</h3>
+                    <p class="text-red-500 text-sm mt-1 flex items-center">
+                        <i class="fa fa-arrow-down mr-1"></i> 3.1% <span class="text-slate-400 ml-1">vs 昨日</span>
+                    </p>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
+                    <i class="fa fa-users text-accent"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-glass rounded-xl p-4 transform hover:scale-[1.02] transition-transform">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-slate-400 text-sm">转化率</p>
+                    <h3 class="text-2xl font-bold mt-1" id="conversion-rate">2.8%</h3>
+                    <p class="text-green-500 text-sm mt-1 flex items-center">
+                        <i class="fa fa-arrow-up mr-1"></i> 1.3% <span class="text-slate-400 ml-1">vs 昨日</span>
+                    </p>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                    <i class="fa fa-exchange text-purple-500"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="grid-dashboard-cols-12 grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+        <!-- 销售趋势图 -->
+        <div class="card-glass rounded-xl p-4 lg:col-span-2 transform hover:shadow-lg transition-shadow">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg">销售趋势</h3>
+                <div class="flex space-x-2">
+                    <button class="px-3 py-1 text-xs rounded bg-primary/20 text-primary">今日</button>
+                    <button class="px-3 py-1 text-xs rounded bg-slate-800/50 text-slate-300 hover:bg-slate-700/50 transition-colors">本周</button>
+                    <button class="px-3 py-1 text-xs rounded bg-slate-800/50 text-slate-300 hover:bg-slate-700/50 transition-colors">本月</button>
+                </div>
+            </div>
+            <div id="sales-trend-chart" class="chart-container"></div>
+        </div>
+
+        <!-- 用户活跃度 -->
+        <div class="card-glass rounded-xl p-4 transform hover:shadow-lg transition-shadow">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg">用户活跃度</h3>
+                <div>
+                    <select class="bg-slate-800/50 text-slate-300 text-xs rounded px-2 py-1 border-none focus:outline-none focus:ring-1 focus:ring-primary">
+                        <option>按小时</option>
+                        <option>按天</option>
+                        <option>按周</option>
+                    </select>
+                </div>
+            </div>
+            <div id="user-active-chart" class="chart-container"></div>
+        </div>
+    </div>
+
+    <!-- 第三行图表 -->
+    <div class="grid-dashboard-cols-12 grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+        <!-- 区域销售 -->
+        <div class="card-glass rounded-xl p-4 transform hover:shadow-lg transition-shadow">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg">区域销售分布</h3>
+                <div>
+                    <button class="text-xs text-slate-400 hover:text-white transition-colors">
+                        <i class="fa fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="region-sales-chart" class="chart-container h-[250px]"></div>
+        </div>
+
+        <!-- 设备分布 -->
+        <div class="card-glass rounded-xl p-4 transform hover:shadow-lg transition-shadow">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg">用户设备分布</h3>
+                <div>
+                    <button class="text-xs text-slate-400 hover:text-white transition-colors">
+                        <i class="fa fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="device-chart" class="chart-container h-[250px]"></div>
+        </div>
+
+        <!-- 实时交易 -->
+        <div class="card-glass rounded-xl p-4 transform hover:shadow-lg transition-shadow">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg">实时交易</h3>
+                <div>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900/20 text-green-400">
+                        <span class="w-1.5 h-1.5 mr-1.5 bg-green-400 rounded-full animate-pulse"></span>
+                        实时更新
+                    </span>
+                </div>
+            </div>
+            <div class="overflow-y-auto h-[250px] scrollbar-hidden" id="realtime-transactions">
+                <!-- 交易记录将通过JS动态加载 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let charts = {};
+        let darkMode = true;
+        let lastUpdateTime = null;
+
+        // 初始化所有图表
+        function initCharts() {
+            // 销售趋势图
+            charts['sales-trend'] = echarts.init(document.getElementById('sales-trend-chart'), darkMode ? 'dark' : 'light');
+            charts['sales-trend'].setOption({
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    textStyle: { color: '#fff' },
+                    axisPointer: {
+                        type: 'cross',
+                        crossStyle: { color: '#165DFF' }
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    top: '5%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: [],
+                    axisLine: {
+                        lineStyle: {
+                            color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        color: darkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                        fontSize: 10
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLine: {
+                        lineStyle: {
+                            color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        color: darkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                        fontSize: 10
+                    },
+                    splitLine: {
+                        lineStyle: {
+                            color: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+                        }
+                    }
+                },
+                series: [{
+                    name: '销售额',
+                    type: 'line',
+                    data: [],
+                    smooth: true,
+                    lineStyle: {
+                        width: 2,
+                        color: '#165DFF'
+                    },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(22, 93, 255, 0.4)' },
+                            { offset: 1, color: 'rgba(22, 93, 255, 0.05)' }
+                        ])
+                    },
+                    symbol: 'circle',
+                    symbolSize: 4,
+                    itemStyle: {
+                        color: '#165DFF',
+                        borderWidth: 1
+                    }
+                }]
+            });
+
+            // 用户活跃度图
+            charts['user-active'] = echarts.init(document.getElementById('user-active-chart'), darkMode ? 'dark' : 'light');
+            charts['user-active'].setOption({
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    textStyle: { color: '#fff' }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    top: '5%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: [],
+                    axisLine: {
+                        lineStyle: {
+                            color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        color: darkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                        fontSize: 10
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLine: {
+                        lineStyle: {
+                            color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        color: darkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                        fontSize: 10
+                    },
+                    splitLine: {
+                        lineStyle: {
+                            color: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+                        }
+                    }
+                },
+                series: [{
+                    name: '活跃用户',
+                    type: 'line',
+                    data: [],
+                    smooth: true,
+                    lineStyle: {
+                        width: 2,
+                        color: '#36CFC9'
+                    },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(54, 207, 201, 0.4)' },
+                            { offset: 1, color: 'rgba(54, 207, 201, 0.05)' }
+                        ])
+                    },
+                    symbol: 'circle',
+                    symbolSize: 4,
+                    itemStyle: {
+                        color: '#36CFC9',
+                        borderWidth: 1
+                    }
+                }]
+            });
+
+            // 区域销售图
+            charts['region-sales'] = echarts.init(document.getElementById('region-sales-chart'), darkMode ? 'dark' : 'light');
+            charts['region-sales'].setOption({
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    textStyle: { color: '#fff' },
+                    axisPointer: {
+                        type: 'shadow'
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    top: '5%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: [],
+                    axisLine: {
+                        lineStyle: {
+                            color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        color: darkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                        fontSize: 10
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLine: {
+                        lineStyle: {
+                            color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        color: darkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                        fontSize: 10
+                    },
+                    splitLine: {
+                        lineStyle: {
+                            color: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+                        }
+                    }
+                },
+                series: [{
+                    name: '销售额',
+                    type: 'bar',
+                    data: [],
+                    barWidth: '60%',
+                    itemStyle: {
+                        borderRadius: 4,
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: '#165DFF' },
+                            { offset: 1, color: '#0a39a8' }
+                        ])
+                    }
+                }]
+            });
+
+            // 设备分布图
+            charts['device'] = echarts.init(document.getElementById('device-chart'), darkMode ? 'dark' : 'light');
+            charts['device'].setOption({
+                tooltip: {
+                    trigger: 'item',
+                    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    textStyle: { color: '#fff' },
+                    formatter: '{a} <br/>{b}: {c}%'
+                },
+                legend: {
+                    orient: 'vertical',
+                    right: '5%',
+                    top: '10%',
+                    bottom: '10%',
+                    textStyle: {
+                        color: darkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                        fontSize: 10
+                    }
+                },
+                series: [{
+                    name: '设备分布',
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    center: ['35%', '50%'],
+                    avoidLabelOverlap: false,
+                    itemStyle: {
+                        borderRadius: 5,
+                        borderColor: darkMode ? '#1e293b' : '#e2e8f0',
+                        borderWidth: 2
+                    },
+                    label: {
+                        show: true,
+                        formatter: '{b}: {c}%',
+                        color: darkMode ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)',
+                        fontSize: 10
+                    },
+                    labelLine: {
+                        show: true,
+                        length: 5,
+                        length2: 5
+                    },
+                    data: []
+                }]
+            });
+
+            // 监听窗口大小变化，调整图表大小
+            window.addEventListener('resize', () => {
+                Object.values(charts).forEach(chart => chart.resize());
+            });
+        }
+
+        // 更新当前时间
+        function updateCurrentTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('current-time').textContent = timeStr;
+        }
+
+        // 更新销售趋势图
+        function updateSalesTrendChart() {
+            fetch('/api/sales_trend')
+                .then(response => response.json())
+                .then(data => {
+                    const option = charts['sales-trend'].getOption();
+                    option.xAxis[0].data = data.time;
+                    option.series[0].data = data.value;
+                    charts['sales-trend'].setOption(option);
+
+                    // 更新今日销售额
+                    const todaySales = data.value.reduce((a, b) => a + b, 0);
+                    document.getElementById('today-sales').textContent = `¥ ${todaySales.toLocaleString()}`;
+                })
+                .catch(error => console.error('Error fetching sales trend:', error));
+        }
+
+        // 更新用户活跃度图
+        function updateUserActiveChart() {
+            fetch('/api/user_active')
+                .then(response => response.json())
+                .then(data => {
+                    const option = charts['user-active'].getOption();
+                    option.xAxis[0].data = data.time;
+                    option.series[0].data = data.value;
+                    charts['user-active'].setOption(option);
+
+                    // 更新活跃用户
+                    const activeUsers = data.value[data.value.length - 1];
+                    document.getElementById('active-users').textContent = activeUsers.toLocaleString();
+                })
+                .catch(error => console.error('Error fetching user active:', error));
+        }
+
+        // 更新区域销售图
+        function updateRegionSalesChart() {
+            fetch('/api/region_sales')
+                .then(response => response.json())
+                .then(data => {
+                    const option = charts['region-sales'].getOption();
+                    option.xAxis[0].data = data.map(item => item.name);
+                    option.series[0].data = data.map(item => item.value);
+                    charts['region-sales'].setOption(option);
+                })
+                .catch(error => console.error('Error fetching region sales:', error));
+        }
+
+        // 更新设备分布图
+        function updateDeviceChart() {
+            fetch('/api/user_device')
+                .then(response => response.json())
+                .then(data => {
+                    const option = charts['device'].getOption();
+                    option.series[0].data = data;
+                    charts['device'].setOption(option);
+                })
+                .catch(error => console.error('Error fetching device data:', error));
+        }
+
+        // 更新实时交易
+        function updateRealtimeTransactions() {
+            fetch('/api/realtime_transactions')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('realtime-transactions');
+                    container.innerHTML = '';
+
+                    data.forEach(transaction => {
+                        const row = document.createElement('div');
+                        row.className = 'flex justify-between items-center py-2 px-3 mb-2 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-colors';
+
+                        row.innerHTML = `
+                            <div class="flex flex-col">
+                                <span class="text-sm font-medium">${transaction.product}</span>
+                                <span class="text-xs text-slate-400">${transaction.id}</span>
+                            </div>
+                            <div class="flex flex-col items-end">
+                                <span class="text-sm font-medium text-green-400">¥${transaction.amount}</span>
+                                <span class="text-xs text-slate-400">${transaction.time}</span>
+                            </div>
+                        `;
+
+                        container.appendChild(row);
+                    });
+
+                    // 更新今日订单数
+                    const todayOrders = data.length * 10; // 简单估算
+                    document.getElementById('today-orders').textContent = todayOrders.toLocaleString();
+
+                    // 更新转化率 - 使用活跃用户数作为分母
+                        const conversionRate = activeUsers > 0 ? ((todayOrders / activeUsers) * 100).toFixed(1) : '0.0';
+                        document.getElementById('conversion-rate').textContent = `${conversionRate}%`;
+                })
+                .catch(error => console.error('Error fetching realtime transactions:', error));
+        }
+
+        // 更新图表主题样式
+        function updateChartsTheme() {
+            const textColor = darkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
+            const axisLineColor = darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            const splitLineColor = darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+            const tooltipBgColor = darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
+            const tooltipTextColor = darkMode ? '#fff' : '#000';
+
+            // 更新销售趋势图
+            const salesOption = charts['sales-trend'].getOption();
+            salesOption.tooltip.backgroundColor = tooltipBgColor;
+            salesOption.tooltip.textStyle.color = tooltipTextColor;
+            salesOption.xAxis[0].axisLine.lineStyle.color = axisLineColor;
+            salesOption.xAxis[0].axisLabel.color = textColor;
+            salesOption.yAxis[0].axisLine.lineStyle.color = axisLineColor;
+            salesOption.yAxis[0].axisLabel.color = textColor;
+            salesOption.yAxis[0].splitLine.lineStyle.color = splitLineColor;
+            charts['sales-trend'].setOption(salesOption);
+
+            // 更新用户活跃度图
+            const userOption = charts['user-active'].getOption();
+            userOption.tooltip.backgroundColor = tooltipBgColor;
+            userOption.tooltip.textStyle.color = tooltipTextColor;
+            userOption.xAxis[0].axisLine.lineStyle.color = axisLineColor;
+            userOption.xAxis[0].axisLabel.color = textColor;
+            userOption.yAxis[0].axisLine.lineStyle.color = axisLineColor;
+            userOption.yAxis[0].axisLabel.color = textColor;
+            userOption.yAxis[0].splitLine.lineStyle.color = splitLineColor;
+            charts['user-active'].setOption(userOption);
+
+            // 更新区域销售图
+            const regionOption = charts['region-sales'].getOption();
+            regionOption.tooltip.backgroundColor = tooltipBgColor;
+            regionOption.tooltip.textStyle.color = tooltipTextColor;
+            regionOption.xAxis[0].axisLine.lineStyle.color = axisLineColor;
+            regionOption.xAxis[0].axisLabel.color = textColor;
+            regionOption.yAxis[0].axisLine.lineStyle.color = axisLineColor;
+            regionOption.yAxis[0].axisLabel.color = textColor;
+            regionOption.yAxis[0].splitLine.lineStyle.color = splitLineColor;
+            charts['region-sales'].setOption(regionOption);
+
+            // 更新设备分布图
+            const deviceOption = charts['device'].getOption();
+            deviceOption.tooltip.backgroundColor = tooltipBgColor;
+            deviceOption.tooltip.textStyle.color = tooltipTextColor;
+            deviceOption.legend.textStyle.color = textColor;
+            deviceOption.series[0].itemStyle.borderColor = darkMode ? '#1e293b' : '#e2e8f0';
+            deviceOption.series[0].label.color = darkMode ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)';
+            charts['device'].setOption(deviceOption);
+        }
+
+        // 切换主题
+        function toggleTheme() {
+            darkMode = !darkMode;
+
+            // 更新按钮图标
+            const themeToggle = document.getElementById('theme-toggle');
+            themeToggle.innerHTML = darkMode ? '<i class="fa fa-moon-o"></i>' : '<i class="fa fa-sun-o"></i>';
+
+            // 更新整体样式
+            document.body.className = darkMode 
+                ? 'bg-gradient-to-br from-dark to-slate-900 text-light font-inter overflow-hidden' 
+                : 'bg-gradient-to-br from-light to-slate-100 text-dark font-inter overflow-hidden';
+
+            // 更新卡片样式
+            const cards = document.querySelectorAll('.card-glass, .card-glass-light');
+            cards.forEach(card => {
+                card.className = darkMode 
+                    ? 'card-glass rounded-xl p-4 transform hover:shadow-lg transition-shadow' 
+                    : 'card-glass-light rounded-xl p-4 transform hover:shadow-lg transition-shadow';
+            });
+
+            // 更新图表主题和颜色
+            updateChartsTheme();
+
+            // 强制图表重绘以确保尺寸正确
+            // 强制重排以确保获取最新尺寸
+            document.body.offsetHeight;
+            // 增加延迟确保CSS过渡完成后再调整图表大小
+            setTimeout(() => {
+                Object.values(charts).forEach(chart => {
+                    const container = chart.getDom().parentElement;
+                    // 强制使用容器当前尺寸重绘图表
+                    chart.resize({
+                        width: container.offsetWidth,
+                        height: container.offsetHeight
+                    });
+                });
+            }, 100);
+        }
+
+        // 更新所有数据
+        function updateAllData() {
+            updateSalesTrendChart();
+            updateUserActiveChart();
+            updateRegionSalesChart();
+            updateDeviceChart();
+            updateRealtimeTransactions();
+
+            // 更新数据更新状态
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('zh-CN');
+            document.getElementById('update-status').textContent = `数据已更新: ${timeStr}`;
+            lastUpdateTime = now;
+        }
+
+        // 页面加载完成后初始化
+        window.onload = function() {
+            // 初始化图表
+            initCharts();
+
+            // 更新当前时间
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 1000);
+
+            // 初始加载数据
+            updateAllData();
+
+            // 设置定时更新
+            setInterval(updateAllData, 3000);  // 每3秒更新一次
+
+            // 绑定主题切换按钮
+            document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+        };
+    </script>
+</body>
+</html>

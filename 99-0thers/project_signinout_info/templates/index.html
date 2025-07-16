@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浙江农商人员考勤信息屏</title>
+    <!-- 引入ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <!-- 引入Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入自定义样式 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fa fa-clock-o"></i> 浙江农商人员考勤信息屏</h1>
+        </header>
+
+        <!-- 时间范围筛选器 -->
+        <div class="time-filter">
+            <button class="filter-btn active" data-range="today">当日</button>
+            <button class="filter-btn" data-range="week">当周</button>
+            <button class="filter-btn" data-range="month">当月</button>
+            <button class="filter-btn" data-range="quarter">当季</button>
+        </div>
+
+        <!-- 信息卡片区域 -->
+        <div class="info-cards">
+            <div class="card">
+                <div class="card-content">
+                    <div class="card-title">今日签到数</div>
+                    <div class="card-value" id="today-checkin">0</div>
+                    <div class="card-compare" id="today-checkin-compare"></div>
+                </div>
+                <i class="fa fa-check-circle card-icon"></i>
+            </div>
+            <div class="card">
+                <div class="card-content">
+                    <div class="card-title">今日迟到数</div>
+                    <div class="card-value" id="today-late">0</div>
+                    <div class="card-compare" id="today-late-compare"></div>
+                </div>
+                <i class="fa fa-exclamation-circle card-icon"></i>
+            </div>
+            <div class="card">
+                <div class="card-content">
+                    <div class="card-title">签到人员总数</div>
+                    <div class="card-value" id="total-employees">0</div>
+                    <div class="card-compare" id="total-employees-compare"></div>
+                </div>
+                <i class="fa fa-users card-icon"></i>
+            </div>
+            <div class="card">
+                <div class="card-content">
+                    <div class="card-title">迟到率</div>
+                    <div class="card-value" id="late-rate">0%</div>
+                    <div class="card-compare" id="late-rate-compare"></div>
+                </div>
+                <i class="fa fa-percentage card-icon"></i>
+            </div>
+
+    </div>
+
+        <!-- 图表区域 -->
+        <div class="charts-container">
+            <!-- 签到趋势曲线图 -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h2><i class="fa fa-line-chart"></i> 签到趋势</h2>
+                </div>
+                <div class="chart-content">
+                    <div id="trend-chart" class="chart"></div>
+                </div>
+            </div>
+
+            <!-- 签到分布散点图 -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h2><i class="fa fa-scatter-chart"></i> 签到分布</h2>
+                </div>
+                <div class="chart-content">
+                    <div id="distribution-chart" class="chart"></div>
+                </div>
+            </div>
+
+            <!-- 加班时长柱状图 -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h2><i class="fa fa-bar-chart"></i> 部门加班时长</h2>
+                </div>
+                <div class="chart-content">
+                    <div id="overtime-chart" class="chart"></div>
+                </div>
+            </div>
+            <!-- 签到批次分布环形图 -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h2><i class="fa fa-circle-o"></i> 签到批次分布</h2>
+                </div>
+                <div class="chart-content">
+                    <div id="batch-chart" class="chart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入自定义脚本 -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
