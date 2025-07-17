@@ -126,10 +126,18 @@ WantedBy=multi-user.target
 
 启动Gunicorn服务：
 ```bash
-# 启动Gunicorn服务（root用户直接运行）
-nohup /var/www/attendance_system/venv/bin/gunicorn -c /var/www/attendance_system/gunicorn_config.py app:app > /var/log/attendance/gunicorn.log 2>&1 &
-
-# 启动Nginx服务
+# 准备日志目录
+  mkdir -p /var/log/attendance && chmod 755 /var/log/attendance
+  
+  # 复制服务配置文件
+  cp attendance.service /etc/systemd/system/
+  systemctl daemon-reload
+  
+  # 启动服务并设置开机自启
+  systemctl start attendance
+  systemctl enable attendance
+  
+  # 启动Nginx服务
 nginx
 
 # 检查服务状态
