@@ -137,8 +137,21 @@ WantedBy=multi-user.target
   systemctl start attendance
   systemctl enable attendance
   
-  # 启动Nginx服务
-nginx
+  # 配置Nginx
+  # 复制站点配置文件
+  cp nginx_attendance.conf /etc/nginx/conf.d/
+  
+  # 禁用默认站点（如有）
+  rm -f /etc/nginx/conf.d/default.conf
+  
+  # 测试Nginx配置
+  nginx -t
+  
+  # 启动/重启Nginx服务
+  systemctl restart nginx
+  
+  # 设置Nginx开机自启
+  systemctl enable nginx
 
 # 检查服务状态
 ps aux | grep gunicorn
