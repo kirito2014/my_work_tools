@@ -3,7 +3,7 @@
 ## 一、环境要求
 - 操作系统：Ubuntu 20.04/22.04 LTS 或 CentOS 7/8
 - 最低配置：2核CPU，2GB内存，20GB磁盘空间
-- 网络要求：开放80端口（HTTP），3306端口（MySQL，可选）
+- 网络要求：开放8080端口（HTTP），3306端口（MySQL，可选）
 
 ## 二、部署架构说明
 本项目采用Nginx+Gunicorn+Flask架构：
@@ -144,7 +144,7 @@ ps aux | grep nginx
 mkdir -p /etc/nginx/sites-available
 tee /etc/nginx/sites-available/attendance > /dev/null <<'EOF'
 server {
-    listen 80;
+    listen 8080;  # Changed from 80 to avoid port conflicts
     server_name your_domain.com;  # 替换为您的域名或服务器IP
 
     location /static {
@@ -169,7 +169,7 @@ sudo chmod 644 /etc/nginx/sites-available/attendance
 添加以下内容：
 ```nginx
 server {
-    listen 80;
+    listen 8080;  # Changed from 80 to avoid port conflicts
     server_name your_domain.com;  # 替换为您的域名或服务器IP
 
     location /static {
@@ -189,17 +189,21 @@ server {
 
 启用站点并重启Nginx：
 ```bash
+mkdir -p /etc/nginx/sites-enabled
 ln -s /etc/nginx/sites-available/attendance /etc/nginx/sites-enabled/
 nginx -t  # 测试配置是否有误
-systemctl restart nginx
-systemctl enable nginx
+nginx -s stop || true && nginx  # Stop existing Nginx if running, then start fresh
+# nginx -s reload is unnecessary after fresh start
+# systemctl is not available; use above commands for Nginx management
+# If you see 'Address already in use' errors, check for other processes using port 8080
+# and stop them manually or change the listen port in Nginx configuration
 ```
 
 ### 3.6 防火墙配置
 ```bash
-# 开放80端口
+# 开放8080端口
 # Ubuntu/Debian
-ufw allow 80/tcp
+ufw allow 8080/tcp  # Updated to match new Nginx port
 ufw allow 443/tcp  # 如果后续配置HTTPS
 
 ufw enable
