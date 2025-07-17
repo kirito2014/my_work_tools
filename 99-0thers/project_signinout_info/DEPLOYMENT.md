@@ -151,6 +151,19 @@ WantedBy=multi-user.target
   systemctl restart nginx
   
   # 设置Nginx开机自启
+  # 创建日志目录并设置权限
+  sudo mkdir -p /var/log/attendance
+  sudo chown -R www-data:www-data /var/log/attendance
+  sudo chmod -R 755 /var/log/attendance
+
+  # 设置项目目录权限
+  sudo chown -R www-data:www-data /var/www/attendance_system
+  sudo chmod -R 755 /var/www/attendance_system
+
+  # 配置SELinux（如启用）
+  sudo setenforce 0
+  sudo sed -i 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
+
   systemctl enable nginx
 
 # 检查服务状态
