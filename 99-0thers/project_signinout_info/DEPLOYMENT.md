@@ -140,8 +140,9 @@ ps aux | grep nginx
 ### 3.5 Nginx配置
 创建Nginx站点配置：
 ```bash
-# 使用sudo tee命令创建配置文件以避免编辑器权限问题
-sudo tee /etc/nginx/sites-available/attendance > /dev/null <<'EOF'
+# 使用tee命令创建配置文件以避免编辑器权限问题
+mkdir -p /etc/nginx/sites-available
+tee /etc/nginx/sites-available/attendance > /dev/null <<'EOF'
 server {
     listen 80;
     server_name your_domain.com;  # 替换为您的域名或服务器IP
