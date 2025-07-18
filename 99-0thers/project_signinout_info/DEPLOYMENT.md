@@ -126,11 +126,45 @@ WantedBy=multi-user.target
 
 启动Gunicorn服务：
 ```bash
-# 启动Gunicorn服务（root用户直接运行）
-nohup /var/www/attendance_system/venv/bin/gunicorn -c /var/www/attendance_system/gunicorn_config.py app:app > /var/log/attendance/gunicorn.log 2>&1 &
+# 准备日志目录
+  mkdir -p /var/log/attendance && chmod 755 /var/log/attendance
+  
+  # 复制服务配置文件
+  cp attendance.service /etc/systemd/system/
+  systemctl daemon-reload
+  
+  # 启动服务并设置开机自启
+  systemctl start attendance
+  systemctl enable attendance
+  
+  # 配置Nginx
+  # 复制站点配置文件
+  cp nginx_attendance.conf /etc/nginx/conf.d/
+  
+  # 禁用默认站点（如有）
+  rm -f /etc/nginx/conf.d/default.conf
+  
+  # 测试Nginx配置
+  nginx -t
+  
+  # 启动/重启Nginx服务
+  systemctl restart nginx
+  
+  # 设置Nginx开机自启
+  # 创建日志目录并设置权限
+  sudo mkdir -p /var/log/attendance
+  sudo chown -R www-data:www-data /var/log/attendance
+  sudo chmod -R 755 /var/log/attendance
 
-# 启动Nginx服务
-nginx
+  # 设置项目目录权限
+  sudo chown -R www-data:www-data /var/www/attendance_system
+  sudo chmod -R 755 /var/www/attendance_system
+
+  # 配置SELinux（如启用）
+  sudo setenforce 0
+  sudo sed -i 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
+
+  systemctl enable nginx
 
 # 检查服务状态
 ps aux | grep gunicorn

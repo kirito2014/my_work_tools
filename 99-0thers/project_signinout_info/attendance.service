@@ -1,0 +1,16 @@
+[Unit]
+Description=Attendance System Gunicorn Service
+After=network.target mysqld.service
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/attendance_system
+Environment="PATH=/var/www/attendance_system/venv/bin"
+ExecStart=/var/www/attendance_system/venv/bin/python3 /var/www/attendance_system/venv/bin/gunicorn -c /var/www/attendance_system/gunicorn_config.py app:app
+Restart=always
+StandardOutput=file:/var/log/attendance/gunicorn.log
+StandardError=file:/var/log/attendance/gunicorn_error.log
+
+[Install]
+WantedBy=multi-user.target
