@@ -1,10 +1,23 @@
 from flask import Flask, jsonify, render_template
+from decimal import Decimal
+from flask.json import JSONEncoder
 import random
 from datetime import datetime, timedelta
-import pymysql
+import mysql
+import mysql.connector
+from mysql.connector import Error
+
 from config import DB_CONFIG
 
 app = Flask(__name__)
+
+class CustomJSONEncoder(JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super(CustomJSONEncoder, self).default(obj)
+
+app.json_encoder = CustomJSONEncoder
 app.config['JSON_AS_ASCII'] = False  # 支持中文显示
 
 # 模拟员工数据
@@ -12,19 +25,22 @@ EMPLOYEES = 22  # 总员工数
 DEPARTMENTS = ["对公组", "零售组", "信贷组", "资管组", "通用组", "自助分析"]
 
 def get_db_connection():
-    """建立数据库连接"""
-    connection = pymysql.connect(
-        host=DB_CONFIG['host'],
-        user=DB_CONFIG['user'],
-        password=DB_CONFIG['password'],
-        database=DB_CONFIG['database'],
-        port=DB_CONFIG['port'],
-        charset=DB_CONFIG['charset'],
-        #ssl={'ca': '/path/to/ca.pem'},
-        allow_public_key=True,
-        cursorclass=pymysql.cursors.DictCursor
-    )
-    return connection
+    """建立数据库连接并返回连接对象，失败时返回None"""
+    connection = None
+    try:
+        connection = mysql.connector.connect(
+            host=DB_CONFIG['host'],
+            user=DB_CONFIG['user'],
+            password=DB_CONFIG['password'],
+            database=DB_CONFIG['database'],
+            port=DB_CONFIG.get('port', 3306),
+            charset=DB_CONFIG.get('charset', 'utf8mb4'),
+
+        )
+        return connection
+    except Error as e:
+        print(f"数据库连接错误: {e}")
+        return None
 
 
 def query_db(query, params=None):
@@ -32,13 +48,15 @@ def query_db(query, params=None):
     connection = None
     try:
         connection = get_db_connection()
-        with connection.cursor() as cursor:
+        with connection.cursor(dictionary=True) as cursor:
             cursor.execute(query, params or ())
             result = cursor.fetchall()
         connection.commit()
         return result
     except Exception as e:
         print(f"Database query error: {str(e)}")
+        print(f"Failed query: {query}")
+        print(f"Query parameters: {params}")
         return None
     finally:
         if connection:
@@ -110,10 +128,10 @@ def generate_late_distribution(time_range):
         # 查询今日迟到记录
         query = """
             SELECT TIME_FORMAT(checkin_time, '%H:%i') as time,
-                   TIMESTAMPDIFF(MINUTE, '08:30:00', checkin_time) as delay
+                   TIMESTAMPDIFF(MINUTE, TIME('08:30:00'), checkin_time) as delay
             FROM attendance_records
             WHERE DATE(checkin_time) = CURDATE()
-              AND checkin_time > '08:30:00'
+              AND checkin_time > TIME('08:30:00')
         """
         results = query_db(query)
         
@@ -287,21 +305,23 @@ def get_overview(time_range):
     current_query = """
         SELECT 
             COUNT(*) as checkin,
-            SUM(CASE WHEN checkin_time > '08:30:00' THEN 1 ELSE 0 END) as late
+            SUM(CASE WHEN checkin_time > TIME('08:30:00') THEN 1 ELSE 0 END) as late
         FROM attendance_records
         WHERE DATE(checkin_time) BETWEEN %s AND %s
     """
-    current_data = query_db(current_query, (current_start, current_end))[0] if query_db(current_query, (current_start, current_end)) else None
+    current_results = query_db(current_query, (current_start, current_end))
+    current_data = current_results[0] if current_results else None
     
     # 查询上一周期数据
     prev_query = """
         SELECT 
             COUNT(*) as checkin,
-            SUM(CASE WHEN checkin_time > '08:30:00' THEN 1 ELSE 0 END) as late
+            SUM(CASE WHEN checkin_time > TIME('08:30:00') THEN 1 ELSE 0 END) as late
         FROM attendance_records
         WHERE DATE(checkin_time) BETWEEN %s AND %s
     """
-    prev_data = query_db(prev_query, (prev_start, prev_end))[0] if query_db(prev_query, (prev_start, prev_end)) else None
+    prev_results = query_db(prev_query, (prev_start, prev_end))
+    prev_data = prev_results[0] if prev_results else None
     
     # 查询总员工数
     total_query = "SELECT COUNT(*) as total FROM employees"
@@ -331,10 +351,10 @@ def get_overview(time_range):
             prev_checkin = random.randint(3900, 4500)
             prev_late = random.randint(220, 340)
     else:
-        current_checkin = current_data['checkin']
-        current_late = current_data['late']
-        prev_checkin = prev_data['checkin']
-        prev_late = prev_data['late']
+        current_checkin = current_data.get('checkin', 0) or 0
+        current_late = current_data.get('late', 0) or 0
+        prev_checkin = prev_data.get('checkin', 0) or 0
+        prev_late = prev_data.get('late', 0) or 0
     
     current_rate = round(current_late / current_checkin * 
 100, 1) if current_checkin > 0 else 0
