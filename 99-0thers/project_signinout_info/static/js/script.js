@@ -373,17 +373,42 @@ function switchTimeRange(range) {
     fetchOverview(range);
 }
 
+// 更新当前日期时间
+function updateDateTime() {
+    const now = new Date();
+    const options = {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    };
+    document.getElementById('current-datetime').textContent = now.toLocaleString('zh-CN', options);
+}
+
+// 获取总在场人数
+function fetchTotalPresent() {
+    fetch('/api/total_present')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('total-present').textContent = data.total_present;
+        })
+        .catch(error => console.error('获取总在场人数失败:', error));
+}
+
 // 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', function() {
-    // 初始化图表
+window.onload = function() {
     initCharts();
-    
-    // 获取初始数据
     fetchOverview(currentRange);
     fetchTrendData(currentRange);
     fetchDistributionData(currentRange);
-    fetchOvertimeData(currentRange);
     fetchBatchData();
+    fetchOvertimeData(currentRange);
+    fetchTotalPresent();
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+};
 
     
     // 绑定时间筛选按钮事件
@@ -401,4 +426,3 @@ document.addEventListener('DOMContentLoaded', function() {
         batchChart.resize();
 
     });
-});

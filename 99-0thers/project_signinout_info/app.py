@@ -418,5 +418,18 @@ def get_status_distribution():
     """获取签到状态占比数据"""
     return jsonify(generate_status_distribution())
 
+@app.route('/api/total_present')
+def get_total_present():
+    try:
+        # 查询在职员工总数
+        query = "SELECT COUNT(*) as count FROM ods_sunline.ods_sunline_psn_binfo WHERE IMPL_FLAG = 'Y'"
+        result = query_db(query)
+        count = result[0]['count'] if result else 0
+        print(f"Total present: {count}")
+        return jsonify({'total_present': count})
+    except Exception as e:
+        print(f"Database query error: {e}")
+        return jsonify({'total_present': 0})
+
 if __name__ == '__main__':
     app.run(debug=True)

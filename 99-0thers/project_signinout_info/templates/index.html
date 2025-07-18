@@ -15,6 +15,7 @@
     <div class="container">
         <header>
             <h1><i class="fa fa-clock-o"></i> 浙江农商人员考勤信息屏</h1>
+            <div class="datetime-display" id="current-datetime"></div>
         </header>
 
         <!-- 时间范围筛选器 -->
@@ -45,9 +46,16 @@
             </div>
             <div class="card">
                 <div class="card-content">
-                    <div class="card-title">签到人员总数</div>
-                    <div class="card-value" id="total-employees">0</div>
-                    <div class="card-compare" id="total-employees-compare"></div>
+                    <div class="card-title">
+                        <span class="title-part">签到人员总数</span>
+                        <span class="title-divider">|</span>
+                        <span class="title-part">总在场人数</span>
+                    </div>
+                    <div class="card-value-container">
+                        <div class="card-value" id="total-employees">0</div>
+                        <div class="divider"></div>
+                        <div class="card-value" id="total-present">0</div>
+                    </div>
                 </div>
                 <i class="fa fa-users card-icon"></i>
             </div>
