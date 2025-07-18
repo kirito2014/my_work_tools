@@ -20,7 +20,7 @@ def get_db_connection():
         database=DB_CONFIG['database'],
         port=DB_CONFIG['port'],
         charset=DB_CONFIG['charset'],
-        ssl={'ca': '/path/to/ca.pem'},
+        #ssl={'ca': '/path/to/ca.pem'},
         allow_public_key=True,
         cursorclass=pymysql.cursors.DictCursor
     )
