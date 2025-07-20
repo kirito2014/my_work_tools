@@ -201,12 +201,40 @@ header {
 }
 
 .datetime-display {
-    background-color: var(--primary-color);
+  display: inline-block;
+  padding: 12px 22px;
+  border: 1px solid #2196F3;
+  border-radius: 6px;
+  background-color: #000;
+  color: #FFFFFF;
+  font-family: 'Consolas', monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  box-shadow: 0 0 10px rgba(33, 150, 243, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.datetime-display::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(33, 150, 243, 0.2), transparent);
+  transition: 0.5s;
+}
+
+.datetime-display:hover::before {
+  left: 100%;
+}
+    /* background-color: var(--primary-color);
     color: white;
     padding: 8px 16px;
     border-radius: 20px;
     font-size: 1rem;
-}
+} */
 
 /* 签到、迟到、迟到率卡片样式调整 */
 #today-checkin, #today-late, #late-rate {
