@@ -1,9 +1,8 @@
 from flask import Flask, jsonify, render_template
 from decimal import Decimal
-from flask.json import JSONEncoder
+from json import JSONEncoder
 import random
 from datetime import datetime, timedelta
-import mysql
 import mysql.connector
 from mysql.connector import Error
 
