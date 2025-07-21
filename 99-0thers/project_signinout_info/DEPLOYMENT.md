@@ -226,7 +226,7 @@ server {
 mkdir -p /etc/nginx/sites-enabled
 ln -s /etc/nginx/sites-available/attendance /etc/nginx/sites-enabled/
 nginx -t  # 测试配置是否有误
-nginx -s stop || true && nginx  # Stop existing Nginx if running, then start fresh
+nginx -s stop || true && nginx  #nginx -s stop || true && nginx  Stop existing Nginx if running, then start fresh
 # nginx -s reload is unnecessary after fresh start
 # systemctl is not available; use above commands for Nginx management
 # If you see 'Address already in use' errors, check for other processes using port 8080

@@ -420,9 +420,8 @@ window.onload = function() {
     
     // 窗口大小变化时重绘图表
     window.addEventListener('resize', function() {
-        trendChart.resize();
-        distributionChart.resize();
-        overtimeChart.resize();
-        batchChart.resize();
-
+        if (trendChart) trendChart.resize();
+        if (distributionChart) distributionChart.resize();
+        if (overtimeChart) overtimeChart.resize();
+        if (batchChart) batchChart.resize();
     });

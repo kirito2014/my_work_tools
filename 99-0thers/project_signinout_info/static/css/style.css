@@ -89,6 +89,9 @@ header h1 {
     justify-content: center;
 }
 
+.info-cards { display: flex; gap: 20px; width: 100%; }
+.info-cards .card:first-child { width: calc(28% - 15px); }
+.info-cards .card:not(:first-child) { width: calc(24% - 15px); }
 .card {
     background-color: var(--card-bg-color);
     border-radius: 10px;
