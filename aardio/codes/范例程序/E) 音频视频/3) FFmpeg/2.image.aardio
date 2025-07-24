@@ -1,9 +1,0 @@
-﻿//转换图像格式
-import console.int;
-import process.ffmpeg;
-
-var ffmpeg = process.ffmpeg("/",
-	"-y","-i","~\codes\范例程序\D) 图形图像\.gdip.jpg","out.webp");
-
-//指定用文本框异步显示进程输出（不阻塞代码向后执行）
-ffmpeg.logResponse();
