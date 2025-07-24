@@ -431,7 +431,7 @@ def get_overview(time_range):
             and DATE(p1.STD_ATTEN_DT) BETWEEN %s AND %s
             )
             SELECT 
-                coalesce(c0815.checkin_0815,0) + coalesce(c0850.checkin_0850,0) AS total_checkin,
+                (coalesce(c0815.checkin_0815,0) + coalesce(c0850.checkin_0850,0)) AS total_checkin,
                 (coalesce(c0815.late_0815,0) + coalesce(c0850.late_0850,0)) AS total_late 
             FROM 
                 c0815, c0850;
@@ -473,7 +473,7 @@ def get_overview(time_range):
             and DATE(p1.STD_ATTEN_DT) BETWEEN %s AND %s
             )
             SELECT 
-                coalesce(c0815.checkin_0815,0) + coalesce(c0850.checkin_0850,0) AS total_checkin,
+                (coalesce(c0815.checkin_0815,0) + coalesce(c0850.checkin_0850,0)) AS total_checkin,
                 (coalesce(c0815.late_0815,0) + coalesce(c0850.late_0850,0)) AS total_late 
             FROM 
                 c0815, c0850;
