@@ -70,11 +70,38 @@ def generate_checkin_trend(time_range):
     if time_range == "today":
         # 查询今日每小时签到数据
         query = """
-            SELECT HOUR(checkin_time) as hour, COUNT(*) as checkin
-            FROM attendance_records
-            WHERE DATE(checkin_time) = CURDATE()
-            GROUP BY HOUR(checkin_time)
-            ORDER BY hour
+            WITH RECURSIVE hours AS (
+                SELECT 0 AS hour
+                UNION ALL
+                SELECT hour + 1 FROM hours WHERE hour < 23
+            ),
+            latest_date AS (
+                SELECT max(atten_dt) AS max_dt 
+                FROM ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp
+            ),
+            checkin_data AS (
+                SELECT
+                    HOUR(p1.EARLIEST_SINGIN_TM) AS hour,
+                    COUNT(*) AS checkin
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND IMPL_FLAG = 'Y'
+                WHERE
+                    p1.ATTEN_DT = (SELECT max_dt FROM latest_date)
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                GROUP BY
+                    HOUR(p1.EARLIEST_SINGIN_TM)
+            )
+            SELECT 
+                h.hour,
+                COALESCE(c.checkin, 0) AS checkin
+            FROM 
+                hours h
+            LEFT JOIN 
+                checkin_data c ON h.hour = c.hour
+            ORDER BY 
+                h.hour;
         """
         results = query_db(query)
         print(results)
@@ -126,11 +153,49 @@ def generate_late_distribution(time_range):
     if time_range == "today":
         # 查询今日迟到记录
         query = """
-            SELECT TIME_FORMAT(checkin_time, '%H:%i') as time,
-                   TIMESTAMPDIFF(MINUTE, TIME('08:30:00'), checkin_time) as delay
-            FROM attendance_records
-            WHERE DATE(checkin_time) = CURDATE()
-              AND checkin_time > TIME('08:30:00')
+
+            WITH latest_date AS (
+                SELECT max(atten_dt) AS max_dt 
+                FROM ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp
+            ),
+            batch_0815 AS (
+                SELECT 
+                    '0815' AS batch,
+                    TIME_FORMAT(p1.EARLIEST_SINGIN_TM, '%H:%i') AS time,
+                    TIMESTAMPDIFF(MINUTE, TIME('08:15:00'), time(p1.EARLIEST_SINGIN_TM)) AS delay
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND IMPL_FLAG = 'Y'
+                INNER JOIN ods_sunline.ods_in_bank_atten_base_info p3 
+                    ON p2.emply_name = p3.emply_name
+                WHERE
+                    p3.atten_batch = '0815'
+                    AND p1.ATTEN_DT = (SELECT max_dt FROM latest_date)
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                    AND p1.EARLIEST_SINGIN_TM > TIME('08:15:00')
+            ),
+            batch_0850 AS (
+                SELECT 
+                    '0850' AS batch,
+                    TIME_FORMAT(p1.EARLIEST_SINGIN_TM, '%H:%i') AS time,
+                    TIMESTAMPDIFF(MINUTE, TIME('08:50:00'), time(p1.EARLIEST_SINGIN_TM)) AS delay
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND IMPL_FLAG = 'Y'
+                INNER JOIN ods_sunline.ods_in_bank_atten_base_info p3 
+                    ON p2.emply_name = p3.emply_name
+                WHERE
+                    p3.atten_batch = '0850'
+                    AND p1.ATTEN_DT = (SELECT max_dt FROM latest_date)
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                    AND p1.EARLIEST_SINGIN_TM > TIME('08:50:00')
+            )
+            SELECT time,delay FROM batch_0815
+            UNION ALL
+            SELECT time,delay FROM batch_0850
+            ORDER BY  time;
         """
         results = query_db(query)
         
@@ -166,20 +231,21 @@ def generate_batch_distribution():
     """
     # 从数据库获取签到批次分布数据
     query = """
-        SELECT batch_name as name, COUNT(*) as value
-        FROM attendance_records
-        WHERE DATE(checkin_time) = CURDATE()
-          AND batch_name IN ('8:15批次', '8:50批次')
-        GROUP BY batch_name
+        select oibabi.atten_batch as name ,count(1) as value  from ods_sunline.ods_sunline_psn_binfo ospb 
+        left join ods_sunline.ods_in_bank_atten_base_info oibabi 
+        on oibabi.emply_name =ospb.emply_name
+        where ospb.impl_flag ='Y'
+        group by oibabi.atten_batch;
     """
     results = query_db(query)
+    print(results)
     
     if results:
         # 确保两个批次都有数据，缺失的批次补0
         batch_map = {item['name']: item['value'] for item in results}
         return [
-            {"name": "8:15批次", "value": batch_map.get('8:15批次', 0)},
-            {"name": "8:50批次", "value": batch_map.get('8:50批次', 0)}
+            {"name": "8:15批次", "value": batch_map.get('0815', 0)},
+            {"name": "8:50批次", "value": batch_map.get('0850', 0)}
         ]
     else:
         # 模拟数据 - 当数据库查询失败时使用
@@ -195,8 +261,22 @@ def generate_status_distribution():
     """生成签到状态占比数据
     签到人数和未签到人数
     """
-    today_checkin = random.randint(5, 20)
-    not_checkin = EMPLOYEES - today_checkin
+    # 查询在职员工总数
+    query = """
+    SELECT COUNT(*) as count FROM ods_sunline.ods_sunline_psn_binfo WHERE IMPL_FLAG = 'Y'
+    """
+    result = query_db(query)
+    TOTAL_EMPLOYEES = result[0]['count'] if result else 0
+    query = """
+    select count(*) from ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1  
+        inner join  ods_sunline.ods_sunline_psn_binfo p2 
+        on p1.EMPLY_NAME  = p2.EMPLY_NAME and  IMPL_FLAG = 'Y'
+        where p1.ATTEN_DT  = 
+        (select max(atten_dt) from ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp)
+        and p1.EARLIEST_SINGIN_TM  is not null;    """
+    result = query_db(query)
+    today_checkin = result[0]['count'] if result else 0
+    not_checkin = TOTAL_EMPLOYEES - today_checkin
     return [
         {"name": "已签到", "value": today_checkin},
         {"name": "未签到", "value": not_checkin}
@@ -209,19 +289,36 @@ def generate_overtime_data(time_range):
     # 从数据库获取部门加班数据
     time_clause = ""
     if time_range == "today":
-        time_clause = "DATE(overtime_date) = CURDATE()"
+        time_clause = "atten_dt  = (SELECT max(atten_dt) AS max_dt     FROM ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp)"
     elif time_range == "week":
-        time_clause = "YEARWEEK(overtime_date, 1) = YEARWEEK(NOW(), 1)"
+        time_clause = "YEARWEEK(atten_dt, 1) = YEARWEEK(NOW(), 1)"
     elif time_range == "month":
-        time_clause = "DATE_FORMAT(overtime_date, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')"
+        time_clause = "DATE_FORMAT(atten_dt, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')"
     else:  # quarter
-        time_clause = "QUARTER(overtime_date) = QUARTER(NOW()) AND YEAR(overtime_date) = YEAR(NOW())"
+        time_clause = "QUARTER(atten_dt) = QUARTER(NOW()) AND YEAR(atten_dt) = YEAR(NOW())"
     
     query = f"""
-        SELECT department, SUM(overtime_hours) as overtime
-        FROM department_overtime
-        WHERE {time_clause}
-        GROUP BY department
+            select department ,case when ot <0 then 0 else ot end as overtime
+            from (SELECT
+                p3.CUST_FUNCTION department,
+                sum(CASE
+                    WHEN p3.ATTEN_BATCH = '0815' THEN TIMESTAMPDIFF(HOUR, time('18:15:00'), TIME(p1.latst_signout_tm) )
+                    WHEN p3.ATTEN_BATCH = '0850' THEN TIMESTAMPDIFF(HOUR, time('18:50:00'), TIME(p1.latst_signout_tm) )
+                end ) 
+                as ot
+            FROM
+                ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+            INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON
+                p1.EMPLY_NAME = p2.EMPLY_NAME
+                AND IMPL_FLAG = 'Y'
+            INNER JOIN ods_sunline.ods_in_bank_atten_base_info p3 
+                    ON
+                p2.emply_name = p3.emply_name
+            WHERE {time_clause}
+            GROUP BY
+                p3.CUST_FUNCTION
+                ) t
     """
     results = query_db(query)
     print(results)
@@ -229,7 +326,7 @@ def generate_overtime_data(time_range):
     if results:
         # 将查询结果转换为所需格式
         result_map = {item['department']: item['overtime'] for item in results}
-        for dept in DEPARTMENTS:
+        for dept in set(item['department']  for item in results):
             data.append({
                 "department": dept,
                 "overtime": result_map.get(dept, 0)
@@ -249,6 +346,7 @@ def generate_overtime_data(time_range):
                 "department": dept,
                 "overtime": hours
             })
+    print(data)
     return data
 
 @app.route('/')
@@ -302,31 +400,93 @@ def get_overview(time_range):
     
     # 查询当前周期数据
     current_query = """
-        SELECT 
-            COUNT(*) as checkin,
-            SUM(CASE WHEN checkin_time > TIME('08:30:00') THEN 1 ELSE 0 END) as late
-        FROM attendance_records
-        WHERE DATE(checkin_time) BETWEEN %s AND %s
+            with c0815 as (
+            SELECT
+                COUNT(*) as checkin_0815,
+                SUM(CASE WHEN p1.EARLIEST_SINGIN_TM  > TIME('08:15:00') THEN 1 ELSE 0 END) as late_0815
+            FROM
+                ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1  
+            inner join  ods_sunline.ods_sunline_psn_binfo p2 
+            on p1.EMPLY_NAME  = p2.EMPLY_NAME and  IMPL_FLAG = 'Y'
+            inner join ods_sunline.ods_in_bank_atten_base_info p3 
+            on p2.emply_name =p3.emply_name
+
+            WHERE
+            p3.atten_batch = '0815'
+            and DATE(p1.STD_ATTEN_DT) BETWEEN %s AND %s
+            ),
+            c0850 as (
+            SELECT
+                COUNT(*) as checkin_0850,
+                SUM(CASE WHEN p1.EARLIEST_SINGIN_TM  > TIME('08:50:00') THEN 1 ELSE 0 END) as late_0850
+            FROM
+                ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1  
+            inner join  ods_sunline.ods_sunline_psn_binfo p2 
+            on p1.EMPLY_NAME  = p2.EMPLY_NAME and  IMPL_FLAG = 'Y'
+            inner join ods_sunline.ods_in_bank_atten_base_info p3 
+            on p2.emply_name =p3.emply_name
+
+            WHERE
+            p3.atten_batch = '0850'
+            and DATE(p1.STD_ATTEN_DT) BETWEEN %s AND %s
+            )
+            SELECT 
+                coalesce(c0815.checkin_0815,0) + coalesce(c0850.checkin_0850,0) AS total_checkin,
+                (coalesce(c0815.late_0815,0) + coalesce(c0850.late_0850,0)) AS total_late 
+            FROM 
+                c0815, c0850;
     """
-    current_results = query_db(current_query, (current_start, current_end))
+    current_results = query_db(current_query, (current_start, current_end,current_start, current_end))
+    print("current_results:",current_results)
     current_data = current_results[0] if current_results else None
     
     # 查询上一周期数据
     prev_query = """
-        SELECT 
-            COUNT(*) as checkin,
-            SUM(CASE WHEN checkin_time > TIME('08:30:00') THEN 1 ELSE 0 END) as late
-        FROM attendance_records
-        WHERE DATE(checkin_time) BETWEEN %s AND %s
+            with c0815 as (
+            SELECT
+                COUNT(*) as checkin_0815,
+                SUM(CASE WHEN p1.EARLIEST_SINGIN_TM  > TIME('08:15:00') THEN 1 ELSE 0 END) as late_0815
+            FROM
+                ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1  
+            inner join  ods_sunline.ods_sunline_psn_binfo p2 
+            on p1.EMPLY_NAME  = p2.EMPLY_NAME and  IMPL_FLAG = 'Y'
+            inner join ods_sunline.ods_in_bank_atten_base_info p3 
+            on p2.emply_name =p3.emply_name
+
+            WHERE
+            p3.atten_batch = '0815'
+            and DATE(p1.STD_ATTEN_DT) BETWEEN %s AND %s
+            ),
+            c0850 as (
+            SELECT
+                COUNT(*) as checkin_0850,
+                SUM(CASE WHEN p1.EARLIEST_SINGIN_TM  > TIME('08:50:00') THEN 1 ELSE 0 END) as late_0850
+            FROM
+                ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1  
+            inner join  ods_sunline.ods_sunline_psn_binfo p2 
+            on p1.EMPLY_NAME  = p2.EMPLY_NAME and  IMPL_FLAG = 'Y'
+            inner join ods_sunline.ods_in_bank_atten_base_info p3 
+            on p2.emply_name =p3.emply_name
+
+            WHERE
+            p3.atten_batch = '0850'
+            and DATE(p1.STD_ATTEN_DT) BETWEEN %s AND %s
+            )
+            SELECT 
+                coalesce(c0815.checkin_0815,0) + coalesce(c0850.checkin_0850,0) AS total_checkin,
+                (coalesce(c0815.late_0815,0) + coalesce(c0850.late_0850,0)) AS total_late 
+            FROM 
+                c0815, c0850;
     """
-    prev_results = query_db(prev_query, (prev_start, prev_end))
+    prev_results = query_db(prev_query, (prev_start, prev_end, prev_start, prev_end))
+    print("prev_results:" ,prev_results)
     prev_data = prev_results[0] if prev_results else None
     
     # 查询总员工数
-    total_query = "SELECT COUNT(*) as total FROM employees"
+    total_query = "SELECT COUNT(*) as count FROM ods_sunline.ods_sunline_psn_binfo WHERE IMPL_FLAG = 'Y'"
     total_data = query_db(total_query)[0] if query_db(total_query) else None
-    total_employees = total_data['total'] if total_data else 22
-    
+    total_employees = total_data['count'] if total_data else 22
+    print("current_data:",current_data)
     # 如果数据库查询失败，使用模拟数据
     if not current_data or not prev_data:
         if time_range == 'today':
@@ -350,11 +510,12 @@ def get_overview(time_range):
             prev_checkin = random.randint(3900, 4500)
             prev_late = random.randint(220, 340)
     else:
-        current_checkin = current_data.get('checkin', 0) or 0
-        current_late = current_data.get('late', 0) or 0
-        prev_checkin = prev_data.get('checkin', 0) or 0
-        prev_late = prev_data.get('late', 0) or 0
-    
+        current_checkin = current_data.get('total_checkin', 0) or 0
+        current_late = current_data.get('total_late', 0) or 0
+        prev_checkin = prev_data.get('total_checkin', 0) or 0
+        prev_late = prev_data.get('total_late', 0) or 0
+        #prev_rate = prev_data.get('late_percentage', 0) or 0
+    print("current_checkin:",current_checkin)
     current_rate = round(current_late / current_checkin * 
 100, 1) if current_checkin > 0 else 0
     prev_rate = round(prev_late / prev_checkin * 100, 1) if prev_checkin > 0 else 0
