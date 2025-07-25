@@ -1,8 +1,0 @@
-import win.ui;
-/*DSG{{*/
-mainForm = win.form(text="${PROJECTNAME}";right=757;bottom=467)
-mainForm.add()
-/*}}*/
-
-mainForm.show();
-return win.loopMessage();

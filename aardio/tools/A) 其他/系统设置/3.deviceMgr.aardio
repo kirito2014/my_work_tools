@@ -1,3 +1,0 @@
-//设备管理
-import sys.device;
-sys.device.manager();
