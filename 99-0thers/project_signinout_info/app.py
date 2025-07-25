@@ -122,27 +122,255 @@ def generate_checkin_trend(time_range):
                 })
     elif time_range == "week":
         # 本周每天数据
-        for day in range(7):
-            date = (now - timedelta(days=6 - day)).strftime("%m-%d")
-            checkin = random.randint(100, 140)
-            data.append({
-                "date": date,
-                "checkin": checkin
-            })
+        query = """
+            WITH date_range AS (
+                SELECT 
+                    DATE_SUB(CURRENT_DATE(), INTERVAL n DAY) AS date
+                FROM (
+                    SELECT 0 AS n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 
+                    UNION SELECT 4 UNION SELECT 5 UNION SELECT 6
+                ) AS days
+            ),
+            batch_0815 AS (
+                SELECT
+                    DATE(p1.STD_ATTEN_DT) AS date,
+                    '0815' AS batch,
+                    COUNT(*) AS checkin
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND IMPL_FLAG = 'Y'
+                INNER JOIN ods_sunline.ods_in_bank_atten_base_info p3 
+                    ON p2.emply_name = p3.emply_name
+                WHERE
+                    p3.atten_batch = '0815'
+                    AND DATE(p1.STD_ATTEN_DT) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                GROUP BY
+                    DATE(p1.STD_ATTEN_DT)
+            ),
+            batch_0850 AS (
+                SELECT
+                    DATE(p1.STD_ATTEN_DT) AS date,
+                    '0850' AS batch,
+                    COUNT(*) AS checkin
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND IMPL_FLAG = 'Y'
+                INNER JOIN ods_sunline.ods_in_bank_atten_base_info p3 
+                    ON p2.emply_name = p3.emply_name
+                WHERE
+                    p3.atten_batch = '0850'
+                    AND DATE(p1.STD_ATTEN_DT) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                GROUP BY
+                    DATE(p1.STD_ATTEN_DT)
+            )
+            SELECT 
+                d.date as date,
+                COALESCE(b0815.checkin, 0) + COALESCE(b0850.checkin, 0) AS checkin
+            FROM 
+                date_range d
+            LEFT JOIN 
+                batch_0815 b0815 ON d.date = b0815.date
+            LEFT JOIN 
+                batch_0850 b0850 ON d.date = b0850.date
+            ORDER BY 
+                d.date asc;
+        """
+        results = query_db(query)
+        print(results)
+        if results:
+            for row in results:
+                data.append({
+                    "date": row['date'].strftime("%m-%d"),
+                    "checkin": row['checkin']
+                })
+        else:
+            # 模拟数据 - 当数据库查询失败时使用
+            for day in range(7):
+                date = (now - timedelta(days=6 - day)).strftime("%m-%d")
+                checkin = random.randint(100, 140)
+                data.append({
+                    "date": date,
+                    "checkin": checkin
+                })
     elif time_range == "month":
         # 本月每周数据
-        for week in range(4):
-            data.append({
-                "week": f"第{week+1}周",
-                "checkin": random.randint(450, 550)
-            })
+        query = """
+            WITH 
+            -- 获取当前月份的第一天和最后一天
+            current_month AS (
+                SELECT 
+                    DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01') AS first_day,
+                    LAST_DAY(CURRENT_DATE()) AS last_day
+            ),
+            -- 生成当前月的所有周（最多6周）
+            month_weeks AS (
+                SELECT 
+                    1 AS week_seq,
+                    '第1周' AS week_name,
+                    first_day AS week_start,
+                    LEAST(DATE_ADD(first_day, INTERVAL 6 DAY), last_day) AS week_end
+                FROM current_month
+                UNION ALL SELECT 2, '第2周', DATE_ADD(first_day, INTERVAL 7 DAY), LEAST(DATE_ADD(first_day, INTERVAL 13 DAY), last_day) FROM current_month
+                UNION ALL SELECT 3, '第3周', DATE_ADD(first_day, INTERVAL 14 DAY), LEAST(DATE_ADD(first_day, INTERVAL 20 DAY), last_day) FROM current_month
+                UNION ALL SELECT 4, '第4周', DATE_ADD(first_day, INTERVAL 21 DAY), LEAST(DATE_ADD(first_day, INTERVAL 27 DAY), last_day) FROM current_month
+                UNION ALL SELECT 5, '第5周', DATE_ADD(first_day, INTERVAL 28 DAY), last_day FROM current_month
+                UNION ALL SELECT 6, '第6周', DATE_ADD(first_day, INTERVAL 35 DAY), last_day FROM current_month
+                WHERE DATE_ADD(first_day, INTERVAL 35 DAY) <= last_day
+            ),
+            -- 0815批次每周统计
+            batch_0815 AS (
+                SELECT 
+                    CEILING(DAYOFMONTH(p1.STD_ATTEN_DT)/7.0) AS week_seq,
+                    COUNT(*) AS checkin
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND IMPL_FLAG = 'Y'
+                INNER JOIN ods_sunline.ods_in_bank_atten_base_info p3 
+                    ON p2.emply_name = p3.emply_name
+                WHERE
+                    p3.atten_batch = '0815'
+                    AND p1.STD_ATTEN_DT BETWEEN (SELECT first_day FROM current_month) AND (SELECT last_day FROM current_month)
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                GROUP BY
+                    CEILING(DAYOFMONTH(p1.STD_ATTEN_DT)/7.0)
+            ),
+            -- 0850批次每周统计
+            batch_0850 AS (
+                SELECT 
+                    CEILING(DAYOFMONTH(p1.STD_ATTEN_DT)/7.0) AS week_seq,
+                    COUNT(*) AS checkin
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND IMPL_FLAG = 'Y'
+                INNER JOIN ods_sunline.ods_in_bank_atten_base_info p3 
+                    ON p2.emply_name = p3.emply_name
+                WHERE
+                    p3.atten_batch = '0850'
+                    AND p1.STD_ATTEN_DT BETWEEN (SELECT first_day FROM current_month) AND (SELECT last_day FROM current_month)
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                GROUP BY
+                    CEILING(DAYOFMONTH(p1.STD_ATTEN_DT)/7.0)
+            )
+            -- 最终结果
+            SELECT 
+                mw.week_name AS week,
+            --     COALESCE(b0815.checkin, 0) AS '0815批次签到数',
+            --     COALESCE(b0850.checkin, 0) AS '0850批次签到数',
+                COALESCE(b0815.checkin, 0) + COALESCE(b0850.checkin, 0) AS checkin
+            FROM 
+                month_weeks mw
+            LEFT JOIN 
+                batch_0815 b0815 ON mw.week_seq = b0815.week_seq
+            LEFT JOIN 
+                batch_0850 b0850 ON mw.week_seq = b0850.week_seq
+            WHERE
+                mw.week_start <= (SELECT last_day FROM current_month)
+            ORDER BY 
+                mw.week_seq;
+        """
+        results = query_db(query)
+        print(results)
+        if results:
+            for row in results:
+                data.append({
+                    "week": row['week'],
+                    "checkin": row['checkin']
+                })
+        else:
+            # 模拟数据 - 当数据库查询失败时使用
+            for week in range(4):
+                data.append({
+                    "week": f"第{week+1}周",
+                    "checkin": random.randint(450, 550)
+                })
     elif time_range == "quarter":
         # 本季度每月数据
-        for month in range(3):
-            data.append({
-                "month": f"{now.month-2+month}月",
-                "checkin": random.randint(1200, 1500)
-            })
+        query = """
+            WITH 
+            -- 生成最近3个月的月份范围
+            month_range AS (
+                SELECT 
+                    DATE_FORMAT(DATE_SUB(CURRENT_DATE(), INTERVAL 2 MONTH), '%Y-%m-01') AS month_start,
+                    LAST_DAY(DATE_SUB(CURRENT_DATE(), INTERVAL 2 MONTH)) AS month_end,
+                    DATE_FORMAT(DATE_SUB(CURRENT_DATE(), INTERVAL 2 MONTH), '%m') AS month_num,
+                    DATE_FORMAT(DATE_SUB(CURRENT_DATE(), INTERVAL 2 MONTH), '%M') AS month_name_en
+                UNION ALL
+                SELECT 
+                    DATE_FORMAT(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), '%Y-%m-01'),
+                    LAST_DAY(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)),
+                    DATE_FORMAT(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), '%m'),
+                    DATE_FORMAT(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), '%M')
+                UNION ALL
+                SELECT 
+                    DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01'),
+                    LAST_DAY(CURRENT_DATE()),
+                    DATE_FORMAT(CURRENT_DATE(), '%m'),
+                    DATE_FORMAT(CURRENT_DATE(), '%M')
+            ),
+            -- 中文月份映射
+            month_mapping AS (
+                SELECT '01' AS num, '一月' AS name UNION ALL
+                SELECT '02', '二月' UNION ALL
+                SELECT '03', '三月' UNION ALL
+                SELECT '04', '四月' UNION ALL
+                SELECT '05', '五月' UNION ALL
+                SELECT '06', '六月' UNION ALL
+                SELECT '07', '七月' UNION ALL
+                SELECT '08', '八月' UNION ALL
+                SELECT '09', '九月' UNION ALL
+                SELECT '10', '十月' UNION ALL
+                SELECT '11', '十一月' UNION ALL
+                SELECT '12', '十二月'
+            ),
+            -- 合并签到数据
+            checkin_data AS (
+                SELECT 
+                    DATE_FORMAT(p1.STD_ATTEN_DT, '%Y-%m') AS month_key,
+                    COUNT(*) AS total_checkin
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND IMPL_FLAG = 'Y'
+                WHERE
+                    p1.STD_ATTEN_DT BETWEEN DATE_SUB(DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01'), INTERVAL 2 MONTH) 
+                                        AND LAST_DAY(CURRENT_DATE())
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                GROUP BY
+                    DATE_FORMAT(p1.STD_ATTEN_DT, '%Y-%m')
+            )
+            -- 最终结果
+            SELECT 
+                mm.name AS 'month',
+                COALESCE(cd.total_checkin, 0) AS 'checkin'
+            FROM 
+                month_range mr
+            JOIN 
+                month_mapping mm ON mr.month_num = mm.num
+            LEFT JOIN 
+                checkin_data cd ON DATE_FORMAT(mr.month_start, '%Y-%m') = cd.month_key
+            ORDER BY 
+                mr.month_start;
+        """
+        results = query_db(query)
+        print(results)
+        if results:
+            for row in results:
+                data.append({
+                    "month": row['month'],
+                    "checkin": row['checkin']
+                })
+        else:
+            for month in range(3):
+                data.append({
+                    "month": f"{now.month-2+month}月",
+                    "checkin": random.randint(1200, 1500)
+                })
     
     return data
 
@@ -153,7 +381,6 @@ def generate_late_distribution(time_range):
     if time_range == "today":
         # 查询今日迟到记录
         query = """
-
             WITH latest_date AS (
                 SELECT max(atten_dt) AS max_dt 
                 FROM ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp
@@ -215,14 +442,378 @@ def generate_late_distribution(time_range):
                     "time": f"{hour}:{minute:02d}",
                     "delay": delay
                 })
-    else:
-        # 其他时间范围按天分布
-        days = 7 if time_range == "week" else 30 if time_range == "month" else 90
-        for day in range(days):
-            data.append({
-                "day": day + 1,
-                "late_count": random.randint(5, 20)
-            })
+    elif time_range == "week":
+        #查询本周的迟到记录
+        query = """
+            WITH 
+            -- 获取本周一日期
+            week_start AS (
+                SELECT DATE_SUB(CURRENT_DATE(), INTERVAL WEEKDAY(CURRENT_DATE()) DAY) AS monday
+            ),
+            -- 生成完整一周的日期（周一到周日）
+            week_days AS (
+                SELECT 
+                    DATE_ADD((SELECT monday FROM week_start), INTERVAL 0 DAY) AS day,
+                    '1' AS day_name
+                UNION ALL
+                SELECT 
+                    DATE_ADD((SELECT monday FROM week_start), INTERVAL 1 DAY) AS day,
+                    '2' AS day_name
+                UNION ALL
+                SELECT 
+                    DATE_ADD((SELECT monday FROM week_start), INTERVAL 2 DAY) AS day,
+                    '3' AS day_name
+                UNION ALL
+                SELECT 
+                    DATE_ADD((SELECT monday FROM week_start), INTERVAL 3 DAY) AS day,
+                    '4' AS day_name
+                UNION ALL
+                SELECT 
+                    DATE_ADD((SELECT monday FROM week_start), INTERVAL 4 DAY) AS day,
+                    '5' AS day_name
+                UNION ALL
+                SELECT 
+                    DATE_ADD((SELECT monday FROM week_start), INTERVAL 5 DAY) AS day,
+                    '6' AS day_name
+                UNION ALL
+                SELECT 
+                    DATE_ADD((SELECT monday FROM week_start), INTERVAL 6 DAY) AS day,
+                    '7' AS day_name
+            ),
+            -- 0815批次当周迟到数据
+            batch_0815_late AS (
+                SELECT 
+                    DATE(p1.STD_ATTEN_DT) AS day,
+                    COUNT(*) AS late_count
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND p2.IMPL_FLAG = 'Y'
+                INNER JOIN ods_sunline.ods_in_bank_atten_base_info p3 
+                    ON p2.emply_name = p3.emply_name
+                WHERE
+                    p3.atten_batch = '0815'
+                    AND p1.STD_ATTEN_DT BETWEEN (SELECT monday FROM week_start) 
+                                        AND DATE_ADD((SELECT monday FROM week_start), INTERVAL 6 DAY)
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                    AND TIME(p1.EARLIEST_SINGIN_TM) > TIME('08:15:00')
+                GROUP BY
+                    DATE(p1.STD_ATTEN_DT)
+            ),
+            -- 0850批次当周迟到数据
+            batch_0850_late AS (
+                SELECT 
+                    DATE(p1.STD_ATTEN_DT) AS day,
+                    COUNT(*) AS late_count
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND p2.IMPL_FLAG = 'Y'
+                INNER JOIN ods_sunline.ods_in_bank_atten_base_info p3 
+                    ON p2.emply_name = p3.emply_name
+                WHERE
+                    p3.atten_batch = '0850'
+                    AND p1.STD_ATTEN_DT BETWEEN (SELECT monday FROM week_start) 
+                                        AND DATE_ADD((SELECT monday FROM week_start), INTERVAL 6 DAY)
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                    AND TIME(p1.EARLIEST_SINGIN_TM) > TIME('08:50:00')
+                GROUP BY
+                    DATE(p1.STD_ATTEN_DT)
+            ),
+            -- 合并两个批次的迟到数据
+            combined_late AS (
+                SELECT day, late_count FROM batch_0815_late
+                UNION ALL
+                SELECT day, late_count FROM batch_0850_late
+            ),
+            -- 按天汇总迟到人数
+            daily_late AS (
+                SELECT 
+                    day,
+                    SUM(late_count) AS total_late
+                FROM 
+                    combined_late
+                GROUP BY 
+                    day
+            )
+            -- 最终结果：显示完整一周，包括没有迟到记录的日期
+            SELECT 
+                
+                w.day_name AS day,
+                COALESCE(d.total_late, 0) AS late_count
+            FROM 
+                week_days w
+            LEFT JOIN 
+                daily_late d ON w.day = d.day
+            ORDER BY 
+                w.day_name;
+        """
+        results = query_db(query)
+        
+        if results:
+            for row in results:
+                data.append({
+                    "day": row['day'],
+                    "late_count": row['late_count']
+                })
+        else:
+        # 模拟数据 - 当数据库查询失败时使用
+            days = 7
+            for day in range(days):
+                data.append({
+                    "day": day + 1,
+                    "late_count": random.randint(5, 20)
+                })  
+    elif time_range == "month":
+        #查询本月的迟到记录
+        query = """
+            WITH 
+            -- 获取当月1号和当前日期
+            current_month AS (
+                SELECT 
+                    DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01') AS first_day,
+                    CURRENT_DATE() AS today
+            ),
+            -- 生成当月1号到今天的日期序列
+            month_days AS (
+                SELECT 
+                    day_of_month AS day,
+                    DATE_ADD((SELECT first_day FROM current_month), INTERVAL day_of_month-1 DAY) AS full_date
+                FROM (
+                    SELECT 1 AS day_of_month UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5
+                    UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10
+                    UNION SELECT 11 UNION SELECT 12 UNION SELECT 13 UNION SELECT 14 UNION SELECT 15
+                    UNION SELECT 16 UNION SELECT 17 UNION SELECT 18 UNION SELECT 19 UNION SELECT 20
+                    UNION SELECT 21 UNION SELECT 22 UNION SELECT 23 UNION SELECT 24 UNION SELECT 25
+                    UNION SELECT 26 UNION SELECT 27 UNION SELECT 28 UNION SELECT 29 UNION SELECT 30
+                    UNION SELECT 31
+                ) AS days
+                WHERE 
+                    day_of_month <= DAY((SELECT today FROM current_month))
+            ),
+            -- 0815批次当月迟到数据
+            batch_0815_late AS (
+                SELECT 
+                    DAY(p1.STD_ATTEN_DT) AS day,
+                    COUNT(*) AS late_count
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND p2.IMPL_FLAG = 'Y'
+                INNER JOIN ods_sunline.ods_in_bank_atten_base_info p3 
+                    ON p2.emply_name = p3.emply_name
+                WHERE
+                    p3.atten_batch = '0815'
+                    AND p1.STD_ATTEN_DT BETWEEN (SELECT first_day FROM current_month) 
+                                        AND (SELECT today FROM current_month)
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                    AND TIME(p1.EARLIEST_SINGIN_TM) > TIME('08:15:00')
+                GROUP BY
+                    DAY(p1.STD_ATTEN_DT)
+            ),
+            -- 0850批次当月迟到数据
+            batch_0850_late AS (
+                SELECT 
+                    DAY(p1.STD_ATTEN_DT) AS day,
+                    COUNT(*) AS late_count
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND p2.IMPL_FLAG = 'Y'
+                INNER JOIN ods_sunline.ods_in_bank_atten_base_info p3 
+                    ON p2.emply_name = p3.emply_name
+                WHERE
+                    p3.atten_batch = '0850'
+                    AND p1.STD_ATTEN_DT BETWEEN (SELECT first_day FROM current_month) 
+                                        AND (SELECT today FROM current_month)
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                    AND TIME(p1.EARLIEST_SINGIN_TM) > TIME('08:50:00')
+                GROUP BY
+                    DAY(p1.STD_ATTEN_DT)
+            ),
+            -- 合并两个批次的迟到数据
+            combined_late AS (
+                SELECT day, late_count FROM batch_0815_late
+                UNION ALL
+                SELECT day, late_count FROM batch_0850_late
+            ),
+            -- 按天汇总迟到人数
+            daily_late AS (
+                SELECT 
+                    day,
+                    SUM(late_count) AS total_late
+                FROM 
+                    combined_late
+                GROUP BY 
+                    day
+            )
+            -- 最终结果：显示当月1号到今天的每天迟到人数
+            SELECT 
+                m.day,
+                COALESCE(d.total_late, 0) AS late_count
+            FROM 
+                month_days m
+            LEFT JOIN 
+                daily_late d ON m.day = d.day
+            ORDER BY 
+                m.day;
+        """
+        results = query_db(query)
+        
+        if results:
+            for row in results:
+                data.append({
+                    "day": row['day'],
+                    "late_count": row['late_count']
+                })
+        else:
+        # 模拟数据 - 当数据库查询失败时使用
+            days = 30
+            for day in range(days):
+                data.append({
+                    "day": day + 1,
+                    "late_count": random.randint(5, 20)
+                })  
+    elif time_range == "quarter":
+        #查询本月的迟到记录
+        query = """
+            WITH 
+            -- 获取当前季度的第一天和当前日期
+            current_quarter AS (
+                SELECT 
+                    CASE 
+                        WHEN MONTH(CURRENT_DATE()) BETWEEN 1 AND 3 THEN DATE_FORMAT(CURRENT_DATE(), '%Y-01-01')
+                        WHEN MONTH(CURRENT_DATE()) BETWEEN 4 AND 6 THEN DATE_FORMAT(CURRENT_DATE(), '%Y-04-01')
+                        WHEN MONTH(CURRENT_DATE()) BETWEEN 7 AND 9 THEN DATE_FORMAT(CURRENT_DATE(), '%Y-07-01')
+                        ELSE DATE_FORMAT(CURRENT_DATE(), '%Y-10-01')
+                    END AS quarter_start,
+                    CURRENT_DATE() AS today
+            ),
+            -- 生成季度开始到今天的日期序列（带序号）
+            quarter_days AS (
+                SELECT 
+                    ROW_NUMBER() OVER () AS day,
+                    date_series.date
+                FROM (
+                    SELECT 
+                        DATE_ADD((SELECT quarter_start FROM current_quarter), INTERVAL seq DAY) AS date
+                    FROM (
+                        SELECT 0 AS seq UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4
+                        UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9
+                        UNION SELECT 10 UNION SELECT 11 UNION SELECT 12 UNION SELECT 13 UNION SELECT 14
+                        UNION SELECT 15 UNION SELECT 16 UNION SELECT 17 UNION SELECT 18 UNION SELECT 19
+                        UNION SELECT 20 UNION SELECT 21 UNION SELECT 22 UNION SELECT 23 UNION SELECT 24
+                        UNION SELECT 25 UNION SELECT 26 UNION SELECT 27 UNION SELECT 28 UNION SELECT 29
+                        UNION SELECT 30 UNION SELECT 31 UNION SELECT 32 UNION SELECT 33 UNION SELECT 34
+                        UNION SELECT 35 UNION SELECT 36 UNION SELECT 37 UNION SELECT 38 UNION SELECT 39
+                        UNION SELECT 40 UNION SELECT 41 UNION SELECT 42 UNION SELECT 43 UNION SELECT 44
+                        UNION SELECT 45 UNION SELECT 46 UNION SELECT 47 UNION SELECT 48 UNION SELECT 49
+                        UNION SELECT 50 UNION SELECT 51 UNION SELECT 52 UNION SELECT 53 UNION SELECT 54
+                        UNION SELECT 55 UNION SELECT 56 UNION SELECT 57 UNION SELECT 58 UNION SELECT 59
+                        UNION SELECT 60 UNION SELECT 61 UNION SELECT 62 UNION SELECT 63 UNION SELECT 64
+                        UNION SELECT 65 UNION SELECT 66 UNION SELECT 67 UNION SELECT 68 UNION SELECT 69
+                        UNION SELECT 70 UNION SELECT 71 UNION SELECT 72 UNION SELECT 73 UNION SELECT 74
+                        UNION SELECT 75 UNION SELECT 76 UNION SELECT 77 UNION SELECT 78 UNION SELECT 79
+                        UNION SELECT 80 UNION SELECT 81 UNION SELECT 82 UNION SELECT 83 UNION SELECT 84
+                        UNION SELECT 85 UNION SELECT 86 UNION SELECT 87 UNION SELECT 88 UNION SELECT 89
+                        UNION SELECT 90 UNION SELECT 91 UNION SELECT 92 -- 最多92天（3个月+）
+                    ) AS seq_nums
+                    WHERE 
+                        DATE_ADD((SELECT quarter_start FROM current_quarter), INTERVAL seq DAY) <= 
+                        (SELECT today FROM current_quarter)
+                ) AS date_series
+            ),
+            -- 0815批次当季迟到数据
+            batch_0815_late AS (
+                SELECT 
+                    DATEDIFF(p1.STD_ATTEN_DT, (SELECT quarter_start FROM current_quarter)) + 1 AS day,
+                    COUNT(*) AS late_count
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND p2.IMPL_FLAG = 'Y'
+                INNER JOIN ods_sunline.ods_in_bank_atten_base_info p3 
+                    ON p2.emply_name = p3.emply_name
+                WHERE
+                    p3.atten_batch = '0815'
+                    AND p1.STD_ATTEN_DT BETWEEN (SELECT quarter_start FROM current_quarter) 
+                                        AND (SELECT today FROM current_quarter)
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                    AND TIME(p1.EARLIEST_SINGIN_TM) > TIME('08:15:00')
+                GROUP BY
+                    DATEDIFF(p1.STD_ATTEN_DT, (SELECT quarter_start FROM current_quarter)) + 1
+            ),
+            -- 0850批次当季迟到数据
+            batch_0850_late AS (
+                SELECT 
+                    DATEDIFF(p1.STD_ATTEN_DT, (SELECT quarter_start FROM current_quarter)) + 1 AS day,
+                    COUNT(*) AS late_count
+                FROM
+                    ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
+                INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
+                    ON p1.EMPLY_NAME = p2.EMPLY_NAME AND p2.IMPL_FLAG = 'Y'
+                INNER JOIN ods_sunline.ods_in_bank_atten_base_info p3 
+                    ON p2.emply_name = p3.emply_name
+                WHERE
+                    p3.atten_batch = '0850'
+                    AND p1.STD_ATTEN_DT BETWEEN (SELECT quarter_start FROM current_quarter) 
+                                        AND (SELECT today FROM current_quarter)
+                    AND p1.EARLIEST_SINGIN_TM IS NOT NULL
+                    AND TIME(p1.EARLIEST_SINGIN_TM) > TIME('08:50:00')
+                GROUP BY
+                    DATEDIFF(p1.STD_ATTEN_DT, (SELECT quarter_start FROM current_quarter)) + 1
+            ),
+            -- 合并两个批次的迟到数据
+            combined_late AS (
+                SELECT day, late_count FROM batch_0815_late
+                UNION ALL
+                SELECT day, late_count FROM batch_0850_late
+            ),
+            -- 按天汇总迟到人数
+            daily_late AS (
+                SELECT 
+                    day,
+                    SUM(late_count) AS total_late
+                FROM 
+                    combined_late
+                GROUP BY 
+                    day
+            )
+            -- 最终结果：显示当季第1天到今天的每天迟到人数
+            SELECT 
+                q.day,
+                COALESCE(d.total_late, 0) AS late_count
+            FROM 
+                quarter_days q
+            LEFT JOIN 
+                daily_late d ON q.day = d.day
+            ORDER BY 
+                q.day;
+        """
+        results = query_db(query)
+        
+        if results:
+            for row in results:
+                data.append({
+                    "day": row['day'],
+                    "late_count": row['late_count']
+                })
+        else:
+        # 模拟数据 - 当数据库查询失败时使用
+            days = 100
+            for day in range(days):
+                data.append({
+                    "day": day + 1,
+                    "late_count": random.randint(5, 20)
+                })  
+    # else:
+    #     # 其他时间范围按天分布
+    #     days = 7 if time_range == "week" else 30 if time_range == "month" else 90
+    #     for day in range(days):
+    #         data.append({
+    #             "day": day + 1,
+    #             "late_count": random.randint(5, 20)
+    #         })
     return data
 
 def generate_batch_distribution():
