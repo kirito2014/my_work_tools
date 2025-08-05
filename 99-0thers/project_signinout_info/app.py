@@ -389,7 +389,7 @@ def generate_late_distribution(time_range):
                 SELECT 
                     '0815' AS batch,
                     TIME_FORMAT(p1.EARLIEST_SINGIN_TM, '%H:%i') AS time,
-                    TIMESTAMPDIFF(MINUTE, TIME('08:15:00'), time(p1.EARLIEST_SINGIN_TM)) AS delay
+                    TIMESTAMPDIFF(MINUTE,  time(p1.EARLIEST_SINGIN_TM),TIME('08:15:00')) AS delay
                 FROM
                     ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
                 INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
@@ -406,7 +406,7 @@ def generate_late_distribution(time_range):
                 SELECT 
                     '0850' AS batch,
                     TIME_FORMAT(p1.EARLIEST_SINGIN_TM, '%H:%i') AS time,
-                    TIMESTAMPDIFF(MINUTE, TIME('08:50:00'), time(p1.EARLIEST_SINGIN_TM)) AS delay
+                    TIMESTAMPDIFF(MINUTE, time(p1.EARLIEST_SINGIN_TM), TIME('08:50:00')) AS delay
                 FROM
                     ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
                 INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
@@ -882,9 +882,9 @@ def generate_overtime_data(time_range):
     if time_range == "today":
         time_clause = "atten_dt  = (SELECT max(atten_dt) AS max_dt     FROM ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp)"
     elif time_range == "week":
-        time_clause = "YEARWEEK(atten_dt, 1) = YEARWEEK(NOW(), 1)"
+        time_clause = "DATE_FORMAT(atten_dt,'%Y-%m-%d')  >=DATE_FORMAT(DATE_SUB(NOW(), INTERVAL (DAYOFWEEK(NOW()) - 2) DAY),'%Y-%m-%d')"
     elif time_range == "month":
-        time_clause = "DATE_FORMAT(atten_dt, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')"
+        time_clause = "DATE_FORMAT(atten_dt,'%Y-%m-%d')  >=DATE_FORMAT(DATE_SUB(NOW(), INTERVAL (DAYOFMONTH(NOW()) -1 ) DAY),'%Y-%m-%d')"
     else:  # quarter
         time_clause = "QUARTER(atten_dt) = QUARTER(NOW()) AND YEAR(atten_dt) = YEAR(NOW())"
     
@@ -894,7 +894,7 @@ def generate_overtime_data(time_range):
                 p3.CUST_FUNCTION department,
                 sum(CASE
                     WHEN p3.ATTEN_BATCH = '0815' THEN TIMESTAMPDIFF(HOUR, time('18:15:00'), TIME(p1.latst_signout_tm) )
-                    WHEN p3.ATTEN_BATCH = '0850' THEN TIMESTAMPDIFF(HOUR, time('18:50:00'), TIME(p1.latst_signout_tm) )
+                    WHEN p3.ATTEN_BATCH = '0850' THEN TIMESTAMPDIFF(HOUR,  time('18:50:00'),TIME(p1.latst_signout_tm) )
                 end ) 
                 as ot
             FROM
@@ -1110,9 +1110,17 @@ def get_overview(time_range):
     current_rate = round(current_late / current_checkin * 
 100, 1) if current_checkin > 0 else 0
     prev_rate = round(prev_late / prev_checkin * 100, 1) if prev_checkin > 0 else 0
-    
+    print(current_rate)
+    print(prev_rate)
     # 计算趋势和百分比变化
     def calculate_trend(current, previous, is_percent=False):
+        # 确保 current 和 previous 是相同类型（转换为 Decimal）
+        from decimal import Decimal
+        if isinstance(current, float):
+            current = Decimal(str(current))
+        if isinstance(previous, float):
+            previous = Decimal(str(previous))
+
         if previous == 0:
             return ('up', '100.0%') if current > 0 else ('flat', '0.0%')
         diff = current - previous
