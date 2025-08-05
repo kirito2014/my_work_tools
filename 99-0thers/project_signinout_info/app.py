@@ -389,7 +389,7 @@ def generate_late_distribution(time_range):
                 SELECT 
                     '0815' AS batch,
                     TIME_FORMAT(p1.EARLIEST_SINGIN_TM, '%H:%i') AS time,
-                    TIMESTAMPDIFF(MINUTE,  time(p1.EARLIEST_SINGIN_TM),TIME('08:15:00')) AS delay
+                    TIMESTAMPDIFF(MINUTE, TIME('08:15:00'),time(p1.EARLIEST_SINGIN_TM)) AS delay
                 FROM
                     ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
                 INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
@@ -406,7 +406,7 @@ def generate_late_distribution(time_range):
                 SELECT 
                     '0850' AS batch,
                     TIME_FORMAT(p1.EARLIEST_SINGIN_TM, '%H:%i') AS time,
-                    TIMESTAMPDIFF(MINUTE, time(p1.EARLIEST_SINGIN_TM), TIME('08:50:00')) AS delay
+                    TIMESTAMPDIFF(MINUTE, TIME('08:50:00'),time(p1.EARLIEST_SINGIN_TM)) AS delay
                 FROM
                     ods_sunline.ods_in_bank_psn_atten_dtl_in_bank_exp p1
                 INNER JOIN ods_sunline.ods_sunline_psn_binfo p2 
