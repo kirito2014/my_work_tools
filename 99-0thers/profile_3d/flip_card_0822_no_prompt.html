@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>卡片3D倾斜效果</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @property --x {
+            syntax: '<number>';
+            initial-value: 0;
+            inherits: true;
+        }
+
+        @property --y {
+            syntax: '<number>';
+            initial-value: 0;
+            inherits: true;
+        }
+
+        @layer reset {
+            * {
+                margin: 0;
+            }
+
+            svg,
+            img {
+                display: block;
+            }
+        }
+
+        .visually-hidden {
+            position: fixed;
+            top: -999vh;
+            left: -999vw;
+            pointer-events: none;
+        }
+
+        main {
+            display: grid;
+            grid: auto-flow / repeat(auto-fit, 300px);
+            gap: 30px;
+            place-items: center;
+            place-content: center;
+            height: 100vh;
+            background:radial-gradient(#424242 0 1px, #0000 1px 10px) 0 / 1em 1em,linear-gradient(#EDEEEE, #E0E0E0)
+        }
+
+        .card {
+            width: 300px;
+            aspect-ratio: 9/12;
+            perspective: 1200px;
+            transform-style: preserve-3d;
+        }
+
+        figure {
+            --atan: calc(-1 * atan2(var(--x), var(--y)));
+            position: relative;
+            height: 100%;
+            border-radius: 1em;
+            transform: rotateX(calc(var(--x) * 1deg)) rotateY(calc(var(--y) * 1deg));
+            overflow: hidden;
+            will-change: transform;
+            transition: --x 400ms ease,--y 400ms ease;
+        }
+
+        figure:hover {
+            transition-duration: 0s;
+        }
+
+        figure:hover::after {
+            opacity: 1;
+        }
+
+        figure::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url('https://images.unsplash.com/photo-1615715874901-ad6a07ec5c88?crop=entropy&cs=srgb&fm=jpg&ixid=M3wzMjM4NDZ8MHwxfHJhbmRvbXx8fHx8fHx8fDE3NTQ0MjE2ODd8&ixlib=rb-4.1.0&q=85') center / cover;
+            mask-image: conic-gradient(from var(--atan), #0000, #fffa, #0000, #fffa, #0000);
+            backdrop-filter: url(#filterEdges);
+            opacity: 0;
+            mix-blend-mode: plus-lighter;
+            transition: opacity 200ms;
+        }
+
+        figure img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+    </style>
+</head>
+
+<body>
+    <svg width="0" height="0">
+        <defs>
+            <filter id="filterEdges">
+                <feConvolveMatrix kernelMatrix="0 1 0 1 -4 1 0 1 0" order="3 3" bias="0" divisor="1"
+                    preserveAlpha="true" />
+            </filter>
+        </defs>
+    </svg>
+
+    <main>
+        <div class="card">
+            <figure>
+                <img src="https://images.unsplash.com/photo-1579783928621-7a13d66a62d1?crop=entropy&cs=srgb&fm=jpg&ixid=M3wzMjM4NDZ8MHwxfHJhbmRvbXx8fHx8fHx8fDE3NTQ0MDUyNDN8&ixlib=rb-4.1.0&q=85"
+                    alt="">
+            </figure>
+        </div>
+        <div class="card">
+            <figure>
+                <img src="https://images.unsplash.com/photo-1575396574188-ccf23d32d4b8?crop=entropy&cs=srgb&fm=jpg&ixid=M3wzMjM4NDZ8MHwxfHJhbmRvbXx8fHx8fHx8fDE3NTQ0ODM3MTN8&ixlib=rb-4.1.0&q=85"
+                    alt="">
+            </figure>
+        </div>
+    </main>
+    <script>
+        const cards = document.querySelectorAll('.card');
+        let mouseEnterTarget = null;
+        let targetBounds = null;
+        function handleMouseEnter(e) {
+            mouseEnterTarget = e.target;
+            targetBounds = e.target.getBoundingClientRect();
+            mouseEnterTarget.addEventListener('mousemove', handleMouseMove);
+            mouseEnterTarget.addEventListener('mouseleave', handleMouseLeave);
+        }
+        function handleMouseLeave(e) {
+            mouseEnterTarget.style.setProperty('--x', 0);
+            mouseEnterTarget.style.setProperty('--y', 0);
+            mouseEnterTarget.removeEventListener('mousemove', handleMouseMove);
+        }
+        function handleMouseMove(e) {
+            const { offsetX, offsetY } = e;
+            const centerX = offsetX - (targetBounds.width * 0.5);
+            const centerY = offsetY - (targetBounds.height * 0.5);
+            const posX = Math.round(-1 * centerX * 0.1);
+            const posY = Math.round(centerY * 0.1);
+            mouseEnterTarget.style.setProperty('--x', posY);
+            mouseEnterTarget.style.setProperty('--y', posX);
+        }
+        cards.forEach(card => {
+            card.addEventListener('mouseenter', handleMouseEnter);
+        })
+    </script>
+</body>
+
+</html> 
