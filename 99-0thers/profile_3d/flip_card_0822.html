@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>卡片3D倾斜效果</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @property --x {
+            syntax: '<number>';
+            initial-value: 0;
+            inherits: true;
+        }
+
+        @property --y {
+            syntax: '<number>';
+            initial-value: 0;
+            inherits: true;
+        }
+
+        @layer reset {
+            * {
+                margin: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                overflow-x: hidden;
+            }
+
+            svg,
+            img {
+                display: block;
+            }
+        }
+
+        .visually-hidden {
+            position: fixed;
+            top: -999vh;
+            left: -999vw;
+            pointer-events: none;
+        }
+
+        main {
+            display: grid;
+            grid: auto-flow / repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            place-items: center;
+            place-content: center;
+            min-height: 100vh;
+            padding: 40px 20px;
+            background: radial-gradient(#424242 0 1px, #0000 1px 10px) 0 / 1em 1em, linear-gradient(#EDEEEE, #E0E0E0);
+        }
+
+        .card {
+            width: 100%;
+            max-width: 320px;
+            aspect-ratio: 9/12;
+            perspective: 1200px;
+            transform-style: preserve-3d;
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+        }
+
+        figure {
+            --atan: calc(-1 * atan2(var(--x), var(--y)));
+            position: relative;
+            height: 100%;
+            border-radius: 16px;
+            transform: rotateX(calc(var(--x) * 1deg)) rotateY(calc(var(--y) * 1deg));
+            overflow: hidden;
+            will-change: transform;
+            transition: --x 400ms ease, --y 400ms ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        figure:hover {
+            transition-duration: 0s;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+        }
+
+        figure:hover::after {
+            opacity: 1;
+        }
+
+        figure::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url('https://images.unsplash.com/photo-1615715874901-ad6a07ec5c88?crop=entropy&cs=srgb&fm=jpg&ixid=M3wzMjM4NDZ8MHwxfHJhbmRvbXx8fHx8fHx8fDE3NTQ0MjE2ODd8&ixlib=rb-4.1.0&q=85') center / cover;
+            mask-image: conic-gradient(from var(--atan), #0000, #fffa, #0000, #fffa, #0000);
+            backdrop-filter: url(#filterEdges);
+            opacity: 0;
+            mix-blend-mode: plus-lighter;
+            transition: opacity 200ms;
+        }
+
+        figure img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+
+        figure:hover img {
+            transform: scale(1.05);
+        }
+
+        .card-content {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+            color: white;
+            transform: translateY(10px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        figure:hover .card-content {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .card-description {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 0 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: #666;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 768px) {
+            main {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .header p {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <svg width="0" height="0">
+        <defs>
+            <filter id="filterEdges">
+                <feConvolveMatrix kernelMatrix="0 1 0 1 -4 1 0 1 0" order="3 3" bias="0" divisor="1"
+                    preserveAlpha="true" />
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="container">
+        <div class="header">
+            <h1>3D卡片悬停效果</h1>
+            <p>将鼠标悬停在卡片上体验3D倾斜效果</p>
+        </div>
+        
+        <main>
+            <div class="card">
+                <figure>
+                    <img src="https://images.unsplash.com/photo-1579783928621-7a13d66a62d1?crop=entropy&cs=srgb&fm=jpg&ixid=M3wzMjM4NDZ8MHwxfHJhbmRvbXx8fHx8fHx8fDE3NTQ0MDUyNDN8&ixlib=rb-4.1.0&q=85"
+                        alt="自然风景">
+                    <div class="card-content">
+                        <h3 class="card-title">美丽自然</h3>
+                        <p class="card-description">探索大自然的奇妙与美丽，感受宁静与和谐。</p>
+                    </div>
+                </figure>
+            </div>
+            <div class="card">
+                <figure>
+                    <img src="https://images.unsplash.com/photo-1575396574188-ccf23d32d4b8?crop=entropy&cs=srgb&fm=jpg&ixid=M3wzMjM4NDZ8MHwxfHJhbmRvbXx8fHx8fHx8fDE3NTQ0ODM3MTN8&ixlib=rb-4.1.0&q=85"
+                        alt="城市建筑">
+                    <div class="card-content">
+                        <h3 class="card-title">现代城市</h3>
+                        <p class="card-description">体验都市生活的活力与建筑的壮丽。</p>
+                    </div>
+                </figure>
+            </div>
+            <div class="card">
+                <figure>
+                    <img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?crop=entropy&cs=srgb&fm=jpg&ixid=M3wzMjM4NDZ8MHwxfHJhbmRvbXx8fHx8fHx8fDE3NTQ1NjY0MjN8&ixlib=rb-4.1.0&q=85"
+                        alt="山脉景观">
+                    <div class="card-content">
+                        <h3 class="card-title">壮丽山脉</h3>
+                        <p class="card-description">高耸的山峰和清新的空气，大自然的杰作。</p>
+                    </div>
+                </figure>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        const cards = document.querySelectorAll('.card');
+        let mouseEnterTarget = null;
+        let targetBounds = null;
+        
+        function handleMouseEnter(e) {
+            mouseEnterTarget = e.currentTarget.querySelector('figure');
+            targetBounds = mouseEnterTarget.getBoundingClientRect();
+            mouseEnterTarget.addEventListener('mousemove', handleMouseMove);
+            mouseEnterTarget.addEventListener('mouseleave', handleMouseLeave);
+        }
+        
+        function handleMouseLeave(e) {
+            if (mouseEnterTarget) {
+                mouseEnterTarget.style.setProperty('--x', 0);
+                mouseEnterTarget.style.setProperty('--y', 0);
+                mouseEnterTarget.removeEventListener('mousemove', handleMouseMove);
+            }
+        }
+        
+        function handleMouseMove(e) {
+            const { offsetX, offsetY } = e;
+            const centerX = offsetX - (targetBounds.width * 0.5);
+            const centerY = offsetY - (targetBounds.height * 0.5);
+            const posX = Math.round(-1 * centerX * 0.1);
+            const posY = Math.round(centerY * 0.1);
+            mouseEnterTarget.style.setProperty('--x', posY);
+            mouseEnterTarget.style.setProperty('--y', posX);
+        }
+        
+        cards.forEach(card => {
+            card.addEventListener('mouseenter', handleMouseEnter);
+        });
+
+        // 添加键盘可访问性支持
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                cards.forEach(card => {
+                    const figure = card.querySelector('figure');
+                    figure.style.setProperty('--x', 0);
+                    figure.style.setProperty('--y', 0);
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>
