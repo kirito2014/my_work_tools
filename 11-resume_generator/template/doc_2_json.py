@@ -1,6 +1,6 @@
-import json
 import re
 import sys
+import json
 from docx import Document
 from typing import Dict, List, Any
 
@@ -114,21 +114,66 @@ def extract_resume_universal(doc_path: str) -> Dict:
     # -------------------------- 5. 提取能力与资质（固定在项目经历之后） --------------------------
     ability_data = {}
     ability_start_row = find_module_start_row("能力与资质")
-    if ability_start_row == -1:
-        ability_start_row = find_module_start_row("技能")
-        ability_keys = ["技能详述", "资质认证", "培训经历", "技能标签"]
-    else:
-        ability_keys = ["业务与技术能力详述", "资质认证", "参与培训", "技能标签"]
     
     if ability_start_row != -1:
-        key_idx = 0
+        # 能力与资质部分有特定的表格结构，需要按行提取
+        # 从能力与资质模块开始，逐行处理
+        current_key = None
+        ability_content = []
+        
         for row_idx in range(ability_start_row + 1, total_rows):
             row = table.rows[row_idx]
-            cell_content = "".join([cell.text.strip().replace("\n", " ") for cell in row.cells if cell.text.strip()])
-            if cell_content and key_idx < len(ability_keys):
-                ability_data[ability_keys[key_idx]] = cell_content
-                key_idx += 1
+            cells = [cell.text.strip().replace("\n", " ") for cell in row.cells if cell.text.strip()]
+            
+            if not cells:
+                continue
+                
+            # 第一列可能是键（如"业务与技术能力详述"、"资质认证"等）
+            if len(cells) >= 1:
+                # 检查是否是新的键（如"业务与技术能力详述"、"资质认证"等）
+                potential_key = cells[0]
+                if "能力详述" in potential_key or "资质认证" in potential_key or "参与培训" in potential_key or "技能标签" in potential_key:
+                    # 保存上一个键的内容
+                    if current_key and ability_content:
+                        ability_data[current_key] = "\n".join(ability_content)
+                        ability_content = []
+                    
+                    current_key = potential_key
+                    # 如果这一行有更多内容，添加到当前键的内容中
+                    if len(cells) > 1:
+                        ability_content.extend(cells[1:])
+                else:
+                    # 继续当前键的内容
+                    if current_key:
+                        ability_content.extend(cells)
+        
+        # 保存最后一个键的内容
+        if current_key and ability_content:
+            ability_data[current_key] = "\n".join(ability_content)
+    
+    # 如果没有提取到内容，使用备用方法
+    if not ability_data:
+        ability_start_row = find_module_start_row("能力与资质")
+        if ability_start_row != -1:
+            # 简单按行提取所有内容
+            ability_content = []
+            for row_idx in range(ability_start_row + 1, total_rows):
+                row = table.rows[row_idx]
+                row_text = " ".join([cell.text.strip() for cell in row.cells if cell.text.strip()])
+                if row_text:
+                    ability_content.append(row_text)
+            
+            # 尝试按常见键名分配内容
+            if ability_content:
+                ability_data = {
+                    "业务与技术能力详述": ability_content[0] if len(ability_content) > 0 else "",
+                    "资质认证": ability_content[1] if len(ability_content) > 1 else "",
+                    "参与培训": ability_content[2] if len(ability_content) > 2 else "",
+                    "技能标签": ability_content[3] if len(ability_content) > 3 else ""
+                }
+    
     resume_data["能力与资质"] = ability_data
+    print("能力与资质提取结果:", ability_data)
 
     return resume_data
 
@@ -145,6 +190,8 @@ def extract_person_name(basic_info: Dict) -> str:
             name = basic_info[key].strip()
             # 清理姓名中的特殊字符
             name = re.sub(r'[【】（）()]', '', name)
+            # 去掉姓名中的数字
+            name = re.sub(r'\d+', '', name)
             return name
     
     return "未知人员"
@@ -161,11 +208,14 @@ def convert_to_template_format(raw_data: Dict) -> Dict:
     # 自动提取人员姓名
     person_name = extract_person_name(basic_info)
     
+    # 提取能力与资质内容
+    ability_data = raw_data.get("能力与资质", {})
+    
     # 构建符合模板格式的数据
     template_data = {
         person_name: {
             "BasicInfo": {
-                "Name": basic_info.get("姓 名", basic_info.get("姓名", basic_info.get("姓    名", person_name))),
+                "Name": person_name,  # 使用处理过的姓名（去掉数字）
                 "WorkYears": basic_info.get("工作年限", basic_info.get("经验年限", "")),
                 "GraduationTime": basic_info.get("毕业时间", basic_info.get("毕业年份", "")),
                 "GraduationSchool": basic_info.get("毕业学校", basic_info.get("学校", "")),
@@ -178,12 +228,10 @@ def convert_to_template_format(raw_data: Dict) -> Dict:
             "WorkExperience": [],
             "ProjectExperience": [],
             "WorkAbility": {
-                "BusinessAbility": raw_data.get("能力与资质", {}).get("业务与技术能力详述", 
-                                    raw_data.get("能力与资质", {}).get("技能详述", "")),
-                "Certification": raw_data.get("能力与资质", {}).get("资质认证", ""),
-                "Training": raw_data.get("能力与资质", {}).get("参与培训", 
-                                raw_data.get("能力与资质", {}).get("培训经历", "")),
-                "SkillTag": raw_data.get("能力与资质", {}).get("技能标签", "")
+                "BusinessAbility": ability_data.get("业务与技术能力详述", ""),
+                "Certification": ability_data.get("资质认证", ""),
+                "Training": ability_data.get("参与培训", ""),
+                "SkillTag": ability_data.get("技能标签", "")
             }
         }
     }
@@ -209,6 +257,14 @@ def convert_to_template_format(raw_data: Dict) -> Dict:
             "ProjectRole": project.get("项目角色", project.get("角色", project.get("职位", ""))),
             "JobDescription": project.get("项目职责说明", project.get("项目描述", project.get("职责", "")))
         })
+    
+    # 处理None值
+    work_ability = template_data[person_name]["WorkAbility"]
+    for key in work_ability:
+        if work_ability[key] is None:
+            work_ability[key] = ""
+        elif work_ability[key] == "None":
+            work_ability[key] = None
     
     return template_data
 
