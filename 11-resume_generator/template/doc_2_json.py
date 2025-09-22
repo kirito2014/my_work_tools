@@ -50,8 +50,8 @@ def extract_resume_universal(doc_path: str) -> Dict:
         
         # 处理第3列和第5列：第3列作为键，第5列作为值（针对表格格式问题）
         if len(cells) >= 6:
-            key2 = cells[3].replace(":", "").replace("：", "").strip().replace(" ", "").replace("\n", "")
-            value2 = cells[5].strip()
+            key2 = cells[4].replace(":", "").replace("：", "").strip().replace(" ", "").replace("\n", "")
+            value2 = cells[6].strip()
             
             # 只有当键不为空且键值不相等时才添加到字典
             if key2 and value2 and key2 != value2:
