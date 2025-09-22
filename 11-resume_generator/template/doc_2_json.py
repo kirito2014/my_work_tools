@@ -132,6 +132,8 @@ def extract_resume_universal(doc_path: str) -> Dict:
                 key1 = cells[0].replace(":", "").replace("：", "").strip().replace("\n", " ").replace(" ", "")
 
                 value1 = cells[1].strip()
+                if value1 == "None":
+                    value1 = "无"
                 
                 # 只有当键不为空且键值不相等时才添加到字典
                 if key1 and value1 and key1 != value1:
