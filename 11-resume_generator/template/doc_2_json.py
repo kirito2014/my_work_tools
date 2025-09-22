@@ -1,6 +1,8 @@
 import re
 import sys
 import json
+import os
+import re
 from docx import Document
 from typing import Dict, List, Any
 
@@ -269,17 +271,23 @@ if __name__ == "__main__":
         template_json = json.dumps(template_formatted_data, ensure_ascii=False, indent=2)
         print(template_json)
 
-        # 保存为JSON文件
-        output_filename = f"{person_name}_简历_模板格式.json"
-        with open(output_filename, "w", encoding="utf-8") as f:
-            f.write(template_json)
-        print(f"\n✅ 已保存{person_name}的简历模板格式数据到：{output_filename}")
-        
-        # 同时保存原始提取结果
-        raw_output_filename = f"{person_name}_简历_原始提取结果.json"
+        # 创建输出目录
+        original_dir = os.path.join("output", "original_json")
+        modify_dir = os.path.join("output", "modifiy_json")
+        os.makedirs(original_dir, exist_ok=True)
+        os.makedirs(modify_dir, exist_ok=True)
+
+        # 保存原始提取结果
+        raw_output_filename = os.path.join(original_dir, f"{person_name}_人员简历.json")
         with open(raw_output_filename, "w", encoding="utf-8") as f:
             json.dump(raw_resume_data, f, ensure_ascii=False, indent=2)
         print(f"✅ 已保存{person_name}的简历原始提取数据到：{raw_output_filename}")
+        
+        # 保存模板格式数据
+        modify_output_filename = os.path.join(modify_dir, f"{person_name}_人员简历.json")
+        with open(modify_output_filename, "w", encoding="utf-8") as f:
+            f.write(template_json)
+        print(f"✅ 已保存{person_name}的简历模板格式数据到：{modify_output_filename}")
         
     except Exception as e:
         print(f"处理简历时发生错误: {e}")
