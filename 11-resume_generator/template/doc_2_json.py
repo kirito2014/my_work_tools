@@ -4,7 +4,13 @@ import json
 import os
 import re
 from docx import Document
-from typing import Dict, List, Any
+from typing import Dict, List, Any  
+
+# 添加项目根目录到Python路径，以便能够导入package模块
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# 导入doc转docx转换器
+from package.utils.doc_converter import convert_doc_to_docx
 
 def extract_resume_universal(doc_path: str) -> Dict:
     """
@@ -170,10 +176,28 @@ def extract_person_name(basic_info: Dict) -> str:
     
     return "未知人员"
 
-def convert_to_template_format(raw_data: Dict) -> Dict:
+def extract_emp_no_from_filename(file_path: str) -> str:
+    """
+    从文件名中提取工号（假设格式为：工号+姓名+工作简历.docx）
+    :param file_path: 文件路径
+    :return: 工号字符串
+    """
+    # 获取文件名（不包含路径）
+    file_name = os.path.basename(file_path)
+    
+    # 使用正则表达式匹配文件名中的工号部分（假设工号由数字组成，后面跟+号）
+    match = re.match(r'^(\d+)\+', file_name)
+    if match:
+        return match.group(1)
+    
+    # 如果文件名格式不符合预期，返回空字符串或默认值
+    return ""
+
+def convert_to_template_format(raw_data: Dict, emp_no: str = "") -> Dict:
     """
     将原始提取的数据转换为模板JSON格式
     :param raw_data: extract_resume_universal函数提取的原始数据
+    :param emp_no: 工号（可选）
     :return: 符合模板格式的字典
     """
     # 提取基本信息
@@ -189,6 +213,7 @@ def convert_to_template_format(raw_data: Dict) -> Dict:
     template_data = {
         basic_info.get("姓名"): {
             "BasicInfo": {
+                "EmpNo": emp_no,  # 工号字段，放在Name前面
                 "Name":  person_name,  # 使用处理过的姓名（去掉数字）
                 "WorkYears": basic_info.get("工作年限", basic_info.get("经验年限", "")),
                 "GraduationTime": basic_info.get("毕业时间", basic_info.get("毕业年份", "")),
@@ -254,11 +279,25 @@ if __name__ == "__main__":
     doc_path = sys.argv[1]
     
     try:
+        # 检查文件类型，如果是doc格式则先转换为docx
+        if doc_path.lower().endswith('.doc'):
+            print(f"检测到doc格式文件: {doc_path}")
+            # 创建临时目录存储转换后的文件
+            temp_dir = os.path.join(os.path.dirname(doc_path), "temp_converted")
+            os.makedirs(temp_dir, exist_ok=True)
+            # 转换doc到docx
+            doc_path = convert_doc_to_docx(doc_path, temp_dir)
+        elif not doc_path.lower().endswith('.docx'):
+            raise ValueError(f"不支持的文件格式: {doc_path}。仅支持.doc和.docx格式。")
+        
         # 提取原始数据
         raw_resume_data = extract_resume_universal(doc_path)
         
-        # 转换为模板格式
-        template_formatted_data = convert_to_template_format(raw_resume_data)
+        # 从文件名中提取工号
+        emp_no = extract_emp_no_from_filename(doc_path)
+        
+        # 转换为模板格式（传入工号）
+        template_formatted_data = convert_to_template_format(raw_resume_data, emp_no)
         
         # 获取人员姓名（用于文件名）
         person_name = list(template_formatted_data.keys())[0]
@@ -277,14 +316,14 @@ if __name__ == "__main__":
         os.makedirs(original_dir, exist_ok=True)
         os.makedirs(modify_dir, exist_ok=True)
 
-        # 保存原始提取结果
-        raw_output_filename = os.path.join(original_dir, f"{person_name}_人员简历.json")
+        # 保存原始提取结果（文件名格式：工号_姓名_人员简历.json）
+        raw_output_filename = os.path.join(original_dir, f"{emp_no}_{person_name}_人员简历.json")
         with open(raw_output_filename, "w", encoding="utf-8") as f:
             json.dump(raw_resume_data, f, ensure_ascii=False, indent=2)
         print(f"✅ 已保存{person_name}的简历原始提取数据到：{raw_output_filename}")
         
-        # 保存模板格式数据
-        modify_output_filename = os.path.join(modify_dir, f"{person_name}_人员简历.json")
+        # 保存模板格式数据（文件名格式：工号_姓名_人员简历.json）
+        modify_output_filename = os.path.join(modify_dir, f"{emp_no}_{person_name}_人员简历.json")
         with open(modify_output_filename, "w", encoding="utf-8") as f:
             f.write(template_json)
         print(f"✅ 已保存{person_name}的简历模板格式数据到：{modify_output_filename}")
