@@ -10,7 +10,24 @@ from typing import Dict, List, Any
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 导入doc转docx转换器
-from package.utils.doc_converter import convert_doc_to_docx
+try:
+    from . import doc_converter as dc
+except ImportError:
+    try:
+        import doc_converter as dc
+    except ImportError:
+        # 尝试动态加载
+        import importlib.util
+        import sys
+        dc_file_path = os.path.join(os.path.dirname(__file__), "doc_converter.py")
+        if os.path.exists(dc_file_path):
+            spec = importlib.util.spec_from_file_location("doc_converter", dc_file_path)
+            dc = importlib.util.module_from_spec(spec)
+            sys.modules["doc_converter"] = dc
+            spec.loader.exec_module(dc)
+        else:
+            print(f"错误: 未找到 doc_converter.py 文件在路径: {dc_file_path}")
+            sys.exit(1)
 
 def extract_resume_universal(doc_path: str) -> Dict:
     """
@@ -286,7 +303,7 @@ if __name__ == "__main__":
             temp_dir = os.path.join(os.path.dirname(doc_path), "temp_converted")
             os.makedirs(temp_dir, exist_ok=True)
             # 转换doc到docx
-            doc_path = convert_doc_to_docx(doc_path, temp_dir)
+            doc_path = dc.convert_doc_to_docx(doc_path, temp_dir)
         elif not doc_path.lower().endswith('.docx'):
             raise ValueError(f"不支持的文件格式: {doc_path}。仅支持.doc和.docx格式。")
         
@@ -312,7 +329,7 @@ if __name__ == "__main__":
 
         # 创建输出目录
         original_dir = os.path.join("output", "original_json")
-        modify_dir = os.path.join("output", "modifiy_json")
+        modify_dir = os.path.join("output", "modify_json")
         os.makedirs(original_dir, exist_ok=True)
         os.makedirs(modify_dir, exist_ok=True)
 

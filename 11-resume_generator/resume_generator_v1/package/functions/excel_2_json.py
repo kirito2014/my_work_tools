@@ -1,7 +1,7 @@
 import pandas as pd
 import json,re
 from datetime import datetime
-import test_import_json as tj
+#import render_from_excel as tj
 from dateutil.relativedelta import relativedelta
 
 def clean_data(value):

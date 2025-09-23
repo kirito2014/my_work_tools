@@ -5,8 +5,15 @@ import json
 from datetime import datetime,timedelta
 import argparse
 from dateutil.relativedelta import relativedelta
+
+
+#设置根目录为项目根目录
+
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(base_dir)
 import excel_2_json as ej
 
+#print(base_dir)
 def parse_date(date_str, is_graduation=False):
     """解析日期字符串为datetime对象，处理特殊格式"""
     if date_str is None:
@@ -497,12 +504,17 @@ def main():
     # 调用generate_check_results函数，生成校验结果
     df = generate_check_results(data)
     
+    # 确保output/checkExcel目录存在
+    check_dir = os.path.join(base_dir, "output/checkExcel")
+    if not os.path.exists(check_dir):
+        os.makedirs(check_dir)
+    
     #文件存在检测，没有写入，有则删除后写入
-    if os.path.exists("check_result.xlsx"):
-        os.remove("check_result.xlsx")
+    if os.path.exists(os.path.join(base_dir, "output/checkExcel/check_result.xlsx")):
+        os.remove(os.path.join(base_dir, "output/checkExcel/check_result.xlsx"))
 
-    # 将校验结果保存到Excel文件中
-    with pd.ExcelWriter("check_result.xlsx") as writer:
+    # 将校验结果保存到根目录output/checkExcel文件夹的check_result.xlsx文件中
+    with pd.ExcelWriter(os.path.join(base_dir, "output/checkExcel/check_result.xlsx")) as writer:
         # 将DataFrame写入Excel文件，指定sheet名称和索引列名称
         df.to_excel(writer, sheet_name="校验结果", index_label="校验序号")
     

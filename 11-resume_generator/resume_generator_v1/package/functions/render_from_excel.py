@@ -3,6 +3,9 @@ import json
 from datetime import datetime
 from docxtpl import DocxTemplate
 
+# 导入项目根目录以便导入其他模块
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 导入 Excel 转 JSON 的模块（需确保两个文件在同一目录）
 try:
     import excel_2_json as ej
@@ -151,10 +154,10 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
 # 配置文件（示例）
 if __name__ == "__main__":
     config = {
-        "json_file": "result.json",
-        "template_file": "人员简历_模板.docx",
-        "output_dir": "output_resumes",
-        "input_file": "人员简历汇总_20241103.xlsx"
+        "json_file": "template/result.json",
+        "template_file": "template/人员简历_模板_01.docx",
+        "output_dir": "output/output_resumes/",
+        "input_file": "template/人员简历汇总_20241103.xlsx"
     }
 
     process_json_data(
