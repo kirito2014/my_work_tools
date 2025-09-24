@@ -48,7 +48,7 @@ if dj is None:
     sys.exit(1)
 
 
-def generate_resume_from_json(person_data, template_path, output_folder, person_name):
+def generate_resume_from_json(person_data, template_path, output_folder, person_name, bankname=None):
     """
     根据JSON数据和Word模板生成简历文档。
 
@@ -67,7 +67,7 @@ def generate_resume_from_json(person_data, template_path, output_folder, person_
 
         # 生成文件名
         current_date = datetime.now().strftime("%Y%m%d")
-        output_filename = f"人员简历_{person_name}_{current_date}.docx"
+        output_filename = f"{bankname}人员简历_{person_name}_{current_date}.docx"
         output_path = os.path.join(output_folder, output_filename)
 
         # 如果文件已存在，则删除
@@ -98,7 +98,7 @@ def create_output_folder(output_folder):
         print(f"输出文件夹已存在: {output_folder}")
 
 
-def process_json_data(json_data, template_path, input_file, output_folder, person_names="all"):
+def process_json_data(json_data, template_path, input_file, output_folder, person_names="all", bankname=None):
     """
     修改后的处理函数：
     1. 强制更新机制：始终删除已存在的JSON并重新生成
@@ -209,7 +209,8 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
                     data[person_name],
                     template_path,
                     output_folder,
-                    person_name
+                    person_name,
+                    bankname,
                 )
                 if output_path: 
                     success_count += 1
@@ -262,5 +263,6 @@ if __name__ == "__main__":
         template_path=template_file,
         input_file=docx_file,
         output_folder=output_dir,
-        person_names="all"  # 可改为["张三", "李四"]指定人员
+        person_names="all",  # 可改为["张三", "李四"]指定人员
+        bankname=bankname,
     )
