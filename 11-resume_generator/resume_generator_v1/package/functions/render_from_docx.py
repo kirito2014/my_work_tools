@@ -56,6 +56,7 @@ def generate_resume_from_json(person_data, template_path, output_folder, person_
     :param template_path: Word模板文件路径。
     :param output_folder: 输出文件夹路径。
     :param person_name: 人员姓名。
+    :param bankname: 银行名称，用于文件名前缀。
     :return: 生成的简历文件路径。
     """
     try:
