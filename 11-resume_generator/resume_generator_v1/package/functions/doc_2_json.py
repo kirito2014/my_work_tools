@@ -73,10 +73,30 @@ def extract_resume_universal(doc_path: str) -> Dict:
                 basic_info[key1] = value1
                 print(f"  添加键值对: '{key1}' -> '{value1}'")
         
-        # 处理第3列和第5列：第3列作为键，第5列作为值（针对表格格式问题）
-        if len(cells) >= 6:
+        # 根据列数动态处理第二个键值对
+        # 情况1: 7列数据 (索引0-6) - 处理第4列和第6列
+        if len(cells) >= 7:
             key2 = cells[4].replace(":", "").replace("：", "").strip().replace(" ", "").replace("\n", "")
             value2 = cells[6].strip()
+            
+            # 只有当键不为空且键值不相等时才添加到字典
+            if key2 and value2 and key2 != value2:
+                basic_info[key2] = value2
+                print(f"  添加键值对: '{key2}' -> '{value2}'")
+        # 情况2: 5列数据 (索引0-4) - 处理第3列和第4列
+        elif len(cells) == 5:
+            # 检查第3列是否为键名（如"工作年限"）
+            key2 = cells[3].replace(":", "").replace("：", "").strip().replace(" ", "").replace("\n", "")
+            value2 = cells[4].strip()
+            
+            # 只有当键不为空且键值不相等时才添加到字典
+            if key2 and value2 and key2 != value2:
+                basic_info[key2] = value2
+                print(f"  添加键值对: '{key2}' -> '{value2}'")
+        # 情况3: 6列数据 (索引0-5) - 处理第3列和第5列
+        elif len(cells) == 6:
+            key2 = cells[3].replace(":", "").replace("：", "").strip().replace(" ", "").replace("\n", "")
+            value2 = cells[5].strip()
             
             # 只有当键不为空且键值不相等时才添加到字典
             if key2 and value2 and key2 != value2:
