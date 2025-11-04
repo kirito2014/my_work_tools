@@ -27,7 +27,7 @@ class ExcelReader:
         else:
             raise ValueError(f"不支持的文件类型: {file_extension}")
 
-    def read_excel(self, sheet_name="数据来源"):
+    def read_excel(self, sheet_name="数据-人事花名册导出"):
         """
         读取Excel文件中的数据。
 
@@ -92,14 +92,14 @@ class ExcelReader:
 # 示例调用
 if __name__ == "__main__":
     # 示例文件路径
-    file_path = r"D:\github\11-resume_generator\template\人员简历最新1.31.xlsm"
+    file_path = r"D:\github\11-resume_generator\resume_generator_v1\input\技术人员名单-8月（删减版）.xlsx"
 
     try:
         # 创建ExcelReader对象
         reader = ExcelReader(file_path)
 
         # 读取数据
-        result = reader.read_excel(sheet_name="数据来源")
+        result = reader.read_excel(sheet_name="数据-人事花名册导出")
 
         # 打印标题行和数据行
         print("标题行:", result["headers"])
