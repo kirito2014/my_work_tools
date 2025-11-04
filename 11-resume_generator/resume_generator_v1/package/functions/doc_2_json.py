@@ -63,45 +63,87 @@ def extract_resume_universal(doc_path: str) -> Dict:
         # 调试输出，查看每行的单元格内容
         print(f"行 {row_idx}: {cells}")
         
-        # 处理第0列和第1列：第0列作为键，第1列作为值
-        if len(cells) >= 2:
-            key1 = cells[0].replace(":", "").replace("：", "").strip().replace(" ", "").replace("\n", "")
-            value1 = cells[1].strip()
-            
-            # 只有当键不为空且键值不相等时才添加到字典
-            if key1 and value1 and key1 != value1:
-                basic_info[key1] = value1
-                print(f"  添加键值对: '{key1}' -> '{value1}'")
+        # 简化的键值对提取方法
+        # 1. 建立常见键名列表（包括可能的变体）
+        common_keys_patterns = {
+            "姓名": ["姓名", "姓    名", "姓名："],
+            "工作年限": ["工作年限", "工作年限："],
+            "毕业时间": ["毕业时间", "毕业时间："],
+            "毕业学校": ["毕业学校", "毕业学校："],
+            "专业": ["专业", "专业："],
+            "最高学历": ["最高学历", "最高学历："],
+            "所在部门": ["所在部门", "所在部门："],
+            "职称": ["职称", "职称：", "职    称"],
+            "个人简介": ["个人简介", "个人简介："]
+        }
         
-        # 根据列数动态处理第二个键值对
-        # 情况1: 7列数据 (索引0-6) - 处理第4列和第6列
-        if len(cells) >= 7:
-            key2 = cells[4].replace(":", "").replace("：", "").strip().replace(" ", "").replace("\n", "")
-            value2 = cells[6].strip()
+        # 2. 遍历所有单元格对，寻找匹配的键值对
+        i = 0
+        while i < len(cells) - 1:
+            current_cell = cells[i].strip()
+            next_cell = cells[i+1].strip()
             
-            # 只有当键不为空且键值不相等时才添加到字典
-            if key2 and value2 and key2 != value2:
-                basic_info[key2] = value2
-                print(f"  添加键值对: '{key2}' -> '{value2}'")
-        # 情况2: 5列数据 (索引0-4) - 处理第3列和第4列
-        elif len(cells) == 5:
-            # 检查第3列是否为键名（如"工作年限"）
-            key2 = cells[3].replace(":", "").replace("：", "").strip().replace(" ", "").replace("\n", "")
-            value2 = cells[4].strip()
+            # 检查当前单元格是否匹配任何键名模式
+            matched_key = None
+            for standard_key, patterns in common_keys_patterns.items():
+                for pattern in patterns:
+                    if pattern in current_cell or current_cell.replace(" ", "").replace(":", "").replace("：", "") == pattern.replace(" ", "").replace(":", "").replace("：", ""):
+                        matched_key = standard_key
+                        break
+                if matched_key:
+                    break
             
-            # 只有当键不为空且键值不相等时才添加到字典
-            if key2 and value2 and key2 != value2:
-                basic_info[key2] = value2
-                print(f"  添加键值对: '{key2}' -> '{value2}'")
-        # 情况3: 6列数据 (索引0-5) - 处理第3列和第5列
-        elif len(cells) == 6:
-            key2 = cells[3].replace(":", "").replace("：", "").strip().replace(" ", "").replace("\n", "")
-            value2 = cells[5].strip()
+            # 如果找到匹配的键，且下一个单元格不是空且不是另一个键名
+            if matched_key and next_cell:
+                # 检查下一个单元格是否也是键名
+                is_next_cell_key = False
+                for patterns in common_keys_patterns.values():
+                    for pattern in patterns:
+                        if pattern in next_cell or next_cell.replace(" ", "").replace(":", "").replace("：", "") == pattern.replace(" ", "").replace(":", "").replace("：", ""):
+                            is_next_cell_key = True
+                            break
+                    if is_next_cell_key:
+                        break
+                
+                # 只有当下一个单元格不是键名时，才作为值
+                if not is_next_cell_key:
+                    # 检查是否已经存在这个键
+                    if matched_key not in basic_info:
+                        basic_info[matched_key] = next_cell
+                        print(f"  添加键值对: '{matched_key}' -> '{next_cell}'")
             
-            # 只有当键不为空且键值不相等时才添加到字典
-            if key2 and value2 and key2 != value2:
-                basic_info[key2] = value2
-                print(f"  添加键值对: '{key2}' -> '{value2}'")
+            i += 1
+            
+        # 3. 对于每行最后一个单元格，如果它匹配一个键，但还没有值，尝试从上一行找值
+        if cells and len(cells) > 0:
+            last_cell = cells[-1].strip()
+            # 检查最后一个单元格是否匹配任何键名模式
+            matched_key = None
+            for standard_key, patterns in common_keys_patterns.items():
+                for pattern in patterns:
+                    if pattern in last_cell or last_cell.replace(" ", "").replace(":", "").replace("：", "") == pattern.replace(" ", "").replace(":", "").replace("：", ""):
+                        matched_key = standard_key
+                        break
+                if matched_key:
+                    break
+            
+            # 如果找到匹配的键，但还没有值，尝试找前一个非键单元格作为值
+            if matched_key and matched_key not in basic_info:
+                # 往前找非键值
+                for j in range(len(cells)-2, -1, -1):
+                    potential_value = cells[j].strip()
+                    is_potential_key = False
+                    for patterns in common_keys_patterns.values():
+                        for pattern in patterns:
+                            if pattern in potential_value or potential_value.replace(" ", "").replace(":", "").replace("：", "") == pattern.replace(" ", "").replace(":", "").replace("：", ""):
+                                is_potential_key = True
+                                break
+                        if is_potential_key:
+                            break
+                    if not is_potential_key and potential_value:
+                        basic_info[matched_key] = potential_value
+                        print(f"  添加键值对: '{matched_key}' -> '{potential_value}'")
+                        break
     
     resume_data["基本情况"] = basic_info
 
