@@ -60,9 +60,74 @@ except ImportError:
         sys.exit(1)
 
 
+def batch_generate_resumes(json_files_dir, template_path, bankname, person_names="all"):
+    """
+    批量生成简历功能
+    
+    :param json_files_dir: 包含JSON文件的目录路径
+    :param template_path: Word模板文件路径
+    :param bankname: 银行名称
+    :param person_names: 要生成简历的人员名单，默认为"all"表示全部生成
+    """
+    # 检查输入参数
+    if not os.path.isdir(json_files_dir):
+        print(f"错误: JSON文件目录 '{json_files_dir}' 不存在")
+        return 0, 0
+    
+    if not os.path.isfile(template_path):
+        print(f"错误: 模板文件 '{template_path}' 不存在")
+        return 0, 0
+    
+    # 创建输出目录
+    output_dir = os.path.join(project_root, "output", bankname)
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 获取所有JSON文件
+    json_files = [f for f in os.listdir(json_files_dir) if f.endswith('.json')]
+    total_files = len(json_files)
+    print(f"共发现 {total_files} 个JSON文件")
+    print("=" * 50)
+    
+    # 统计信息
+    success_count = 0
+    failed_count = 0
+    
+    # 处理每个JSON文件
+    for index, json_file in enumerate(json_files, 1):
+        json_path = os.path.join(json_files_dir, json_file)
+        print(f"\n[{index}/{total_files}] 正在处理JSON文件: {json_file}")
+        
+        try:
+            # 调用render_from_docx模块处理文件
+            render_module.process_json_data(
+                json_data=json_path,
+                template_path=template_path,
+                input_file=None,  # 批量生成时不需要input_file
+                output_folder=output_dir,
+                person_names=person_names,
+                bankname=bankname
+            )
+            success_count += 1
+            print(f"  - 处理完成")
+        except Exception as e:
+            print(f"  - 处理失败: {e}")
+            failed_count += 1
+            import traceback
+            traceback.print_exc()
+    
+    # 输出统计信息
+    print("\n" + "=" * 50)
+    print(f"批量生成完成！")
+    print(f"总JSON文件数: {total_files}")
+    print(f"成功生成: {success_count}")
+    print(f"生成失败: {failed_count}")
+    print(f"输出目录: {output_dir}")
+    
+    return success_count, failed_count
+
 def batch_process_resumes(input_folder, template_path, bankname):
     """
-    批量处理文件夹中的所有简历文件
+    批量处理文件夹中的所有简历文件（仅处理，不生成）
     
     :param input_folder: 包含简历文件的输入文件夹路径
     :param template_path: Word模板文件路径
@@ -76,10 +141,6 @@ def batch_process_resumes(input_folder, template_path, bankname):
     if not os.path.isfile(template_path):
         print(f"错误: 模板文件 '{template_path}' 不存在")
         sys.exit(1)
-    
-    # 创建输出目录
-    output_dir = os.path.join(project_root, "output", bankname)
-    os.makedirs(output_dir, exist_ok=True)
     
     # 创建temp_converted目录
     temp_dir = os.path.join(input_folder, "temp_converted")
@@ -151,19 +212,8 @@ def batch_process_resumes(input_folder, template_path, bankname):
             json_file = os.path.join(project_root, "output", "modify_json", json_filename)
             os.makedirs(os.path.dirname(json_file), exist_ok=True)
             
-            # 调用render_from_docx模块处理文件
-            print(f"  - 正在生成简历...")
-            render_module.process_json_data(
-                json_data=json_file,
-                template_path=template_path,
-                input_file=processed_doc_path,
-                output_folder=output_dir,
-                person_names="all",
-                bankname=bankname
-            )
-            
             processed_files += 1
-            print(f"  - 处理完成")
+            print(f"  - 文件处理完成（仅转换，未生成简历）")
             
         except Exception as e:
             print(f"  - 处理失败: {e}")
@@ -178,7 +228,6 @@ def batch_process_resumes(input_folder, template_path, bankname):
     print(f"成功处理: {processed_files}")
     print(f"转换文件数: {converted_files}")
     print(f"处理失败: {failed_files}")
-    print(f"输出目录: {output_dir}")
     print(f"JSON目录: {os.path.join(project_root, 'output', 'modify_json')}")
     
 

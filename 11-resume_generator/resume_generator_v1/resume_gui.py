@@ -1111,6 +1111,65 @@ class ResumeGeneratorGUI:
             
             self._log(f"开始生成选中人员简历，银行: {bankname}，人员数量: {len(person_names)}")
             self._log(f"选中的员工编号: {', '.join(self.selected_list)}")
+        
+        # 调用批量生成简历功能
+        self._batch_generate_resumes_in_thread(bankname, person_names)
+    
+    def _batch_generate_resumes_in_thread(self, bankname, person_names):
+        """在新线程中执行批量生成简历，避免GUI卡顿"""
+        def generate_thread():
+            try:
+                # 从output/modify_json目录获取所有JSON文件
+                modify_dir = os.path.join(base_dir, "output", "modify_json")
+                if not os.path.exists(modify_dir):
+                    self._log(f"目录不存在: {modify_dir}")
+                    return
+                
+                # 获取所有JSON文件
+                json_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
+                if not json_files:
+                    self._log("未找到JSON文件，请先解析简历")
+                    return
+                
+                # 设置模板文件路径
+                template_path = os.path.join(base_dir, "template", "人员简历_模板.docx")
+                if not os.path.exists(template_path):
+                    # 尝试备选模板路径
+                    template_path = os.path.join(base_dir, "template", "人员简历_模板_01.docx")
+                    if not os.path.exists(template_path):
+                        self._log("未找到简历模板文件")
+                        return
+                
+                # 检查是否成功导入batch_render_module
+                if batch_render_module and hasattr(batch_render_module, 'batch_generate_resumes'):
+                    self._log(f"调用批生成功能，JSON目录: {modify_dir}，模板: {os.path.basename(template_path)}")
+                    
+                    # 调用批生成函数
+                    success_count, failed_count = batch_render_module.batch_generate_resumes(
+                        json_files_dir=modify_dir,
+                        template_path=template_path,
+                        bankname=bankname,
+                        person_names=person_names
+                    )
+                    
+                    # 更新进度为100%
+                    self.progress_var.set(100)
+                    self.progress_label.config(text="100%")
+                    
+                    # 记录结果
+                    self._log(f"批生成完成！成功: {success_count}，失败: {failed_count}")
+                    self._log(f"输出目录: {os.path.join(base_dir, 'output', bankname)}")
+                else:
+                    # 如果模块导入失败，使用原有的生成逻辑
+                    self._log("批生成模块不可用，使用备用生成逻辑")
+                    self._save_selected_emp_numbers([], None, bankname)
+            except Exception as e:
+                self._log(f"生成简历过程中出错: {str(e)}")
+        
+        # 启动新线程执行生成任务
+        thread = threading.Thread(target=generate_thread)
+        thread.daemon = True
+        thread.start()
     
     def _save_selected_emp_numbers(self, emp_numbers, timestamp=None, bankname=None):
         """保存选中的员工编号到文件
@@ -1163,7 +1222,7 @@ class ResumeGeneratorGUI:
             output_dir = os.path.join(base_dir, "output", bankname)
             os.makedirs(output_dir, exist_ok=True)
             
-            # 生成简历
+            # 生成简历（备用逻辑，当批生成模块不可用时使用）
             success_count = 0
             total_files = len(json_files)
             
@@ -1177,14 +1236,15 @@ class ResumeGeneratorGUI:
                     
                     # 获取要处理的人员
                     valid_names = []
-                    if person_names == "all":
+                    if "person_names" in locals() and person_names == "all":
                         valid_names = list(data.keys())
-                    else:
+                    elif "person_names" in locals():
                         valid_names = [name for name in person_names if name in data]
+                    else:
+                        valid_names = list(data.keys())
                     
                     # 生成每个人员的简历
                     for person_name in valid_names:
-                        # 这里简化处理，实际应该调用render_from_docx模块
                         # 生成文件名
                         current_date = datetime.now().strftime("%Y%m%d")
                         output_filename = f"{bankname}人员简历_{person_name}_{current_date}.docx"
