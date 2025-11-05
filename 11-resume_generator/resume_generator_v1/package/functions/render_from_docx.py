@@ -204,6 +204,44 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
             if not data:
                 print("❌ JSON数据为空，终止流程")
                 return
+            
+            # 从文件名中提取工号，用于匹配info_json中的信息
+            json_filename = os.path.basename(json_data)
+            # 假设文件名格式为"工号_姓名_人员简历.json"，提取工号
+            emp_no = json_filename.split('_')[0]
+            
+            # 尝试从info_json目录加载对应工号的额外信息
+            # 直接使用项目根目录路径
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(current_file))))
+            info_json_dir = os.path.join(project_root, "output", "info_json")
+            # 从json_filename中提取姓名
+            name_part = json_filename.split('_')[1]
+            # 构建正确格式的info_json文件路径：工号_姓名_人员信息.json
+            info_json_file = os.path.join(info_json_dir, f"{emp_no}_{name_part}_人员信息.json")
+            additional_info = None
+            
+            if os.path.exists(info_json_file):
+                try:
+                    with open(info_json_file, 'r', encoding='utf-8') as info_f:
+                        info_data = json.load(info_f)
+                        if "AddtionInfo" in info_data:
+                            additional_info = info_data["AddtionInfo"]
+                            print(f"✅ 成功加载{emp_no}的额外信息")
+                except Exception as e:
+                    print(f"⚠️  读取额外信息文件出错: {str(e)}")
+            else:
+                # 直接使用正确的路径变量，确保没有额外字符
+                print(f"ℹ️  未找到{emp_no}的额外信息文件: {info_json_file}")
+            
+            # 将AdditionInfo添加到每个人员的数据中
+            if additional_info:
+                for person_name, person_data in data.items():
+                    # 确保BasicInfo存在
+                    if "BasicInfo" not in person_data:
+                        person_data["BasicInfo"] = {}
+                    # 添加AddtionInfo
+                    person_data["AddtionInfo"] = additional_info
+                    print(f"🔄 已将额外信息添加到{person_name}的数据中")
 
             # 动态获取处理人员名单
             valid_names = []
