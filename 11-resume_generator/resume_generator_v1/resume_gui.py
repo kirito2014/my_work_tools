@@ -1,10 +1,12 @@
 import tkinter as tk
-from tkinter import ttk, filedialog, scrolledtext
+from tkinter import ttk, filedialog, scrolledtext, messagebox
 import tkinter.font as font
 import os
 import sys
 import json
-from datetime import datetime
+import subprocess
+import threading
+from datetime import datetime, date
 
 # 设置项目根目录
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -54,6 +56,7 @@ class ResumeGeneratorGUI:
         # 文件路径变量
         self.resume_file_path = tk.StringVar()
         self.selected_persons = []
+        self.selected_list = []  # 存储选中的员工编号
         
         # 设置中文字体
         self.font_config = {}
@@ -61,6 +64,9 @@ class ResumeGeneratorGUI:
         
         # 创建界面
         self._create_widgets()
+        
+        # 初始化时尝试加载员工信息
+        self._load_employee_info()
         
     def _setup_fonts(self):
         # 设置中文字体
@@ -75,7 +81,20 @@ class ResumeGeneratorGUI:
         main_frame = ttk.Frame(self.root, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # 1. 简历解析入库部分
+        # 1. 技术人员信息解析部分
+        tech_info_frame = ttk.LabelFrame(main_frame, text="解析技术人员信息", padding="15")
+        tech_info_frame.pack(fill=tk.X, pady=10)
+        
+        # 技术人员信息文件路径
+        self.tech_info_file_path = tk.StringVar()
+        tech_path_frame = ttk.Frame(tech_info_frame)
+        tech_path_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Entry(tech_path_frame, textvariable=self.tech_info_file_path, width=50, font=self.font_config['entry']).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        ttk.Button(tech_path_frame, text="选择Excel文件", command=self._select_tech_info_file, width=15, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
+        ttk.Button(tech_path_frame, text="解析信息", command=self._parse_tech_info, width=10, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
+        
+        # 2. 简历解析入库部分
         parse_frame = ttk.LabelFrame(main_frame, text="解析简历文件入库", padding="15")
         parse_frame.pack(fill=tk.X, pady=10)
         
@@ -104,19 +123,69 @@ class ResumeGeneratorGUI:
         self.person_list_frame.pack(fill=tk.X, pady=5)
         self.person_list_frame.pack_forget()  # 初始隐藏
         
-        # 人员名单按钮
-        ttk.Button(self.person_list_frame, text="更新人员名单", command=self._update_person_list, width=15).pack(pady=5)
+        # 人员名单按钮和搜索框
+        control_frame = ttk.Frame(self.person_list_frame)
+        control_frame.pack(fill=tk.X, pady=5)
         
-        # 人员列表（使用Treeview实现多选）
-        self.person_tree = ttk.Treeview(self.person_list_frame, columns=("name",), show="headings", height=5)
+        ttk.Button(control_frame, text="更新人员名单", command=self._update_person_list, width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="上次选择人员", command=self._load_last_selected, width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Label(control_frame, text="搜索:", font=self.font_config['label']).pack(side=tk.LEFT, padx=5)
+        self.search_var = tk.StringVar()
+        self.search_var.trace_add("write", self._filter_person_list)
+        ttk.Entry(control_frame, textvariable=self.search_var, width=20, font=self.font_config['entry']).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="确认选择", command=self._confirm_selection, width=10).pack(side=tk.LEFT, padx=5)
+        # 新增清除选择按钮
+        ttk.Button(control_frame, text="清除选择", command=self._clear_selected, width=10).pack(side=tk.LEFT, padx=5)
+        
+        # 部门筛选框架
+        dept_frame = ttk.LabelFrame(self.person_list_frame, text="部门筛选", padding="5")
+        dept_frame.pack(fill=tk.X, pady=5)
+        
+        # 一级部门下拉框
+        ttk.Label(dept_frame, text="一级部门:", font=self.font_config['label']).pack(side=tk.LEFT, padx=5)
+        self.level1_dept_var = tk.StringVar()
+        self.level1_dept_combobox = ttk.Combobox(dept_frame, textvariable=self.level1_dept_var, width=15, font=self.font_config['entry'])
+        self.level1_dept_combobox.bind("<<ComboboxSelected>>", self._on_level1_dept_selected)
+        self.level1_dept_combobox.pack(side=tk.LEFT, padx=5)
+        
+        # 二级部门下拉框
+        ttk.Label(dept_frame, text="二级部门:", font=self.font_config['label']).pack(side=tk.LEFT, padx=5)
+        self.level2_dept_var = tk.StringVar()
+        self.level2_dept_combobox = ttk.Combobox(dept_frame, textvariable=self.level2_dept_var, width=15, font=self.font_config['entry'])
+        self.level2_dept_combobox.bind("<<ComboboxSelected>>", self._filter_by_dept)
+        self.level2_dept_combobox.pack(side=tk.LEFT, padx=5)
+        
+        # 新增筛选按钮（放在清除筛选按钮左边）
+        ttk.Button(dept_frame, text="部门筛选", command=self._filter_by_dept, width=10).pack(side=tk.LEFT, padx=5)
+        
+        # 清除筛选按钮
+        ttk.Button(dept_frame, text="清除筛选", command=self._clear_filters, width=10).pack(side=tk.LEFT, padx=5)
+        
+        # 人员列表（使用Treeview实现复选框多选）
+        # 添加复选框列
+        self.person_tree = ttk.Treeview(self.person_list_frame, columns=("select", "emp_no", "name", "dept"), show="headings", height=5)
+        self.person_tree.heading("select", text="选择")
+        self.person_tree.heading("emp_no", text="员工编号")
         self.person_tree.heading("name", text="人员姓名")
-        self.person_tree.column("name", width=400)
-        self.person_tree.pack(fill=tk.X, pady=5)
+        self.person_tree.heading("dept", text="部门")
+        self.person_tree.column("select", width=60, anchor="center")
+        self.person_tree.column("emp_no", width=100)
+        self.person_tree.column("name", width=180)
+        self.person_tree.column("dept", width=220)
         
-        # 添加滚动条
-        tree_scroll = ttk.Scrollbar(self.person_list_frame, orient="horizontal", command=self.person_tree.xview)
-        self.person_tree.configure(xscrollcommand=tree_scroll.set)
-        tree_scroll.pack(fill=tk.X)
+        # 绑定点击事件实现复选框
+        self.person_tree.bind("<Button-1>", self._on_tree_click)  # 绑定点击事件
+        self.person_tree.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        # 添加垂直滚动条
+        tree_vscroll = ttk.Scrollbar(self.person_list_frame, orient="vertical", command=self.person_tree.yview)
+        self.person_tree.configure(yscrollcommand=tree_vscroll.set)
+        tree_vscroll.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 添加水平滚动条
+        tree_hscroll = ttk.Scrollbar(self.person_list_frame, orient="horizontal", command=self.person_tree.xview)
+        self.person_tree.configure(xscrollcommand=tree_hscroll.set)
+        tree_hscroll.pack(fill=tk.X)
         
         # 银行选择和生成按钮
         bank_frame = ttk.Frame(generate_frame)
@@ -179,6 +248,99 @@ class ResumeGeneratorGUI:
         if file_path:
             self.resume_file_path.set(file_path)
             self._log(f"已选择文件: {file_path}")
+    
+    def _select_tech_info_file(self):
+        """选择技术人员信息Excel文件"""
+        file_path = filedialog.askopenfilename(
+            title="选择技术人员信息Excel文件",
+            filetypes=[("Excel文件", "*.xlsx;*.xls"), ("所有文件", "*.*")]
+        )
+        if file_path:
+            self.tech_info_file_path.set(file_path)
+            self._log(f"已选择技术人员信息文件: {file_path}")
+    
+    def _parse_tech_info(self):
+        """解析技术人员信息"""
+        file_path = self.tech_info_file_path.get()
+        if not file_path:
+            self._log("请先选择技术人员信息文件")
+            return
+        
+        if not os.path.exists(file_path):
+            self._log(f"文件不存在: {file_path}")
+            return
+        
+        self._log(f"开始解析技术人员信息文件: {file_path}")
+        self.progress_var.set(10)
+        self.progress_label.config(text="10%")
+        
+        # 在单独的线程中执行解析操作
+        threading.Thread(target=self._parse_tech_info_thread, args=(file_path,)).start()
+    
+    def _parse_tech_info_thread(self, file_path):
+        """在单独线程中解析技术人员信息"""
+        try:
+            # 执行get_emp_list脚本
+            self._log("正在执行get_emp_list脚本...")
+            self._update_progress(30)
+            
+            get_emp_cmd = [sys.executable, "get_emp_list.py", file_path]
+            result = subprocess.run(get_emp_cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                self._log("✅ get_emp_list脚本执行成功")
+                for line in result.stdout.split('\n'):
+                    if line.strip():
+                        self._log(f"  {line.strip()}")
+            else:
+                self._log("❌ get_emp_list脚本执行失败")
+                for line in result.stderr.split('\n'):
+                    if line.strip():
+                        self._log(f"  {line.strip()}")
+                return
+            
+            self._update_progress(60)
+            
+            # 执行excel_2_info_json脚本
+            self._log("正在执行excel_2_info_json脚本...")
+            
+            excel_2_json_path = os.path.join(base_dir, "package", "functions", "excel_2_info_json.py")
+            excel_2_json_cmd = [sys.executable, excel_2_json_path, file_path]
+            result = subprocess.run(excel_2_json_cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                self._log("✅ excel_2_info_json脚本执行成功")
+                for line in result.stdout.split('\n'):
+                    if line.strip():
+                        self._log(f"  {line.strip()}")
+            else:
+                self._log("❌ excel_2_info_json脚本执行失败")
+                for line in result.stderr.split('\n'):
+                    if line.strip():
+                        self._log(f"  {line.strip()}")
+                return
+            
+            self._update_progress(90)
+            
+            # 加载员工信息并更新部门下拉框
+            self._load_employee_info()
+            
+            self._update_progress(100)
+            self._log("🎉 技术人员信息解析完成！")
+            
+        except Exception as e:
+            self._log(f"解析技术人员信息时出错: {str(e)}")
+            import traceback
+            self._log(traceback.format_exc())
+    
+    def _update_progress(self, value):
+        """在主线程中更新进度条"""
+        def update():
+            self.progress_var.set(value)
+            self.progress_label.config(text=f"{value}%")
+        
+        if self.root.winfo_exists():
+            self.root.after(0, update)
     
     def _start_parse(self):
         file_path = self.resume_file_path.get()
@@ -260,36 +422,415 @@ class ResumeGeneratorGUI:
     def _toggle_person_list(self):
         if self.generate_method.get() == "selected":
             self.person_list_frame.pack(fill=tk.X, pady=5)
+            # 自动更新人员名单，确保有数据显示
+            self._update_person_list()
         else:
             self.person_list_frame.pack_forget()
     
     def _update_person_list(self):
-        # 清空现有列表
+        """更新人员名单，包含执行get_emp_list脚本"""
+        self._log("开始更新人员名单...")
+        
+        # 在单独的线程中执行更新操作
+        threading.Thread(target=self._update_person_list_thread).start()
+    
+    def _confirm_selection(self):
+        """确认选择并保存选中的人员"""
+        # 收集所有选中的员工编号
+        self.selected_list = []
         for item in self.person_tree.get_children():
-            self.person_tree.delete(item)
+            values = self.person_tree.item(item, "values")
+            if values and len(values) > 0 and values[0] == "✓":
+                emp_no = values[1]
+                self.selected_list.append(emp_no)
         
-        # 从output/modify_json目录读取JSON文件，提取人员名单
-        modify_dir = os.path.join(base_dir, "output", "modify_json")
-        if not os.path.exists(modify_dir):
-            self._log(f"目录不存在: {modify_dir}")
-            return
-        
-        try:
-            person_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
-            for json_file in person_files:
-                file_path = os.path.join(modify_dir, json_file)
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        if data and isinstance(data, dict):
-                            for person_name in data.keys():
-                                self.person_tree.insert("", "end", values=(person_name,))
-                except Exception as e:
-                    self._log(f"读取文件时出错 {json_file}: {str(e)}")
+        if self.selected_list:
+            # 保存选中的员工编号到带时间戳的文件
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            self._save_selected_emp_numbers(self.selected_list, timestamp)
+            self._log(f"已确认选择 {len(self.selected_list)} 人")
+            self._log(f"选中的员工编号: {', '.join(self.selected_list)}")
+        else:
+            self._log("未选择任何人员")
+    
+    def _on_tree_click(self, event):
+        """处理树视图的点击事件，实现复选框功能"""
+        # 获取点击的列
+        region = self.person_tree.identify_region(event.x, event.y)
+        if region == "cell":
+            column = self.person_tree.identify_column(event.x)
+            item = self.person_tree.identify_row(event.y)
             
-            self._log(f"已更新人员名单，共 {len(self.person_tree.get_children())} 人")
+            if column == "#1" and item:
+                # 获取当前值
+                values = list(self.person_tree.item(item, "values"))
+                # 切换选中状态
+                if values and len(values) > 0:
+                    if values[0] == "✓":
+                        values[0] = ""
+                    else:
+                        values[0] = "✓"
+                    # 更新值
+                    self.person_tree.item(item, values=values)
+    
+    def _update_person_list_thread(self):
+        """在单独线程中更新人员名单"""
+        try:
+            # 执行get_emp_list脚本
+            self._update_progress(30)
+            self._log("正在执行get_emp_list脚本获取最新员工信息...")
+            
+            # 执行get_emp_list.py脚本
+            get_emp_cmd = [sys.executable, "get_emp_list.py"]
+            result = subprocess.run(get_emp_cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                self._log("✅ get_emp_list脚本执行成功")
+                # 输出脚本的部分关键信息
+                for line in result.stdout.split('\n'):
+                    if any(keyword in line for keyword in ['成功保存', '共保存', '部门统计']):
+                        self._log(f"  {line.strip()}")
+            else:
+                self._log("❌ get_emp_list脚本执行失败")
+                for line in result.stderr.split('\n'):
+                    if line.strip():
+                        self._log(f"  {line.strip()}")
+            
+            # 加载员工信息
+            self._update_progress(60)
+            if not self._load_employee_info():
+                self._log("⚠️ 未找到员工信息，请先更新人员名单")
+                return
+            
+            # 清空现有列表
+            def clear_tree():
+                for item in self.person_tree.get_children():
+                    self.person_tree.delete(item)
+            
+            if self.root.winfo_exists():
+                self.root.after(0, clear_tree)
+            
+            # 直接从config/emp_list.json加载人员信息
+            self._update_progress(80)
+            
+            # 存储所有人员信息
+            all_persons = []
+            
+            # 从员工信息中提取人员名单
+            if hasattr(self, 'employee_info') and self.employee_info:
+                for emp in self.employee_info:
+                    emp_no = emp.get('EmpNo', '')
+                    # 直接使用JobName作为姓名（从get_emp_list.py中可以看到，JobName实际上对应的是姓名列）
+                    person_name = emp.get('JobName', '')
+                    
+                    # 获取部门信息
+                    level1 = emp.get('Level1Dept', '')
+                    level2 = emp.get('Level2Dept', '')
+                    dept_info = f"{level1}-{level2}" if level1 and level2 else level1 or level2
+                    
+                    # 只有当工号和姓名都不为空时才添加
+                    if emp_no and person_name:
+                        all_persons.append((emp_no, person_name, dept_info))
+            
+            # 如果从emp_list.json没有获取到姓名，回退到从modify_json目录读取
+            if not all_persons and hasattr(self, 'employee_info') and self.employee_info:
+                self._log("从emp_list.json未获取到姓名信息，尝试从modify_json目录补充...")
+                modify_dir = os.path.join(base_dir, "output", "modify_json")
+                if os.path.exists(modify_dir):
+                    # 创建工号到员工信息的映射
+                    emp_map = {emp.get('EmpNo'): emp for emp in self.employee_info}
+                    person_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
+                    for json_file in person_files:
+                        file_path = os.path.join(modify_dir, json_file)
+                        try:
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                data = json.load(f)
+                                if data and isinstance(data, dict):
+                                    for person_name, person_data in data.items():
+                                        # 获取员工编号
+                                        emp_no = ""
+                                        if 'BasicInfo' in person_data and 'EmpNo' in person_data['BasicInfo']:
+                                            emp_no = person_data['BasicInfo']['EmpNo']
+                                        elif file_path and os.path.basename(file_path).split('_')[0].isdigit():
+                                            emp_no = os.path.basename(file_path).split('_')[0]
+                                        
+                                        # 如果在emp_map中找到该工号，使用emp_list.json中的部门信息
+                                        if emp_no in emp_map:
+                                            emp = emp_map[emp_no]
+                                            level1 = emp.get('Level1Dept', '')
+                                            level2 = emp.get('Level2Dept', '')
+                                            dept_info = f"{level1}-{level2}" if level1 and level2 else level1 or level2
+                                            all_persons.append((emp_no, person_name, dept_info))
+                        except Exception as e:
+                            self._log(f"处理文件{json_file}时出错: {str(e)}")
+                            continue
+            
+            # 按员工编号排序并插入树视图
+            all_persons.sort(key=lambda x: (x[0] if x[0].isdigit() else '99999', x[1]))
+            
+            def populate_tree():
+                for emp_no, person_name, dept_info in all_persons:
+                    # 添加空的复选框列
+                    self.person_tree.insert("", "end", values=("", emp_no, person_name, dept_info))
+                self._log(f"已更新人员名单，共 {len(all_persons)} 人")
+            
+            if self.root.winfo_exists():
+                self.root.after(0, populate_tree)
+                self.root.after(0, lambda: self._update_progress(100))
+            
         except Exception as e:
             self._log(f"更新人员名单时出错: {str(e)}")
+            import traceback
+            self._log(traceback.format_exc())
+    
+    def _load_employee_info(self):
+        """加载员工信息，用于部门筛选
+        
+        Returns:
+            bool: 是否成功加载
+        """
+        try:
+            emp_list_path = os.path.join(base_dir, "config", "emp_list.json")
+            if not os.path.exists(emp_list_path):
+                self._log(f"员工信息文件不存在: {emp_list_path}")
+                # 如果是初始化时检查且不存在，显示提示
+                if not hasattr(self, 'employee_info'):
+                    messagebox.showinfo("提示", "请先更新人员名单以获取员工信息")
+                return False
+            
+            with open(emp_list_path, 'r', encoding='utf-8') as f:
+                self.employee_info = json.load(f)
+            
+            # 提取部门信息
+            level1_depts = set()
+            level2_depts = {}
+            
+            for emp in self.employee_info:
+                level1 = emp.get('Level1Dept', '')
+                level2 = emp.get('Level2Dept', '')
+                
+                if level1:
+                    level1_depts.add(level1)
+                    if level1 not in level2_depts:
+                        level2_depts[level1] = set()
+                    if level2:
+                        level2_depts[level1].add(level2)
+            
+            # 更新一级部门下拉框
+            def update_dept_comboboxes():
+                # 清空并设置一级部门
+                self.level1_dept_combobox['values'] = ['全部'] + sorted(list(level1_depts))
+                self.level1_dept_combobox.current(0)
+                
+                # 清空二级部门
+                self.level2_dept_combobox['values'] = ['全部']
+                self.level2_dept_combobox.current(0)
+            
+            if self.root.winfo_exists():
+                self.root.after(0, update_dept_comboboxes)
+                self._log(f"已加载 {len(self.employee_info)} 条员工信息")
+            
+            return True
+        
+        except Exception as e:
+            self._log(f"加载员工信息时出错: {str(e)}")
+            return False
+    
+    def _load_last_selected(self):
+        """加载最近一次选择的人员名单"""
+        try:
+            # 首先确保人员列表已经更新
+            if not self.person_tree.get_children():
+                self._log("人员列表为空，先更新人员名单...")
+                # 同步更新人员名单，等待完成
+                self._update_person_list_thread()
+                # 给一点时间确保人员列表加载完成
+                import time
+                time.sleep(1)
+                
+                # 再次检查
+                if not self.person_tree.get_children():
+                    messagebox.showinfo("提示", "无法加载人员列表，请手动点击更新人员名单")
+                    return
+            
+            config_dir = os.path.join(base_dir, "config")
+            if not os.path.exists(config_dir):
+                messagebox.showinfo("提示", "未找到配置目录")
+                return
+            
+            # 查找所有selected_list_开头的文件（更宽松的匹配）
+            selected_files = []
+            for filename in os.listdir(config_dir):
+                if filename.startswith("selected_list_"):
+                    # 尝试提取时间戳部分
+                    timestamp_str = filename[len("selected_list_"):].replace(".txt", "")
+                    try:
+                        # 尝试解析时间戳，如果失败则使用文件修改时间
+                        try:
+                            datetime.strptime(timestamp_str, "%Y%m%d%H%M%S")
+                            selected_files.append((filename, timestamp_str))
+                        except ValueError:
+                            # 使用文件修改时间作为备选
+                            file_path = os.path.join(config_dir, filename)
+                            mod_time = os.path.getmtime(file_path)
+                            selected_files.append((filename, str(int(mod_time))))
+                    except Exception:
+                        continue
+            
+            # 按时间戳降序排序，获取最新的文件
+            if selected_files:
+                selected_files.sort(key=lambda x: x[1], reverse=True)
+                latest_file = selected_files[0][0]
+                latest_file_path = os.path.join(config_dir, latest_file)
+                
+                # 读取文件内容
+                with open(latest_file_path, 'r', encoding='utf-8') as f:
+                    content = f.read().strip()
+                
+                if content:
+                    # 解析员工编号列表
+                    self.selected_list = [emp_no.strip() for emp_no in content.split(',')]
+                    
+                    # 记录匹配情况
+                    matched_count = 0
+                    
+                    # 选中树视图中对应的项
+                    for item in self.person_tree.get_children():
+                        values = self.person_tree.item(item, "values")
+                        if values and len(values) > 1 and values[1] in self.selected_list:
+                            # 设置选中状态
+                            new_values = list(values)
+                            new_values[0] = "✓"
+                            self.person_tree.item(item, values=new_values)
+                            matched_count += 1
+                    
+                    if matched_count > 0:
+                        self._log(f"已加载最近选择的 {matched_count} 人")
+                        self._log(f"来自文件: {latest_file}")
+                        if matched_count < len(self.selected_list):
+                            self._log(f"注意: 有 {len(self.selected_list) - matched_count} 个员工编号在当前列表中未找到")
+                    else:
+                        self._log(f"警告: 未找到任何匹配的员工记录")
+                        self._log(f"尝试匹配的员工编号: {', '.join(self.selected_list)}")
+                else:
+                    messagebox.showinfo("提示", "最近的选择文件为空")
+            else:
+                # 也尝试检查默认的selected_list.txt文件
+                default_file = os.path.join(config_dir, "selected_list.txt")
+                if os.path.exists(default_file):
+                    with open(default_file, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                    if content:
+                        self.selected_list = [emp_no.strip() for emp_no in content.split(',')]
+                        matched_count = 0
+                        for item in self.person_tree.get_children():
+                            values = self.person_tree.item(item, "values")
+                            if values and len(values) > 1 and values[1] in self.selected_list:
+                                new_values = list(values)
+                                new_values[0] = "✓"
+                                self.person_tree.item(item, values=new_values)
+                                matched_count += 1
+                        self._log(f"已从默认文件加载选择的 {matched_count} 人")
+                    else:
+                        messagebox.showinfo("提示", "默认选择文件为空")
+                else:
+                    messagebox.showinfo("提示", "未找到任何历史选择记录")
+        
+        except Exception as e:
+            self._log(f"加载上次选择时出错: {str(e)}")
+            import traceback
+            self._log(traceback.format_exc())
+            messagebox.showerror("错误", f"加载上次选择时出错: {str(e)}")
+    
+    def _on_level1_dept_selected(self, event):
+        """一级部门选择变化时更新二级部门列表"""
+        level1_dept = self.level1_dept_var.get()
+        
+        # 清空二级部门
+        self.level2_dept_combobox['values'] = ['全部']
+        self.level2_dept_combobox.current(0)
+        
+        if level1_dept != '全部' and hasattr(self, 'employee_info'):
+            # 提取该一级部门下的所有二级部门
+            level2_depts = set()
+            for emp in self.employee_info:
+                if emp.get('Level1Dept') == level1_dept and emp.get('Level2Dept'):
+                    level2_depts.add(emp.get('Level2Dept'))
+            
+            if level2_depts:
+                self.level2_dept_combobox['values'] = ['全部'] + sorted(list(level2_depts))
+    
+    def _filter_person_list(self, *args):
+        """根据搜索框内容过滤人员列表"""
+        search_text = self.search_var.get().lower()
+        self._apply_filters(search_text, self.level1_dept_var.get(), self.level2_dept_var.get())
+    
+    def _filter_by_dept(self, event=None):
+        """根据部门选择过滤人员列表"""
+        self._apply_filters(self.search_var.get().lower(), self.level1_dept_var.get(), self.level2_dept_var.get())
+    
+    def _clear_selected(self):
+        """清除所有已点选的人员信息"""
+        count = 0
+        # 清除所有选中状态
+        for item in self.person_tree.get_children():
+            values = self.person_tree.item(item, "values")
+            if values and len(values) > 0 and values[0] == "✓":
+                new_values = list(values)
+                new_values[0] = ""
+                self.person_tree.item(item, values=new_values)
+                count += 1
+        
+        # 清空已选中列表
+        self.selected_list = []
+        self._log(f"已清除 {count} 人的选择状态")
+    
+    def _apply_filters(self, search_text, level1_dept, level2_dept):
+        """应用所有筛选条件"""
+        # 首先确保所有项目都是可见的
+        for item in self.person_tree.get_children():
+            self.person_tree.item(item, tags=())
+        
+        # 筛选逻辑
+        for item in self.person_tree.get_children():
+            values = self.person_tree.item(item, "values")
+            if not values or len(values) < 4:
+                continue
+            
+            _, emp_no, name, dept = values
+            
+            # 搜索文本筛选
+            search_match = True
+            if search_text:
+                search_match = search_text in emp_no.lower() or search_text in name.lower() or search_text in dept.lower()
+            
+            # 一级部门筛选
+            level1_match = True
+            if level1_dept != '全部':
+                level1_match = level1_dept in dept
+            
+            # 二级部门筛选
+            level2_match = True
+            if level2_dept != '全部' and level1_dept != '全部':
+                level2_match = f"{level1_dept}-{level2_dept}" in dept or level2_dept in dept
+            
+            # 如果不匹配，隐藏项目
+            if not (search_match and level1_match and level2_match):
+                self.person_tree.item(item, tags=('hidden',))
+        
+        # 设置隐藏标签的样式
+        self.person_tree.tag_configure('hidden', foreground='gray')
+    
+    def _clear_filters(self):
+        """清除所有筛选条件"""
+        self.search_var.set("")
+        self.level1_dept_combobox.current(0)
+        self.level2_dept_combobox['values'] = ['全部']
+        self.level2_dept_combobox.current(0)
+        
+        # 显示所有项目
+        for item in self.person_tree.get_children():
+            self.person_tree.item(item, tags=())
     
     def _generate_resumes(self):
         bankname = self.bank_var.get()
@@ -297,22 +838,86 @@ class ResumeGeneratorGUI:
             self._log("请选择银行")
             return
         
+        # 隐藏人员选择框架，显示进度条和日志
+        if hasattr(self, 'person_list_frame') and self.generate_method.get() == "selected":
+            self.person_list_frame.pack_forget()
+        
+        # 确保进度条可见
+        if hasattr(self, 'progress_bar'):
+            self.progress_bar.pack(fill=tk.X, pady=5)
+        if hasattr(self, 'progress_label'):
+            self.progress_label.pack(pady=2)
+        
+        # 确保日志区域可见
+        if hasattr(self, 'log_frame'):
+            self.log_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
         # 确定要处理的人员名单
         if self.generate_method.get() == "all":
             person_names = "all"
             self._log(f"开始全量生成简历，银行: {bankname}")
         else:
-            # 获取选中的人员
-            selected_items = self.person_tree.selection()
-            if not selected_items:
-                self._log("请至少选择一位人员")
-                return
+            # 检查是否有已确认选择的人员
+            if not self.selected_list:
+                # 如果没有已确认的选择，尝试从复选框中获取
+                emp_numbers = []
+                for item in self.person_tree.get_children():
+                    values = self.person_tree.item(item, "values")
+                    if values and len(values) > 0 and values[0] == "✓":
+                        emp_no = values[1]
+                        emp_numbers.append(emp_no)
+                
+                if not emp_numbers:
+                    self._log("请先选择或确认要生成简历的人员")
+                    messagebox.showinfo("提示", "请先选择人员并点击'确认选择'按钮")
+                    # 恢复人员列表显示
+                    if hasattr(self, 'person_list_frame'):
+                        self.person_list_frame.pack(fill=tk.X, pady=5)
+                    return
+                
+                # 自动保存并确认选择
+                self.selected_list = emp_numbers
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                self._save_selected_emp_numbers(emp_numbers, timestamp)
             
+            # 获取人员姓名
             person_names = []
-            for item in selected_items:
-                person_names.append(self.person_tree.item(item, "values")[0])
+            for item in self.person_tree.get_children():
+                values = self.person_tree.item(item, "values")
+                if values and len(values) > 1 and values[1] in self.selected_list:
+                    person_names.append(values[2])
             
             self._log(f"开始生成选中人员简历，银行: {bankname}，人员数量: {len(person_names)}")
+            self._log(f"选中的员工编号: {', '.join(self.selected_list)}")
+    
+    def _save_selected_emp_numbers(self, emp_numbers, timestamp=None):
+        """保存选中的员工编号到文件
+        
+        Args:
+            emp_numbers: 员工编号列表
+            timestamp: 时间戳，如果为None则使用当前时间
+        """
+        try:
+            # 确保目录存在
+            config_dir = os.path.join(base_dir, "config")
+            os.makedirs(config_dir, exist_ok=True)
+            
+            # 保存到默认文件（兼容旧版）
+            default_path = os.path.join(config_dir, "selected_list.txt")
+            with open(default_path, 'w', encoding='utf-8') as f:
+                f.write(",".join(emp_numbers))
+            
+            # 如果提供了时间戳，保存到带时间戳的文件
+            if timestamp:
+                timestamp_path = os.path.join(config_dir, f"selected_list_{timestamp}.txt")
+                with open(timestamp_path, 'w', encoding='utf-8') as f:
+                    f.write(",".join(emp_numbers))
+                
+                self._log(f"已保存选中的员工编号到: {timestamp_path}")
+            else:
+                self._log(f"已保存选中的员工编号到: {default_path}")
+        except Exception as e:
+            self._log(f"保存选中员工编号时出错: {str(e)}")
         
         try:
             # 从output/modify_json目录获取所有JSON文件
