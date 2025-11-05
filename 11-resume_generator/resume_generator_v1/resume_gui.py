@@ -123,6 +123,7 @@ class ResumeGeneratorGUI:
         self.person_list_frame = ttk.LabelFrame(generate_frame, text="点选人员名单", padding="10")
         self.person_list_frame.pack(fill=tk.X, pady=5)
         self.person_list_frame.pack_forget()  # 初始隐藏
+        self._person_list_visible = False  # 标记人员列表是否可见
         
         # 人员名单按钮和搜索框
         control_frame = ttk.Frame(self.person_list_frame)
@@ -137,6 +138,8 @@ class ResumeGeneratorGUI:
         ttk.Button(control_frame, text="确认选择", command=self._confirm_selection, width=10).pack(side=tk.LEFT, padx=5)
         # 新增清除选择按钮
         ttk.Button(control_frame, text="清除选择", command=self._clear_selected, width=10).pack(side=tk.LEFT, padx=5)
+        # 新增折叠按钮
+        ttk.Button(control_frame, text="折叠", command=self._toggle_person_list_visibility, width=8).pack(side=tk.RIGHT, padx=5)
         
         # 部门筛选框架
         dept_frame = ttk.LabelFrame(self.person_list_frame, text="部门筛选", padding="5")
@@ -421,12 +424,36 @@ class ResumeGeneratorGUI:
             self._log(f"解析过程中出错: {str(e)}")
     
     def _toggle_person_list(self):
+        """根据生成方式切换人员列表的显示状态"""
         if self.generate_method.get() == "selected":
             self.person_list_frame.pack(fill=tk.X, pady=5)
             # 自动更新人员名单，确保有数据显示
             self._update_person_list()
+            self._person_list_visible = True
         else:
             self.person_list_frame.pack_forget()
+            self._person_list_visible = False
+            # 确保进度条可见
+            self.progress_bar.pack(fill=tk.X, pady=5)
+            self.progress_label.pack(pady=2)
+            # 确保日志区域可见
+            self.log_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+    
+    def _toggle_person_list_visibility(self):
+        """切换人员列表的折叠/展开状态"""
+        if self._person_list_visible:
+            # 折叠人员列表
+            self.person_list_frame.pack_forget()
+            self._person_list_visible = False
+            # 确保进度条可见
+            self.progress_bar.pack(fill=tk.X, pady=5)
+            self.progress_label.pack(pady=2)
+            # 确保日志区域可见
+            self.log_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        else:
+            # 展开人员列表
+            self.person_list_frame.pack(fill=tk.X, pady=5)
+            self._person_list_visible = True
     
     def _update_person_list(self):
         """更新人员名单，包含执行get_emp_list脚本"""
