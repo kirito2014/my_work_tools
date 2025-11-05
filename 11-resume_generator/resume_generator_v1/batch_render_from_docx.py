@@ -83,9 +83,26 @@ def batch_generate_resumes(json_files_dir, template_path, bankname, person_names
     os.makedirs(output_dir, exist_ok=True)
     
     # 获取所有JSON文件
-    json_files = [f for f in os.listdir(json_files_dir) if f.endswith('.json')]
+    all_json_files = [f for f in os.listdir(json_files_dir) if f.endswith('.json')]
+    
+    # 根据person_names过滤JSON文件
+    if person_names != "all":
+        # 假设JSON文件名格式为"工号_姓名_人员简历.json"
+        # 提取person_names中的工号（如果包含工号格式）
+        filtered_json_files = []
+        for json_file in all_json_files:
+            # 从文件名中提取工号（通常是文件名的第一部分）
+            file_prefix = json_file.split('_')[0]
+            # 检查是否包含在person_names中
+            if file_prefix in person_names:
+                filtered_json_files.append(json_file)
+        json_files = filtered_json_files
+        print(f"根据指定名单过滤后，共发现 {len(json_files)} 个匹配的JSON文件")
+    else:
+        json_files = all_json_files
+        print(f"共发现 {len(json_files)} 个JSON文件")
+    
     total_files = len(json_files)
-    print(f"共发现 {total_files} 个JSON文件")
     print("=" * 50)
     
     # 统计信息
@@ -99,12 +116,13 @@ def batch_generate_resumes(json_files_dir, template_path, bankname, person_names
         
         try:
             # 调用render_from_docx模块处理文件
+            # 由于我们已经根据工号过滤了JSON文件，处理文件时应该处理其中的所有人员
             render_module.process_json_data(
                 json_data=json_path,
                 template_path=template_path,
                 input_file=None,  # 批量生成时不需要input_file
                 output_folder=output_dir,
-                person_names=person_names,
+                person_names="all",  # 处理文件中的所有人员
                 bankname=bankname
             )
             success_count += 1

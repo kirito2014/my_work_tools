@@ -1100,17 +1100,15 @@ class ResumeGeneratorGUI:
                 # 自动保存并确认选择
                 self.selected_list = emp_numbers
                 timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                self._save_selected_emp_numbers(emp_numbers, timestamp, bankname)
+                # 直接使用工号列表作为person_names
+                person_names = emp_numbers
+                self._save_selected_emp_numbers(emp_numbers, timestamp, bankname, person_names)
             
-            # 获取人员姓名
-            person_names = []
-            for item in self.person_tree.get_children():
-                values = self.person_tree.item(item, "values")
-                if values and len(values) > 1 and values[1] in self.selected_list:
-                    person_names.append(values[2])
+            # 直接使用工号列表作为person_names，因为批生成函数需要工号来过滤JSON文件
+            person_names = self.selected_list
             
             self._log(f"开始生成选中人员简历，银行: {bankname}，人员数量: {len(person_names)}")
-            self._log(f"选中的员工编号: {', '.join(self.selected_list)}")
+            self._log(f"选中的员工编号: {', '.join(person_names)}")
         
         # 调用批量生成简历功能
         self._batch_generate_resumes_in_thread(bankname, person_names)
@@ -1162,7 +1160,7 @@ class ResumeGeneratorGUI:
                 else:
                     # 如果模块导入失败，使用原有的生成逻辑
                     self._log("批生成模块不可用，使用备用生成逻辑")
-                    self._save_selected_emp_numbers([], None, bankname)
+                    self._save_selected_emp_numbers(emp_numbers, None, bankname, person_names)
             except Exception as e:
                 self._log(f"生成简历过程中出错: {str(e)}")
         
@@ -1171,7 +1169,7 @@ class ResumeGeneratorGUI:
         thread.daemon = True
         thread.start()
     
-    def _save_selected_emp_numbers(self, emp_numbers, timestamp=None, bankname=None):
+    def _save_selected_emp_numbers(self, emp_numbers, timestamp=None, bankname=None, person_names=None):
         """保存选中的员工编号到文件
         
         Args:
@@ -1213,9 +1211,24 @@ class ResumeGeneratorGUI:
                 return
             
             # 获取所有JSON文件
-            json_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
+            all_json_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
+            
+            # 根据emp_numbers过滤JSON文件
+            if emp_numbers:
+                filtered_json_files = []
+                for json_file in all_json_files:
+                    # 从文件名中提取工号
+                    file_prefix = json_file.split('_')[0]
+                    if file_prefix in emp_numbers:
+                        filtered_json_files.append(json_file)
+                json_files = filtered_json_files
+                self._log(f"根据选中名单过滤后，共发现 {len(json_files)} 个匹配的JSON文件")
+            else:
+                json_files = all_json_files
+                self._log(f"共发现 {len(json_files)} 个JSON文件")
+            
             if not json_files:
-                self._log("未找到JSON文件，请先解析简历")
+                self._log("未找到匹配的JSON文件")
                 return
             
             # 设置输出目录
@@ -1235,13 +1248,8 @@ class ResumeGeneratorGUI:
                         data = json.load(f)
                     
                     # 获取要处理的人员
-                    valid_names = []
-                    if "person_names" in locals() and person_names == "all":
-                        valid_names = list(data.keys())
-                    elif "person_names" in locals():
-                        valid_names = [name for name in person_names if name in data]
-                    else:
-                        valid_names = list(data.keys())
+                    # 由于我们已经根据工号过滤了JSON文件，这里可以处理文件中的所有人员
+                    valid_names = list(data.keys())
                     
                     # 生成每个人员的简历
                     for person_name in valid_names:
