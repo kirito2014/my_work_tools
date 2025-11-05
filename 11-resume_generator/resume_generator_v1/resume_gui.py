@@ -8,6 +8,14 @@ import subprocess
 import threading
 from datetime import datetime, date
 
+# 导入ttkthemes以使用arc主题
+try:
+    from ttkthemes import ThemedTk
+except ImportError:
+    print("警告: 未找到ttkthemes模块，请先安装: pip install ttkthemes")
+    # 如果没有ttkthemes，将ThemedTk设置为普通的tk.Tk作为备用
+    ThemedTk = tk.Tk
+
 # 设置项目根目录
 base_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(base_dir)
@@ -65,7 +73,7 @@ class ResumeGeneratorGUI:
         self.root = root
         self.root.title("简历生成器")
         self.root.geometry("900x700")
-        self.root.configure(bg="#f0f0f0")
+        # 不再需要手动设置背景色，由主题处理
         
         # 文件路径变量
         self.resume_file_path = tk.StringVar()
@@ -240,7 +248,7 @@ class ResumeGeneratorGUI:
         self.progress_label.pack(pady=5)
         
         # 4. 日志显示区域
-        self.log_frame = ttk.LabelFrame(main_frame, text="日志显示区域", padding="15")
+        self.log_frame = ttk.LabelFrame(main_frame, text="日志信息", padding="15")
         self.log_frame.pack(fill=tk.BOTH, expand=True, pady=10)
         
         self.log_text = scrolledtext.ScrolledText(self.log_frame, wrap=tk.WORD, font=self.font_config['text'], height=15)
@@ -251,12 +259,18 @@ class ResumeGeneratorGUI:
         self._setup_styles()
     
     def _setup_styles(self):
-        # 设置按钮样式
+        # 设置按钮样式，基于arc主题
         style = ttk.Style()
+        # 保留现有的按钮样式设置，但使用主题的默认背景色
         style.configure("Accent.TButton", font=self.font_config['button'])
         style.map("Accent.TButton", 
-                  foreground=[('active', 'blue')],
-                  background=[('active', '#e0e0e0')])
+                  foreground=[('active', 'blue')])
+        
+        # 为其他组件设置字体
+        style.configure("TLabel", font=self.font_config['label'])
+        style.configure("TEntry", font=self.font_config['entry'])
+        style.configure("TCombobox", font=self.font_config['entry'])
+        style.configure("TTreeview", font=self.font_config['text'])
     
     def _get_bank_list(self):
         # 模拟银行列表
@@ -1287,6 +1301,9 @@ class ResumeGeneratorGUI:
         print(message)
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    # 使用ThemedTk并应用arc主题
+    root = ThemedTk(theme="arc")
+    # 创建应用实例
     app = ResumeGeneratorGUI(root)
+    # 启动主循环
     root.mainloop()
