@@ -105,6 +105,7 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
     1. 强制更新机制：始终删除已存在的JSON并重新生成
     2. 前置文件检查：先验证Doc/Docx和模板文件存在性
     3. 增强错误处理链
+    4. 支持input_file为None的情况（批量生成场景）
     """
     try:
         # 确保JSON文件所在目录存在
@@ -114,8 +115,13 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
             print(f"📁 已创建JSON目录：{json_dir}")
         
         # ========== 前置检查阶段 ========== 
-        # 验证Doc/Docx文件存在性
-        if not os.path.isfile(input_file):
+        # 验证模板文件存在性
+        if not os.path.isfile(template_path):
+            print(f"❌ 关键错误：Word模板文件不存在 {os.path.abspath(template_path)}")
+            return
+            
+        # 验证Doc/Docx文件存在性（仅在input_file不为None时检查）
+        if input_file is not None and not os.path.isfile(input_file):
             print(f"❌ 关键错误：Doc/Docx源文件不存在 {os.path.abspath(input_file)}")
             return
 
@@ -125,62 +131,70 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
             return
 
         # ========== 数据准备阶段 ========== 
-        # 强制删除已存在的JSON文件
-        if os.path.exists(json_data):
-            try:
-                os.remove(json_data)
-                print(f"🗑️ 已清除旧版JSON文件：{json_data}")
-            except Exception as e:
-                print(f"❌ 删除旧JSON文件失败：{str(e)}")
+        # 只有当input_file不为None时，才执行JSON生成逻辑
+        if input_file is not None:
+            # 强制删除已存在的JSON文件
+            if os.path.exists(json_data):
+                try:
+                    os.remove(json_data)
+                    print(f"🗑️ 已清除旧版JSON文件：{json_data}")
+                except Exception as e:
+                    print(f"❌ 删除旧JSON文件失败：{str(e)}")
+                    return
+
+            # 处理Doc/Docx生成新JSON
+            print("\n🔨 正在转换Doc/Docx数据...")
+            
+            # 检查文件类型，如果是doc格式则先转换为docx
+            processed_doc_path = input_file
+            if input_file.lower().endswith('.doc'):
+                print(f"检测到doc格式文件: {input_file}")
+                # 创建临时目录存储转换后的文件
+                temp_dir = os.path.join(os.path.dirname(input_file), "temp_converted")
+                os.makedirs(temp_dir, exist_ok=True)
+                # 转换doc到docx
+                try:
+                    from . import doc_converter as dc
+                except ImportError:
+                    try:
+                        import doc_converter as dc
+                    except ImportError:
+                        print("错误: 未找到 doc_converter.py 文件")
+                        sys.exit(1)
+                processed_doc_path = dc.convert_doc_to_docx(input_file, temp_dir)
+            elif not input_file.lower().endswith('.docx'):
+                print(f"❌ 不支持的文件格式: {input_file}。仅支持.doc和.docx格式。")
                 return
 
-        # 处理Doc/Docx生成新JSON
-        print("\n🔨 正在转换Doc/Docx数据...")
-        
-        # 检查文件类型，如果是doc格式则先转换为docx
-        processed_doc_path = input_file
-        if input_file.lower().endswith('.doc'):
-            print(f"检测到doc格式文件: {input_file}")
-            # 创建临时目录存储转换后的文件
-            temp_dir = os.path.join(os.path.dirname(input_file), "temp_converted")
-            os.makedirs(temp_dir, exist_ok=True)
-            # 转换doc到docx
+            # 提取原始数据
+            raw_resume_data = dj.extract_resume_universal(processed_doc_path)
+            if not raw_resume_data:
+                print("❌ Doc/Docx提取数据失败，请检查文档格式")
+                return
+
+            # 从文件名中提取工号
+            emp_no = dj.extract_emp_no_from_filename(input_file)
+            
+            # 转换为模板格式
+            result = dj.convert_to_template_format(raw_resume_data, emp_no)
+            if not result:
+                print("❌ Doc/Docx转换JSON失败，请检查文档数据格式")
+                return
+
+            # 保存新版JSON文件
             try:
-                from . import doc_converter as dc
-            except ImportError:
-                try:
-                    import doc_converter as dc
-                except ImportError:
-                    print("错误: 未找到 doc_converter.py 文件")
-                    sys.exit(1)
-            processed_doc_path = dc.convert_doc_to_docx(input_file, temp_dir)
-        elif not input_file.lower().endswith('.docx'):
-            print(f"❌ 不支持的文件格式: {input_file}。仅支持.doc和.docx格式。")
-            return
-
-        # 提取原始数据
-        raw_resume_data = dj.extract_resume_universal(processed_doc_path)
-        if not raw_resume_data:
-            print("❌ Doc/Docx提取数据失败，请检查文档格式")
-            return
-
-        # 从文件名中提取工号
-        emp_no = dj.extract_emp_no_from_filename(input_file)
-        
-        # 转换为模板格式
-        result = dj.convert_to_template_format(raw_resume_data, emp_no)
-        if not result:
-            print("❌ Doc/Docx转换JSON失败，请检查文档数据格式")
-            return
-
-        # 保存新版JSON文件
-        try:
-            with open(json_data, 'w', encoding='utf-8') as f:
-                json.dump(result, f, ensure_ascii=False, indent=4)
-            print(f"✅ 已生成新版JSON文件：{json_data}")
-        except Exception as e:
-            print(f"❌ JSON文件保存失败：{str(e)}")
-            return
+                with open(json_data, 'w', encoding='utf-8') as f:
+                    json.dump(result, f, ensure_ascii=False, indent=4)
+                print(f"✅ 已生成新版JSON文件：{json_data}")
+            except Exception as e:
+                print(f"❌ JSON文件保存失败：{str(e)}")
+                return
+        else:
+            # 如果input_file为None，说明是批量生成模式，直接使用已有JSON文件
+            print(f"\n📋 批量生成模式：使用现有JSON文件 {os.path.basename(json_data)}")
+            if not os.path.exists(json_data):
+                print(f"❌ JSON文件不存在：{json_data}")
+                return
 
         # ========== 简历生成阶段 ========== 
         print("\n📑 开始生成简历文档...")
