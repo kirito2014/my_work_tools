@@ -2,6 +2,13 @@ import os
 import json
 import sys
 
+# 导入pandas
+try:
+    import pandas as pd
+except ImportError:
+    print("错误: 未找到pandas模块，请使用 pip install pandas 安装")
+    sys.exit(1)
+
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -73,6 +80,7 @@ def convert_excel_to_json(excel_file_path, sheet_name="数据-人事花名册导
                     # 如果是EmpNo字段且是数字，格式化为5位数
                     if translated_headers[i] == "EmpNo" and value_str.strip().isdigit():
                         value_str = value_str.strip().zfill(5)
+                    # 保留原始Name值（包含数字）用于文件名生成
                     row_dict[translated_headers[i]] = value_str
             result_list.append(row_dict)
         
@@ -92,15 +100,19 @@ def create_modify_json_format(employee_data):
     
     for emp in employee_data:
         emp_no = emp.get("EmpNo", "")
-        name = emp.get("Name", "未知")
+        # 使用原始姓名作为键名（包含数字）
+        original_name = emp.get("Name", "未知")
         
-        # 构建AdditionInfo字典
+        # 构建AdditionInfo字典，确保其中的Name字段不包含数字
         addition_info = {}
         for key, value in emp.items():
+            if key == "Name":
+                # 去除Name字段中的数字
+                value = ''.join([char for char in str(value) if not char.isdigit()])
             addition_info[key] = value
         
         # 按照modify_json格式组织数据
-        modify_data[name] = {
+        modify_data[original_name] = {
             "AddtionInfo": addition_info
         }
     
@@ -126,7 +138,7 @@ def save_json_files(modify_data, output_dir):
         try:
             with open(filename, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-            print(f"✅ 已保存 {emp_no}_{name}_人员信息.json")
+            print(f"✅ 已保存信息JSON: {emp_no}_{name}_人员信息.json")
         except Exception as e:
             print(f"❌ 保存 {emp_no}_{name}_人员信息.json 时出错: {e}")
 
@@ -169,11 +181,4 @@ def main():
     print(f"\n处理完成！所有JSON文件已保存到: {output_dir}")
 
 if __name__ == "__main__":
-    # 导入pandas
-    try:
-        import pandas as pd
-    except ImportError:
-        print("错误: 未找到pandas模块，请使用 pip install pandas 安装")
-        sys.exit(1)
-    
     main()
