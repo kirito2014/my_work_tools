@@ -85,19 +85,42 @@ class ResumeGeneratorGUI:
         self.font_config = {}
         self._setup_fonts()
         
+        # 添加菜单栏
+        self._create_menu()
+        
         # 创建界面
         self._create_widgets()
         
         # 初始化时尝试加载员工信息
         self._load_employee_info()
         
+    def _create_menu(self):
+        """创建菜单栏"""
+        # 创建菜单栏
+        menubar = tk.Menu(self.root)
+        
+        # 创建文件菜单
+        file_menu = tk.Menu(menubar, tearoff=0, font=self.font_config['button'])
+        file_menu.add_command(label="退出", command=self._quit_app)
+        
+        # 将文件菜单添加到菜单栏
+        menubar.add_cascade(label="文件", menu=file_menu)
+        
+        # 设置菜单栏
+        self.root.config(menu=menubar)
+        
+    def _quit_app(self):
+        """退出应用程序"""
+        if messagebox.askyesno("确认退出", "确定要退出简历生成器吗？"):
+            self.root.quit()
+        
     def _setup_fonts(self):
-        # 设置中文字体
-        self.font_config['title'] = ('SimHei', 12, 'bold')
-        self.font_config['label'] = ('SimHei', 10)
-        self.font_config['button'] = ('SimHei', 10)
-        self.font_config['entry'] = ('SimHei', 10)
-        self.font_config['text'] = ('SimHei', 9)
+        # 设置中文字体为微软雅黑
+        self.font_config['title'] = ('Microsoft YaHei', 12, 'bold')
+        self.font_config['label'] = ('Microsoft YaHei', 10)
+        self.font_config['button'] = ('Microsoft YaHei', 10)
+        self.font_config['entry'] = ('Microsoft YaHei', 10)
+        self.font_config['text'] = ('Microsoft YaHei', 9)
     
     def _create_widgets(self):
         # 创建主框架
