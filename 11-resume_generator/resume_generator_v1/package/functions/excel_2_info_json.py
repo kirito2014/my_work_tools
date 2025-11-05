@@ -26,12 +26,14 @@ def translate_headers(excel_headers):
         "管理关系一级部门": "DepartmentLevel1",
         "管理关系二级部门": "DepartmentLevel2",
         "岗位": "Position",
+        "职类": "JobCategory",
         "专业级别": "ProfessionalLevel",
         "公司邮箱": "CompanyEmail",
         "入职日期": "EntryDate",
         "初次入职日期": "FirstEntryDate",
         "司龄": "CompanyYears",
         "工龄": "WorkYears",
+        "缴纳公司": "PaymentCompany",
         "base地": "BaseLocation",
         "性别": "Gender",
         "出生日期": "BirthDate",
@@ -43,7 +45,8 @@ def translate_headers(excel_headers):
         "毕业院校": "GraduationSchool",
         "学历": "HighestEducation",
         "专业": "Major",
-        "合同签订法人": "ContractLegalPerson"
+        "合同签订法人": "ContractLegalPerson",
+        "任职状态": "EmploymentStatus"
     }
     
     # 返回翻译后的键名列表
@@ -144,7 +147,7 @@ def save_json_files(modify_data, output_dir):
 
 def main():
     # 设置默认的Excel文件路径
-    default_excel_path = os.path.join("input", "技术人员名单-8月（删减版）.xlsx")
+    default_excel_path = os.path.join("input", "技术人员名单-11月.xlsx")
     
     # 允许用户通过命令行参数指定Excel文件路径
     if len(sys.argv) > 1:
