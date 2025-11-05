@@ -11,7 +11,7 @@ try:
     import pandas as pd
     # 导入现有的Excel转JSON功能
     from package.functions.excel_2_info_json import convert_excel_to_json, create_modify_json_format, save_json_files
-    from package.utils.file_helper import read_json_file, write_json_file
+    from package.utils.file_helper import read_file, write_file
 except ImportError as e:
     print(f"导入模块失败: {e}")
     sys.exit(1)
@@ -74,8 +74,15 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output"):
                 file_path = os.path.join(resume_dir, filename)
                 try:
                     # 读取现有简历文件
-                    resume_data = read_json_file(file_path)
-                    if not resume_data:
+                    file_content = read_file(file_path)
+                    if not file_content:
+                        continue
+                    
+                    try:
+                        # 解析JSON字符串为Python字典
+                        resume_data = json.loads(file_content)
+                    except json.JSONDecodeError as e:
+                        print(f"❌ 解析简历文件 {filename} 失败: {e}")
                         continue
                     
                     # 获取员工姓名
@@ -85,9 +92,10 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output"):
                     # 更新AddtionInfo
                     if name in resume_data:
                         resume_data[name]["AddtionInfo"] = emp_data
-                        # 写回文件
-                        write_json_file(file_path, resume_data)
-                        print(f"✅ 已更新简历JSON: {filename}")
+                        # 将字典转换为JSON字符串并写回文件
+                        updated_content = json.dumps(resume_data, ensure_ascii=False, indent=2)
+                        write_file(file_path, updated_content)
+                        print(f"[OK] 已更新简历JSON: {filename}")
                         updated_count += 1
                         found = True
                         break
