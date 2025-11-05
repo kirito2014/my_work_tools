@@ -57,6 +57,7 @@ class ResumeGeneratorGUI:
         self.resume_file_path = tk.StringVar()
         self.selected_persons = []
         self.selected_list = []  # 存储选中的员工编号
+        self.hidden_items = {}  # 存储被隐藏的项目
         
         # 设置中文字体
         self.font_config = {}
@@ -787,11 +788,15 @@ class ResumeGeneratorGUI:
     
     def _apply_filters(self, search_text, level1_dept, level2_dept):
         """应用所有筛选条件"""
-        # 首先确保所有项目都是可见的
-        for item in self.person_tree.get_children():
-            self.person_tree.item(item, tags=())
+        # 首先恢复所有被隐藏的项目
+        if hasattr(self, 'hidden_items') and self.hidden_items:
+            for item in list(self.hidden_items.keys()):
+                self.person_tree.reattach(item, '', 'end')
+            # 清空隐藏项目列表
+            self.hidden_items = {}
         
         # 筛选逻辑
+        # 注意：这里我们需要重新获取所有可见的项目（现在应该是全部项目）
         for item in self.person_tree.get_children():
             values = self.person_tree.item(item, "values")
             if not values or len(values) < 4:
@@ -816,10 +821,10 @@ class ResumeGeneratorGUI:
             
             # 如果不匹配，隐藏项目
             if not (search_match and level1_match and level2_match):
-                self.person_tree.item(item, tags=('hidden',))
-        
-        # 设置隐藏标签的样式
-        self.person_tree.tag_configure('hidden', foreground='gray')
+                # 保存被隐藏的项目的值
+                self.hidden_items[item] = values
+                # 从Treeview中移除项目
+                self.person_tree.detach(item)
     
     def _clear_filters(self):
         """清除所有筛选条件"""
@@ -828,7 +833,15 @@ class ResumeGeneratorGUI:
         self.level2_dept_combobox['values'] = ['全部']
         self.level2_dept_combobox.current(0)
         
-        # 显示所有项目
+        # 重新显示所有被隐藏的项目
+        if hasattr(self, 'hidden_items'):
+            for item, values in self.hidden_items.items():
+                # 重新插入项目
+                self.person_tree.reattach(item, '', 'end')
+            # 清空隐藏项目列表
+            self.hidden_items = {}
+        
+        # 确保所有项目都可见
         for item in self.person_tree.get_children():
             self.person_tree.item(item, tags=())
     
