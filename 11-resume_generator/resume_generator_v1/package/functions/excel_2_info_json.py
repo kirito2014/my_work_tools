@@ -80,7 +80,7 @@ def convert_excel_to_json(excel_file_path, sheet_name="数据-人事花名册导
                     # 如果是EmpNo字段且是数字，格式化为5位数
                     if translated_headers[i] == "EmpNo" and value_str.strip().isdigit():
                         value_str = value_str.strip().zfill(5)
-                    # 保留原始Name值（包含数字）用于文件名生成
+                    # 保留原始Name值（包含数字）用于文件名
                     row_dict[translated_headers[i]] = value_str
             result_list.append(row_dict)
         
@@ -138,9 +138,9 @@ def save_json_files(modify_data, output_dir):
         try:
             with open(filename, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-            print(f"✅ 已保存信息JSON: {emp_no}_{name}_人员信息.json")
+            print(f"[OK] 已保存信息JSON: {emp_no}_{name}_人员信息.json")
         except Exception as e:
-            print(f"❌ 保存 {emp_no}_{name}_人员信息.json 时出错: {e}")
+            print(f"[ERROR] 保存 {emp_no}_{name}_人员信息.json 时出错: {e}")
 
 def main():
     # 设置默认的Excel文件路径

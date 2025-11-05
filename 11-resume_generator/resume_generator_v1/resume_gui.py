@@ -43,6 +43,20 @@ try:
     
     # 动态导入excel_reader模块
     from package.utils import excel_reader
+    
+    # 动态导入batch_render_from_docx模块
+    batch_render_module = None
+    try:
+        import batch_render_from_docx as batch_render_module
+    except ImportError:
+        batch_render_path = os.path.join(base_dir, 'batch_render_from_docx.py')
+        if os.path.exists(batch_render_path):
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("batch_render_from_docx", batch_render_path)
+            batch_render_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(batch_render_module)
+        else:
+            print(f"警告: 未找到 batch_render_from_docx.py 文件在路径: {batch_render_path}")
 except Exception as e:
     print(f"导入模块时出错: {e}")
 
@@ -138,6 +152,10 @@ class ResumeGeneratorGUI:
         ttk.Button(control_frame, text="确认选择", command=self._confirm_selection, width=10).pack(side=tk.LEFT, padx=5)
         # 新增清除选择按钮
         ttk.Button(control_frame, text="清除选择", command=self._clear_selected, width=10).pack(side=tk.LEFT, padx=5)
+        # 新增取消折叠按钮（初始隐藏）
+        self.unfold_button = ttk.Button(control_frame, text="取消折叠", command=self._show_person_list, width=8)
+        # 默认隐藏取消折叠按钮
+        
         # 新增折叠按钮
         ttk.Button(control_frame, text="折叠", command=self._toggle_person_list_visibility, width=8).pack(side=tk.RIGHT, padx=5)
         
@@ -222,10 +240,10 @@ class ResumeGeneratorGUI:
         self.progress_label.pack(pady=5)
         
         # 4. 日志显示区域
-        log_frame = ttk.LabelFrame(main_frame, text="日志显示区域", padding="15")
-        log_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        self.log_frame = ttk.LabelFrame(main_frame, text="日志显示区域", padding="15")
+        self.log_frame.pack(fill=tk.BOTH, expand=True, pady=10)
         
-        self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, font=self.font_config['text'], height=15)
+        self.log_text = scrolledtext.ScrolledText(self.log_frame, wrap=tk.WORD, font=self.font_config['text'], height=15)
         self.log_text.pack(fill=tk.BOTH, expand=True)
         self.log_text.config(state=tk.DISABLED)
         
@@ -245,13 +263,13 @@ class ResumeGeneratorGUI:
         return ["长亮科技", "测试银行", "招商银行", "建设银行", "工商银行", "农业银行"]
     
     def _select_file(self):
-        file_path = filedialog.askopenfilename(
-            title="选择简历文件",
-            filetypes=[("Word文档", "*.docx;*.doc"), ("所有文件", "*.*")]
+        """选择简历文件夹路径"""
+        folder_path = filedialog.askdirectory(
+            title="选择简历文件夹"
         )
-        if file_path:
-            self.resume_file_path.set(file_path)
-            self._log(f"已选择文件: {file_path}")
+        if folder_path:
+            self.resume_file_path.set(folder_path)
+            self._log(f"已选择文件夹: {folder_path}")
     
     def _select_tech_info_file(self):
         """选择技术人员信息Excel文件"""
@@ -346,91 +364,244 @@ class ResumeGeneratorGUI:
         if self.root.winfo_exists():
             self.root.after(0, update)
     
-    def _start_parse(self):
-        file_path = self.resume_file_path.get()
-        if not file_path:
-            self._log("请先选择文件路径")
-            return
+    def _batch_convert_to_json(self, input_folder):
+        """
+        批量将文件夹中的docx/doc文件转换为json
+        利用batch_render_from_docx.py中的批量处理逻辑，但只执行JSON转换部分
+        """
+        import os
+        import sys
+        import json
+        from datetime import datetime
         
-        if not os.path.exists(file_path):
-            self._log(f"文件不存在: {file_path}")
-            return
+        # 创建temp_converted目录
+        temp_dir = os.path.join(input_folder, "temp_converted")
+        os.makedirs(temp_dir, exist_ok=True)
         
-        self._log(f"开始解析文件: {file_path}")
-        self.progress_var.set(10)
-        self.progress_label.config(text="10%")
-        
+        # 创建输出目录
+        modify_dir = os.path.join(base_dir, "output", "modify_json")
         try:
-            # 调用doc_2_json模块解析文件
-            if dj:
+            os.makedirs(modify_dir, exist_ok=True)
+            # 验证目录创建成功
+            if os.path.isdir(modify_dir):
+                self._log(f"输出目录已准备就绪: {modify_dir}")
+            else:
+                self._log(f"警告: 无法创建或访问输出目录: {modify_dir}")
+                # 尝试使用绝对路径作为备选
+                modify_dir = os.path.abspath(os.path.join(os.getcwd(), "output", "modify_json"))
+                os.makedirs(modify_dir, exist_ok=True)
+                self._log(f"已切换到备选输出目录: {modify_dir}")
+        except Exception as e:
+            self._log(f"创建输出目录时出错: {e}")
+            # 设置一个默认的安全目录作为备选
+            default_dir = os.path.abspath(os.path.join(os.getcwd(), "resume_json_output"))
+            modify_dir = default_dir
+            os.makedirs(modify_dir, exist_ok=True)
+            self._log(f"已使用默认备用目录: {modify_dir}")
+        
+        # 统计信息
+        total_files = 0
+        processed_files = 0
+        failed_files = 0
+        converted_files = 0
+        
+        # 使用batch_render_from_docx模块中的逻辑来遍历和处理文件
+        # 遍历文件夹中的所有.doc和.docx文件
+        resume_files = []
+        for root, dirs, files in os.walk(input_folder):
+            # 跳过temp_converted目录
+            if "temp_converted" in dirs:
+                dirs.remove("temp_converted")
+            
+            for file in files:
+                if file.lower().endswith(('.doc', '.docx')):
+                    # 跳过临时文件
+                    if file.startswith('~$'):
+                        continue
+                    
+                    file_path = os.path.join(root, file)
+                    resume_files.append(file_path)
+        
+        total_files = len(resume_files)
+        self._log(f"共发现 {total_files} 个简历文件")
+        
+        # 导入doc_converter模块（从batch_render_from_docx借鉴的导入方式）
+        doc_converter = None
+        try:
+            if batch_render_module and hasattr(batch_render_module, 'doc_converter'):
+                doc_converter = batch_render_module.doc_converter
+            else:
+                from package.functions import doc_converter
+        except ImportError:
+            try:
+                # 尝试动态加载
+                import importlib.util
+                converter_path = os.path.join(base_dir, "package", "functions", "doc_converter.py")
+                if os.path.exists(converter_path):
+                    spec = importlib.util.spec_from_file_location("doc_converter", converter_path)
+                    doc_converter = importlib.util.module_from_spec(spec)
+                    sys.modules["doc_converter"] = doc_converter
+                    spec.loader.exec_module(doc_converter)
+                    self._log("通过动态加载成功导入 doc_converter.py 文件")
+            except Exception as e:
+                self._log(f"导入 doc_converter 模块失败: {e}")
+        
+        # 处理每个文件
+        for index, file_path in enumerate(resume_files, 1):
+            self._log(f"[{index}/{total_files}] 正在处理文件: {os.path.basename(file_path)}")
+            
+            try:
+                # 处理doc格式文件（借鉴batch_render_from_docx中的转换逻辑）
+                processed_doc_path = file_path
+                is_converted = False
+                
+                if file_path.lower().endswith('.doc'):
+                    self._log("检测到doc格式文件，正在转换为docx...")
+                    try:
+                        if doc_converter and hasattr(doc_converter, 'convert_doc_to_docx'):
+                            processed_doc_path = doc_converter.convert_doc_to_docx(file_path, temp_dir)
+                            converted_files += 1
+                            is_converted = True
+                            self._log(f"转换成功: {os.path.basename(processed_doc_path)}")
+                        else:
+                            self._log("警告: 缺少doc_converter模块或convert_doc_to_docx方法，无法转换doc文件")
+                            continue
+                    except Exception as e:
+                        self._log(f"转换失败: {e}")
+                        failed_files += 1
+                        continue
+                
+                # 生成JSON文件名（借鉴batch_render_from_docx中的命名逻辑）
+                base_name = os.path.splitext(os.path.basename(processed_doc_path))[0]
+                # 移除"_已转换"后缀
+                if is_converted and "_已转换" in base_name:
+                    base_name = base_name.replace("_已转换", "")
+                
                 # 从文件名提取工号和姓名
-                base_name = os.path.splitext(os.path.basename(file_path))[0]
                 parts = base_name.split('+')
                 if len(parts) >= 2:
                     emp_no = parts[0]
-                    person_name = parts[1]
+                    name = parts[1]
+                    json_filename = f"{emp_no}_{name}_人员简历.json"
                 else:
+                    json_filename = f"{base_name}.json"
                     emp_no = "unknown"
-                    person_name = "unknown"
                 
-                # 检查文件类型，如果是doc格式则转换为docx
-                processed_doc_path = file_path
-                if file_path.lower().endswith('.doc'):
-                    self._log("检测到doc格式文件，正在转换为docx...")
-                    # 这里需要处理doc转docx，简化处理
-                    self._log("注意：doc转docx功能需要doc_converter模块支持")
-                
-                # 提取简历数据
-                self._log("正在提取简历数据...")
-                self.progress_var.set(30)
-                self.progress_label.config(text="30%")
-                
-                raw_resume_data = dj.extract_resume_universal(processed_doc_path)
-                if not raw_resume_data:
-                    self._log("提取数据失败，请检查文档格式")
-                    return
-                
-                # 转换为模板格式
-                self._log("正在转换为模板格式...")
-                self.progress_var.set(70)
-                self.progress_label.config(text="70%")
-                
-                result = dj.convert_to_template_format(raw_resume_data, emp_no)
-                if not result:
-                    self._log("转换失败，请检查文档数据格式")
-                    return
-                
-                # 创建输出目录
-                modify_dir = os.path.join(base_dir, "output", "modify_json")
-                os.makedirs(modify_dir, exist_ok=True)
-                
-                # 保存JSON文件
-                json_filename = f"{emp_no}_{person_name}_人员简历.json"
+                # 设置JSON文件路径
                 json_file = os.path.join(modify_dir, json_filename)
                 
-                with open(json_file, 'w', encoding='utf-8') as f:
-                    json.dump(result, f, ensure_ascii=False, indent=4)
+                # 提取简历数据并转换为模板格式
+                self._log("正在提取简历数据...")
+                if dj:
+                    raw_resume_data = dj.extract_resume_universal(processed_doc_path)
+                    if not raw_resume_data:
+                        self._log("提取数据失败，请检查文档格式")
+                        failed_files += 1
+                        continue
+                    
+                    self._log("正在转换为模板格式...")
+                    result = dj.convert_to_template_format(raw_resume_data, emp_no)
+                    if not result:
+                        self._log("转换失败，请检查文档数据格式")
+                        failed_files += 1
+                        continue
+                    
+                    # 保存JSON文件，添加额外的错误处理
+                    try:
+                        with open(json_file, 'w', encoding='utf-8') as f:
+                            json.dump(result, f, ensure_ascii=False, indent=4)
+                        
+                        # 验证文件是否成功保存
+                        if os.path.exists(json_file) and os.path.getsize(json_file) > 0:
+                            processed_files += 1
+                            self._log(f"处理完成，JSON文件已保存至: {json_file}")
+                        else:
+                            self._log(f"警告: JSON文件可能未正确保存: {json_file}")
+                            failed_files += 1
+                            continue
+                    except Exception as e:
+                        self._log(f"保存JSON文件时出错: {e}")
+                        failed_files += 1
+                        continue
+                else:
+                    self._log("错误: 未能导入doc_2_json模块")
+                    failed_files += 1
+                    continue
                 
-                self.progress_var.set(100)
-                self.progress_label.config(text="100%")
-                self._log(f"解析完成！JSON文件已保存至: {json_file}")
+                # 更新进度
+                progress = int((index / total_files) * 100)
+                self._update_progress(progress)
                 
-                # 更新人员名单
-                self._update_person_list()
-                
-            else:
-                self._log("错误: 未能导入doc_2_json模块")
-        except Exception as e:
-            self._log(f"解析过程中出错: {str(e)}")
+            except Exception as e:
+                self._log(f"处理失败: {str(e)}")
+                failed_files += 1
+        
+        # 处理完成后进行验证
+        json_files_validated = 0
+        if processed_files > 0:
+            self._log("=" * 50)
+            self._log(f"开始验证生成的JSON文件...")
+            for json_file in os.listdir(modify_dir):
+                if json_file.endswith('.json'):
+                    json_path = os.path.join(modify_dir, json_file)
+                    try:
+                        with open(json_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        # 验证JSON结构（至少包含基本字段）
+                        if isinstance(data, dict) and len(data) > 0:
+                            json_files_validated += 1
+                            # 记录验证成功的文件名（可选）
+                            # self._log(f"  ✓ {json_file}")
+                    except Exception as e:
+                        self._log(f"  ✗ 验证JSON文件失败 {json_file}: {e}")
+        
+        # 输出统计信息
+        self._log("=" * 50)
+        self._log(f"批处理完成！")
+        self._log(f"总文件数: {total_files}")
+        self._log(f"成功处理: {processed_files}")
+        self._log(f"转换文件数: {converted_files}")
+        self._log(f"处理失败: {failed_files}")
+        if processed_files > 0:
+            self._log(f"JSON文件验证成功: {json_files_validated}/{processed_files}")
+        self._log(f"JSON目录: {modify_dir}")
+        
+        # 更新人员名单
+        self._update_person_list()
+        
+    def _start_parse(self):
+        folder_path = self.resume_file_path.get()
+        if not folder_path:
+            self._log("请先选择文件夹路径")
+            return
+        
+        if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
+            self._log(f"文件夹不存在或不是有效文件夹: {folder_path}")
+            return
+        
+        self._log(f"开始批量解析文件夹: {folder_path}")
+        self.progress_var.set(0)
+        self.progress_label.config(text="0%")
+        
+        # 在新线程中执行批量转换
+        thread = threading.Thread(target=self._batch_convert_to_json, args=(folder_path,))
+        thread.daemon = True
+        thread.start()
     
     def _toggle_person_list(self):
         """根据生成方式切换人员列表的显示状态"""
         if self.generate_method.get() == "selected":
+            # 隐藏取消折叠按钮
+            self.unfold_button.pack_forget()
+            # 显示人员列表
             self.person_list_frame.pack(fill=tk.X, pady=5)
             # 自动更新人员名单，确保有数据显示
             self._update_person_list()
             self._person_list_visible = True
         else:
+            # 隐藏取消折叠按钮
+            self.unfold_button.pack_forget()
+            # 隐藏人员列表
             self.person_list_frame.pack_forget()
             self._person_list_visible = False
             # 确保进度条可见
@@ -450,6 +621,17 @@ class ResumeGeneratorGUI:
             self.progress_label.pack(pady=2)
             # 确保日志区域可见
             self.log_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+            # 显示取消折叠按钮
+            self.unfold_button.pack(side=tk.RIGHT, padx=5)
+    
+    def _show_person_list(self):
+        """显示人员列表并隐藏取消折叠按钮"""
+        if not self._person_list_visible:
+            # 隐藏取消折叠按钮
+            self.unfold_button.pack_forget()
+            # 显示人员列表
+            self.person_list_frame.pack(fill=tk.X, pady=5)
+            self._person_list_visible = True
         else:
             # 展开人员列表
             self.person_list_frame.pack(fill=tk.X, pady=5)
@@ -918,7 +1100,7 @@ class ResumeGeneratorGUI:
                 # 自动保存并确认选择
                 self.selected_list = emp_numbers
                 timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                self._save_selected_emp_numbers(emp_numbers, timestamp)
+                self._save_selected_emp_numbers(emp_numbers, timestamp, bankname)
             
             # 获取人员姓名
             person_names = []
@@ -930,12 +1112,13 @@ class ResumeGeneratorGUI:
             self._log(f"开始生成选中人员简历，银行: {bankname}，人员数量: {len(person_names)}")
             self._log(f"选中的员工编号: {', '.join(self.selected_list)}")
     
-    def _save_selected_emp_numbers(self, emp_numbers, timestamp=None):
+    def _save_selected_emp_numbers(self, emp_numbers, timestamp=None, bankname=None):
         """保存选中的员工编号到文件
         
         Args:
             emp_numbers: 员工编号列表
             timestamp: 时间戳，如果为None则使用当前时间
+            bankname: 银行名称，如果为None则不执行后续操作
         """
         try:
             # 确保目录存在
@@ -959,6 +1142,10 @@ class ResumeGeneratorGUI:
         except Exception as e:
             self._log(f"保存选中员工编号时出错: {str(e)}")
         
+        # 如果没有提供bankname，不执行后续操作
+        if bankname is None:
+            return
+            
         try:
             # 从output/modify_json目录获取所有JSON文件
             modify_dir = os.path.join(base_dir, "output", "modify_json")
