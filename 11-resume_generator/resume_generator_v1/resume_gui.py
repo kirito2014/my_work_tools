@@ -92,6 +92,11 @@ class ResumeGeneratorGUI:
         self.root.geometry("900x700")
         # 不再需要手动设置背景色，由主题处理
         
+        # 设置窗口图标
+        icon_path = r"D:\github\11-resume_generator\resume_generator_v1\resources\icons\sunline.ico"  # 使用原始字符串避免转义序列
+        if os.path.exists(icon_path):
+            self.root.iconbitmap(icon_path)
+        
         # 文件路径变量
         self.resume_file_path = tk.StringVar()
         self.selected_persons = []
