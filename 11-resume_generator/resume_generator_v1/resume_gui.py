@@ -106,9 +106,185 @@ class ResumeGeneratorGUI:
         # 将文件菜单添加到菜单栏
         menubar.add_cascade(label="文件", menu=file_menu)
         
+        # 创建特殊更新菜单
+        special_menu = tk.Menu(menubar, tearoff=0, font=self.font_config['button'])
+        special_menu.add_command(label="特殊更新", command=self._show_special_update_dialog)
+        
+        # 将特殊更新菜单添加到菜单栏
+        menubar.add_cascade(label="特殊更新", menu=special_menu)
+        
         # 设置菜单栏
         self.root.config(menu=menubar)
         
+    def _show_special_update_dialog(self):
+        """显示特殊更新对话框"""
+        # 创建新窗口
+        dialog = tk.Toplevel(self.root)
+        dialog.title("特殊更新")
+        dialog.geometry("600x500")
+        dialog.resizable(False, False)
+        
+        # 设置字体
+        dialog_font = self.font_config['label']
+        
+        # 创建主框架
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 1. 文件选择部分
+        file_frame = ttk.LabelFrame(main_frame, text="文件选择", padding="10")
+        file_frame.pack(fill=tk.X, pady=10)
+        
+        # 简历文件夹选择
+        resume_folder_frame = ttk.Frame(file_frame)
+        resume_folder_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(resume_folder_frame, text="简历文件夹:", font=dialog_font).pack(side=tk.LEFT, padx=5)
+        self.special_resume_folder = tk.StringVar()
+        ttk.Entry(resume_folder_frame, textvariable=self.special_resume_folder, width=40, font=dialog_font).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        ttk.Button(resume_folder_frame, text="浏览", command=lambda: self._select_folder(self.special_resume_folder)).pack(side=tk.LEFT, padx=5)
+        
+        # 人员信息文件选择
+        info_file_frame = ttk.Frame(file_frame)
+        info_file_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(info_file_frame, text="人员信息文件:", font=dialog_font).pack(side=tk.LEFT, padx=5)
+        self.special_info_file = tk.StringVar()
+        ttk.Entry(info_file_frame, textvariable=self.special_info_file, width=40, font=dialog_font).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        ttk.Button(info_file_frame, text="浏览", command=lambda: self._select_excel_file(self.special_info_file)).pack(side=tk.LEFT, padx=5)
+        
+        # 2. 更新选项部分
+        option_frame = ttk.LabelFrame(main_frame, text="更新选项", padding="10")
+        option_frame.pack(fill=tk.X, pady=10)
+        
+        # 更新方式下拉框
+        update_type_frame = ttk.Frame(option_frame)
+        update_type_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(update_type_frame, text="更新方式:", font=dialog_font).pack(side=tk.LEFT, padx=5)
+        self.update_type_var = tk.StringVar(value="1")
+        update_type_combobox = ttk.Combobox(update_type_frame, textvariable=self.update_type_var, state="readonly", font=dialog_font, width=20)
+        update_type_combobox['values'] = ["只更新简历信息(1)", "只更新人员信息(2)", "更新全部信息(3)"]
+        update_type_combobox.pack(side=tk.LEFT, padx=5)
+        
+        # 人员编号输入框
+        emp_frame = ttk.Frame(option_frame)
+        emp_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(emp_frame, text="人员编号:", font=dialog_font).pack(side=tk.LEFT, padx=5)
+        self.employee_numbers_var = tk.StringVar()
+        ttk.Entry(emp_frame, textvariable=self.employee_numbers_var, width=30, font=dialog_font).pack(side=tk.LEFT, padx=5)
+        ttk.Label(emp_frame, text="多个用逗号分隔，全部更新请输入ALL", font=dialog_font).pack(side=tk.LEFT, padx=5)
+        
+        # 3. 按钮部分
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(button_frame, text="执行更新", command=lambda: self._execute_special_update(dialog), style="Accent.TButton").pack(side=tk.LEFT, padx=10)
+        ttk.Button(button_frame, text="取消", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
+        
+        # 居中显示
+        dialog.transient(self.root)
+        dialog.grab_set()
+        self.root.wait_window(dialog)
+    
+    def _select_folder(self, string_var):
+        """选择文件夹"""
+        folder_path = filedialog.askdirectory()
+        if folder_path:
+            string_var.set(folder_path)
+    
+    def _select_excel_file(self, string_var):
+        """选择Excel文件"""
+        file_path = filedialog.askopenfilename(filetypes=[("Excel文件", "*.xlsx;*.xls")])
+        if file_path:
+            string_var.set(file_path)
+    
+    def _execute_special_update(self, dialog):
+        """执行特殊更新"""
+        # 获取更新类型
+        update_type = self.update_type_var.get()
+        update_option = 1 if "1" in update_type else 2 if "2" in update_type else 3
+        
+        # 获取人员编号
+        employee_numbers = self.employee_numbers_var.get().strip()
+        if not employee_numbers:
+            messagebox.showerror("错误", "请输入人员编号")
+            return
+        
+        # 获取文件路径
+        resume_folder = self.special_resume_folder.get()
+        info_file = self.special_info_file.get()
+        
+        # 验证必要的文件路径
+        if employee_numbers.upper() == "ALL" and not resume_folder:
+            messagebox.showerror("错误", "全部更新时必须选择简历文件夹")
+            return
+        
+        if not info_file:
+            messagebox.showerror("错误", "请选择人员信息文件")
+            return
+        
+        # 构建命令
+        cmd = [sys.executable, os.path.join(base_dir, "package", "functions", "update_specific_jsons.py"), 
+               str(update_option), employee_numbers, "--excel", info_file]
+        
+        # 如果提供了简历文件夹，添加--word参数
+        if resume_folder:
+            cmd.extend(["--word", resume_folder])
+        
+        # 关闭对话框
+        dialog.destroy()
+        
+        # 显示进度窗口
+        progress_window = tk.Toplevel(self.root)
+        progress_window.title("执行更新")
+        progress_window.geometry("500x200")
+        progress_window.transient(self.root)
+        progress_window.grab_set()
+        
+        # 添加输出文本框
+        output_text = scrolledtext.ScrolledText(progress_window, wrap=tk.WORD, font=self.font_config['text'])
+        output_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # 实时更新输出的函数
+        def update_output(process):
+            while True:
+                line = process.stdout.readline()
+                if not line:
+                    break
+                output_text.insert(tk.END, line)
+                output_text.see(tk.END)
+            
+            # 处理完成后更新UI
+            progress_window.after(0, lambda: output_text.insert(tk.END, "\n更新完成！"))
+            progress_window.after(0, lambda: output_text.see(tk.END))
+            
+            # 添加完成按钮
+            done_button = ttk.Button(progress_window, text="完成", command=progress_window.destroy, style="Accent.TButton")
+            done_button.pack(pady=10)
+        
+        # 在新线程中执行命令
+        def execute_command():
+            try:
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
+                                          text=True, cwd=base_dir)
+                
+                # 在主线程中更新UI
+                self.root.after(0, lambda: update_output(process))
+                
+                # 等待进程完成
+                process.wait()
+            except Exception as e:
+                self.root.after(0, lambda: output_text.insert(tk.END, f"执行错误: {e}"))
+                self.root.after(0, lambda: output_text.see(tk.END))
+                self.root.after(0, lambda: ttk.Button(progress_window, text="完成", 
+                                                     command=progress_window.destroy, 
+                                                     style="Accent.TButton").pack(pady=10))
+        
+        # 启动执行线程
+        threading.Thread(target=execute_command, daemon=True).start()
+    
     def _quit_app(self):
         """退出应用程序"""
         if messagebox.askyesno("确认退出", "确定要退出简历生成器吗？"):

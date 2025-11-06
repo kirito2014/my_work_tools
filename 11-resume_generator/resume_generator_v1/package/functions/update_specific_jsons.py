@@ -142,8 +142,9 @@ def main():
                        help="更新选项: 1-只更新简历json, 2-只更新信息json, 3-两者都更新")
     parser.add_argument("employee_numbers", 
                        help="更新人员工号，支持ALL或列表格式如['07003','02794']或逗号分隔如07003,02794")
-    parser.add_argument("--excel", default=os.path.join("input", "技术人员名单-8月（删减版）.xlsx"), 
-                       help="Excel文件路径")
+    parser.add_argument("--excel", default=os.path.join("input", "技术人员名单-11月.xlsx"), 
+                       help="人员基本信息文件路径")
+    parser.add_argument("--word", default="", help="简历文件夹路径")
     
     args = parser.parse_args()
     
@@ -169,8 +170,28 @@ def main():
     # 根据选项执行更新
     if args.update_option in [1, 3]:  # 更新简历JSON
         print("更新简历JSON文件...")
-        resume_updated = update_resume_jsons(employee_numbers, excel_data)
-        total_updated += resume_updated
+        # 当员工编号为ALL且提供了word参数时，使用批量更新
+        if employee_numbers == "ALL" and args.word:
+            print(f"执行批量更新，使用简历文件夹: {args.word}")
+            try:
+                # 导入batch_render_from_docx模块
+                import importlib.util
+                batch_render_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'batch_render_from_docx.py')
+                if os.path.exists(batch_render_path):
+                    spec = importlib.util.spec_from_file_location("batch_render_from_docx", batch_render_path)
+                    batch_render_module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(batch_render_module)
+                    # 调用批量更新函数
+                    batch_render_module.batch_modify_json(args.word, args.excel)
+                    print("批量更新完成")
+                    total_updated += 1  # 标记执行了批量更新
+                else:
+                    print(f"错误: 未找到batch_render_from_docx.py文件: {batch_render_path}")
+            except Exception as e:
+                print(f"执行批量更新时出错: {e}")
+        else:
+            resume_updated = update_resume_jsons(employee_numbers, excel_data)
+            total_updated += resume_updated
     
     if args.update_option in [2, 3]:  # 更新信息JSON
         print("更新信息JSON文件...")
