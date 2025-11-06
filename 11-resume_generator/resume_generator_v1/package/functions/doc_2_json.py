@@ -61,7 +61,7 @@ def extract_resume_universal(doc_path: str) -> Dict:
         cells = [cell.text.strip().replace("\n", " ") for cell in row.cells]
         
         # 调试输出，查看每行的单元格内容
-        print(f"行 {row_idx}: {cells}")
+        #print(f"行 {row_idx}: {cells}")
         
         # 简化的键值对提取方法
         # 1. 建立常见键名列表（包括可能的变体）
@@ -110,7 +110,7 @@ def extract_resume_universal(doc_path: str) -> Dict:
                     # 检查是否已经存在这个键
                     if matched_key not in basic_info:
                         basic_info[matched_key] = next_cell
-                        print(f"  添加键值对: '{matched_key}' -> '{next_cell}'")
+                        #print(f"  添加键值对: '{matched_key}' -> '{next_cell}'")
             
             i += 1
             
@@ -142,7 +142,7 @@ def extract_resume_universal(doc_path: str) -> Dict:
                             break
                     if not is_potential_key and potential_value:
                         basic_info[matched_key] = potential_value
-                        print(f"  添加键值对: '{matched_key}' -> '{potential_value}'")
+                        #print(f"  添加键值对: '{matched_key}' -> '{potential_value}'")
                         break
     
     resume_data["基本情况"] = basic_info
@@ -210,7 +210,7 @@ def extract_resume_universal(doc_path: str) -> Dict:
         for row_idx in range(ability_start_row + 1, total_rows):
             row = table.rows[row_idx]
             cells = [cell.text.strip().replace("\n", " ") for cell in row.cells if cell.text.strip()]
-            print(f"行 {row_idx}: {cells}")
+            #print(f"行 {row_idx}: {cells}")
             if not cells:
                 continue
                 
@@ -227,12 +227,12 @@ def extract_resume_universal(doc_path: str) -> Dict:
                     ability_data[key1] = value1
 
 
-                    print(f"  添加键值对: '{key1}' -> '{value1}'")
+                    #print(f"  添加键值对: '{key1}' -> '{value1}'")
 
 
     
     resume_data["能力与资质"] = ability_data
-    print("能力与资质提取结果:", ability_data)
+    #print("能力与资质提取结果:", ability_data)
 
     return resume_data
 
@@ -387,7 +387,7 @@ if __name__ == "__main__":
         
         print(f"\n【{person_name}的简历 - 模板格式数据】")
         template_json = json.dumps(template_formatted_data, ensure_ascii=False, indent=2)
-        print(template_json)
+        #print(template_json)
 
         # 创建输出目录
         original_dir = os.path.join("output", "original_json")
@@ -399,13 +399,13 @@ if __name__ == "__main__":
         raw_output_filename = os.path.join(original_dir, f"{emp_no}_{person_name}_人员简历.json")
         with open(raw_output_filename, "w", encoding="utf-8") as f:
             json.dump(raw_resume_data, f, ensure_ascii=False, indent=2)
-        print(f"✅ 已保存{person_name}的简历原始提取数据到：{raw_output_filename}")
+        print(f"[OK] 已保存{person_name}的简历原始提取数据到：{raw_output_filename}")
         
         # 保存模板格式数据（文件名格式：工号_姓名_人员简历.json）
         modify_output_filename = os.path.join(modify_dir, f"{emp_no}_{person_name}_人员简历.json")
         with open(modify_output_filename, "w", encoding="utf-8") as f:
             f.write(template_json)
-        print(f"✅ 已保存{person_name}的简历模板格式数据到：{modify_output_filename}")
+        print(f"[OK] 已保存{person_name}的简历模板格式数据到：{modify_output_filename}")
         
     except Exception as e:
         print(f"处理简历时发生错误: {e}")

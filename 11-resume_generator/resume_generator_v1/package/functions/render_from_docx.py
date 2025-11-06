@@ -117,17 +117,17 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
         # ========== 前置检查阶段 ========== 
         # 验证模板文件存在性
         if not os.path.isfile(template_path):
-            print(f"❌ 关键错误：Word模板文件不存在 {os.path.abspath(template_path)}")
+            print(f"[ERROR] 关键错误：Word模板文件不存在 {os.path.abspath(template_path)}")
             return
             
         # 验证Doc/Docx文件存在性（仅在input_file不为None时检查）
         if input_file is not None and not os.path.isfile(input_file):
-            print(f"❌ 关键错误：Doc/Docx源文件不存在 {os.path.abspath(input_file)}")
+            print(f"[ERROR] 关键错误：Doc/Docx源文件不存在 {os.path.abspath(input_file)}")
             return
 
         # 验证模板文件存在性
         if not os.path.isfile(template_path):
-            print(f"❌ 关键错误：Word模板文件不存在 {os.path.abspath(template_path)}")
+            print(f"[ERROR] 关键错误：Word模板文件不存在 {os.path.abspath(template_path)}")
             return
 
         # ========== 数据准备阶段 ========== 
@@ -137,9 +137,9 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
             if os.path.exists(json_data):
                 try:
                     os.remove(json_data)
-                    print(f"🗑️ 已清除旧版JSON文件：{json_data}")
+                    print(f"[DELETE] 已清除旧版JSON文件：{json_data}")
                 except Exception as e:
-                    print(f"❌ 删除旧JSON文件失败：{str(e)}")
+                    print(f"[ERROR] 删除旧JSON文件失败：{str(e)}")
                     return
 
             # 处理Doc/Docx生成新JSON
@@ -163,13 +163,13 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
                         sys.exit(1)
                 processed_doc_path = dc.convert_doc_to_docx(input_file, temp_dir)
             elif not input_file.lower().endswith('.docx'):
-                print(f"❌ 不支持的文件格式: {input_file}。仅支持.doc和.docx格式。")
+                print(f"[ERROR] 不支持的文件格式: {input_file}。仅支持.doc和.docx格式。")
                 return
 
             # 提取原始数据
             raw_resume_data = dj.extract_resume_universal(processed_doc_path)
             if not raw_resume_data:
-                print("❌ Doc/Docx提取数据失败，请检查文档格式")
+                print("[ERROR] Doc/Docx提取数据失败，请检查文档格式")
                 return
 
             # 从文件名中提取工号
@@ -178,22 +178,22 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
             # 转换为模板格式
             result = dj.convert_to_template_format(raw_resume_data, emp_no)
             if not result:
-                print("❌ Doc/Docx转换JSON失败，请检查文档数据格式")
+                print("[ERROR] Doc/Docx转换JSON失败，请检查文档数据格式")
                 return
 
             # 保存新版JSON文件
             try:
                 with open(json_data, 'w', encoding='utf-8') as f:
                     json.dump(result, f, ensure_ascii=False, indent=4)
-                print(f"✅ 已生成新版JSON文件：{json_data}")
+                print(f"[OK] 已生成新版JSON文件：{json_data}")
             except Exception as e:
-                print(f"❌ JSON文件保存失败：{str(e)}")
+                print(f"[ERROR] JSON文件保存失败：{str(e)}")
                 return
         else:
             # 如果input_file为None，说明是批量生成模式，直接使用已有JSON文件
             print(f"\n📋 批量生成模式：使用现有JSON文件 {os.path.basename(json_data)}")
             if not os.path.exists(json_data):
-                print(f"❌ JSON文件不存在：{json_data}")
+                print(f"[ERROR] JSON文件不存在：{json_data}")
                 return
 
         # ========== 简历生成阶段 ========== 
@@ -202,7 +202,7 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
             data = json.load(f)
             
             if not data:
-                print("❌ JSON数据为空，终止流程")
+                print("[ERROR] JSON数据为空，终止流程")
                 return
             
             # 从文件名中提取工号，用于匹配info_json中的信息
@@ -226,12 +226,12 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
                         info_data = json.load(info_f)
                         if "AddtionInfo" in info_data:
                             additional_info = info_data["AddtionInfo"]
-                            print(f"✅ 成功加载{emp_no}的额外信息")
+                            print(f"[OK] 成功加载{emp_no}的额外信息")
                 except Exception as e:
-                    print(f"⚠️  读取额外信息文件出错: {str(e)}")
+                    print(f"[WARNING] 读取额外信息文件出错: {str(e)}")
             else:
                 # 直接使用正确的路径变量，确保没有额外字符
-                print(f"ℹ️  未找到{emp_no}的额外信息文件: {info_json_file}")
+                print(f"[INFO] 未找到{emp_no}的额外信息文件: {info_json_file}")
             
             # 将AdditionInfo添加到每个人员的数据中
             if additional_info:
@@ -273,10 +273,10 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
             print(f"🏁 处理完成！成功率 {success_count}/{len(valid_names)}")
             print(f"📁 输出路径：{os.path.abspath(output_folder)}")
             if len(valid_names) > success_count:
-                print("⚠️  失败详情请查看上方错误提示")
+                print("[WARNING] 失败详情请查看上方错误提示")
 
     except Exception as e:
-        print(f"\n❌ 全局异常：{str(e)}")
+        print(f"\n[ERROR] 全局异常：{str(e)}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

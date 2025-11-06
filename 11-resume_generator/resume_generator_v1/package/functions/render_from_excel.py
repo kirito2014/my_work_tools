@@ -72,12 +72,12 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
         # ========== 前置检查阶段 ========== 
         # 验证Excel文件存在性
         if not os.path.isfile(input_file):
-            print(f"❌ 关键错误：Excel源文件不存在 {os.path.abspath(input_file)}")
+            print(f"[ERROR] 关键错误：Excel源文件不存在 {os.path.abspath(input_file)}")
             return
 
         # 验证模板文件存在性
         if not os.path.isfile(template_path):
-            print(f"❌ 关键错误：Word模板文件不存在 {os.path.abspath(template_path)}")
+            print(f"[ERROR] 关键错误：Word模板文件不存在 {os.path.abspath(template_path)}")
             return
 
         # ========== 数据准备阶段 ==========
@@ -85,45 +85,45 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
         if os.path.exists(json_data):
             try:
                 os.remove(json_data)
-                print(f"🗑️ 已清除旧版JSON文件：{json_data}")
+                print(f"[DELETE] 已清除旧版JSON文件：{json_data}")
             except Exception as e:
-                print(f"❌ 删除旧JSON文件失败：{str(e)}")
+                print(f"[ERROR] 删除旧JSON文件失败：{str(e)}")
                 return
 
         # 处理Excel生成新JSON
-        print("\n🔨 正在转换Excel数据...")
+        print("\n[PROCESS] 正在转换Excel数据...")
         result = ej.process_excel_to_json(input_file)
         
         if not result:
-            print("❌ Excel转换JSON失败，请检查Excel数据格式")
+            print("[ERROR] Excel转换JSON失败，请检查Excel数据格式")
             return
             
         # 保存新版JSON文件
         try:
             with open(json_data, 'w', encoding='utf-8') as f:
                 json.dump(result, f, ensure_ascii=False, indent=4)
-            print(f"✅ 已生成新版JSON文件：{json_data}")
+            print(f"[OK] 已生成新版JSON文件：{json_data}")
         except Exception as e:
-            print(f"❌ JSON文件保存失败：{str(e)}")
+            print(f"[ERROR] JSON文件保存失败：{str(e)}")
             return
 
         # ========== 简历生成阶段 ==========
-        print("\n📑 开始生成简历文档...")
+        print("\n[INFO] 开始生成简历文档...")
         with open(json_data, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
             if not data:
-                print("❌ JSON数据为空，终止流程")
+                print("[ERROR] JSON数据为空，终止流程")
                 return
 
             # 动态获取处理人员名单
             valid_names = []
             if person_names == "all":
                 valid_names = list(data.keys())
-                print(f"🔍 检测到需处理全部 {len(valid_names)} 位人员")
+                print(f"[INFO] 检测到需处理全部 {len(valid_names)} 位人员")
             else:
                 valid_names = [name for name in person_names if name in data]
-                print(f"🔍 指定处理 {len(valid_names)} 位人员，过滤无效名称 {len(person_names)-len(valid_names)} 个")
+                print(f"[INFO] 指定处理 {len(valid_names)} 位人员，过滤无效名称 {len(person_names)-len(valid_names)} 个")
 
             # 创建输出目录（自动处理已存在情况）
             create_output_folder(output_folder)
@@ -141,14 +141,14 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
                     success_count += 1
 
             # 生成统计报告
-            print("\n" + "="*40)
-            print(f"🏁 处理完成！成功率 {success_count}/{len(valid_names)}")
-            print(f"📁 输出路径：{os.path.abspath(output_folder)}")
+            print(f"\n" + "="*40)
+            print(f"[INFO] 处理完成！成功率 {success_count}/{len(valid_names)}")
+            print(f"[INFO] 输出路径：{os.path.abspath(output_folder)}")
             if len(valid_names) > success_count:
-                print("⚠️  失败详情请查看上方错误提示")
+                print("[WARNING] 失败详情请查看上方错误提示")
 
     except Exception as e:
-        print(f"\n❌ 全局异常：{str(e)}")
+        print(f"\n[ERROR] 全局异常：{str(e)}")
         sys.exit(1)
 
 # 配置文件（示例）

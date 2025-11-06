@@ -119,16 +119,16 @@ class ResumeGeneratorGUI:
     def _show_special_update_dialog(self):
         """显示特殊更新对话框"""
         # 创建新窗口
-        dialog = tk.Toplevel(self.root)
-        dialog.title("特殊更新")
-        dialog.geometry("600x500")
-        dialog.resizable(False, False)
+        self.special_dialog = tk.Toplevel(self.root)
+        self.special_dialog.title("特殊更新")
+        self.special_dialog.geometry("600x700")  # 增加高度以容纳日志栏
+        self.special_dialog.resizable(False, False)
         
         # 设置字体
         dialog_font = self.font_config['label']
         
         # 创建主框架
-        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame = ttk.Frame(self.special_dialog, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # 1. 文件选择部分
@@ -157,17 +157,7 @@ class ResumeGeneratorGUI:
         option_frame = ttk.LabelFrame(main_frame, text="更新选项", padding="10")
         option_frame.pack(fill=tk.X, pady=10)
         
-        # 更新方式下拉框
-        update_type_frame = ttk.Frame(option_frame)
-        update_type_frame.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(update_type_frame, text="更新方式:", font=dialog_font).pack(side=tk.LEFT, padx=5)
-        self.update_type_var = tk.StringVar(value="1")
-        update_type_combobox = ttk.Combobox(update_type_frame, textvariable=self.update_type_var, state="readonly", font=dialog_font, width=20)
-        update_type_combobox['values'] = ["只更新简历信息(1)", "只更新人员信息(2)", "更新全部信息(3)"]
-        update_type_combobox.pack(side=tk.LEFT, padx=5)
-        
-        # 人员编号输入框
+        # 人员编号输入框 - 移到最上面
         emp_frame = ttk.Frame(option_frame)
         emp_frame.pack(fill=tk.X, pady=5)
         
@@ -176,17 +166,39 @@ class ResumeGeneratorGUI:
         ttk.Entry(emp_frame, textvariable=self.employee_numbers_var, width=30, font=dialog_font).pack(side=tk.LEFT, padx=5)
         ttk.Label(emp_frame, text="多个用逗号分隔，全部更新请输入ALL", font=dialog_font).pack(side=tk.LEFT, padx=5)
         
+        # 提示标签 - 放在更新选项下面，更新方式上面
+        tip_frame = ttk.Frame(option_frame)
+        tip_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(tip_frame, text="提示: 全部更新时必须选择简历文件夹", font=("Microsoft YaHei", 9, "italic"), foreground="#3366CC").pack(anchor=tk.W, padx=5)
+        
+        # 更新方式下拉框
+        update_type_frame = ttk.Frame(option_frame)
+        update_type_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(update_type_frame, text="更新方式:", font=dialog_font).pack(side=tk.LEFT, padx=5)
+        self.update_type_var = tk.StringVar(value="选择更新方式")
+        update_type_combobox = ttk.Combobox(update_type_frame, textvariable=self.update_type_var, state="readonly", font=dialog_font, width=20)
+        update_type_combobox['values'] = ["1-只更新简历信息", "2-只更新人员信息", "3-更新全部信息"]
+        update_type_combobox.pack(side=tk.LEFT, padx=5)
+        
         # 3. 按钮部分
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=10)
         
-        ttk.Button(button_frame, text="执行更新", command=lambda: self._execute_special_update(dialog), style="Accent.TButton").pack(side=tk.LEFT, padx=10)
-        ttk.Button(button_frame, text="取消", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
+        ttk.Button(button_frame, text="执行更新", command=self._execute_special_update, style="Accent.TButton").pack(side=tk.LEFT, padx=10)
+        ttk.Button(button_frame, text="取消", command=self.special_dialog.destroy).pack(side=tk.LEFT, padx=10)
+        
+        # 4. 日志栏 - 集成到对话框内部
+        log_frame = ttk.LabelFrame(main_frame, text="执行日志", padding="10")
+        log_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        # 创建日志文本框
+        self.output_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, font=self.font_config['text'])
+        self.output_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # 居中显示
-        dialog.transient(self.root)
-        dialog.grab_set()
-        self.root.wait_window(dialog)
+        self.special_dialog.transient(self.root)
+        self.special_dialog.grab_set()
     
     def _select_folder(self, string_var):
         """选择文件夹"""
@@ -200,10 +212,14 @@ class ResumeGeneratorGUI:
         if file_path:
             string_var.set(file_path)
     
-    def _execute_special_update(self, dialog):
+    def _execute_special_update(self):
         """执行特殊更新"""
-        # 获取更新类型
+        # 验证是否选择了更新方式
         update_type = self.update_type_var.get()
+        if update_type == "选择更新方式":
+            messagebox.showerror("错误", "请选择执行方式")
+            return
+            
         update_option = 1 if "1" in update_type else 2 if "2" in update_type else 3
         
         # 获取人员编号
@@ -233,19 +249,9 @@ class ResumeGeneratorGUI:
         if resume_folder:
             cmd.extend(["--word", resume_folder])
         
-        # 关闭对话框
-        dialog.destroy()
-        
-        # 显示进度窗口
-        progress_window = tk.Toplevel(self.root)
-        progress_window.title("执行更新")
-        progress_window.geometry("500x200")
-        progress_window.transient(self.root)
-        progress_window.grab_set()
-        
-        # 添加输出文本框
-        output_text = scrolledtext.ScrolledText(progress_window, wrap=tk.WORD, font=self.font_config['text'])
-        output_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # 清空日志栏
+        self.output_text.delete(1.0, tk.END)
+        self.output_text.insert(tk.END, "开始执行更新操作...\n")
         
         # 实时更新输出的函数
         def update_output(process):
@@ -253,16 +259,16 @@ class ResumeGeneratorGUI:
                 line = process.stdout.readline()
                 if not line:
                     break
-                output_text.insert(tk.END, line)
-                output_text.see(tk.END)
+                self.special_dialog.after(0, lambda l=line: [
+                    self.output_text.insert(tk.END, l),
+                    self.output_text.see(tk.END)
+                ])
             
             # 处理完成后更新UI
-            progress_window.after(0, lambda: output_text.insert(tk.END, "\n更新完成！"))
-            progress_window.after(0, lambda: output_text.see(tk.END))
-            
-            # 添加完成按钮
-            done_button = ttk.Button(progress_window, text="完成", command=progress_window.destroy, style="Accent.TButton")
-            done_button.pack(pady=10)
+            self.special_dialog.after(0, lambda: [
+                self.output_text.insert(tk.END, "\n更新完成！"),
+                self.output_text.see(tk.END)
+            ])
         
         # 在新线程中执行命令
         def execute_command():
@@ -270,17 +276,16 @@ class ResumeGeneratorGUI:
                 process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
                                           text=True, cwd=base_dir)
                 
-                # 在主线程中更新UI
-                self.root.after(0, lambda: update_output(process))
+                # 更新输出
+                update_output(process)
                 
                 # 等待进程完成
                 process.wait()
             except Exception as e:
-                self.root.after(0, lambda: output_text.insert(tk.END, f"执行错误: {e}"))
-                self.root.after(0, lambda: output_text.see(tk.END))
-                self.root.after(0, lambda: ttk.Button(progress_window, text="完成", 
-                                                     command=progress_window.destroy, 
-                                                     style="Accent.TButton").pack(pady=10))
+                self.special_dialog.after(0, lambda: [
+                    self.output_text.insert(tk.END, f"执行错误: {e}\n"),
+                    self.output_text.see(tk.END)
+                ])
         
         # 启动执行线程
         threading.Thread(target=execute_command, daemon=True).start()
@@ -523,12 +528,12 @@ class ResumeGeneratorGUI:
             result = subprocess.run(get_emp_cmd, capture_output=True, text=True)
             
             if result.returncode == 0:
-                self._log("✅ get_emp_list脚本执行成功")
+                self._log("[OK] get_emp_list脚本执行成功")
                 for line in result.stdout.split('\n'):
                     if line.strip():
                         self._log(f"  {line.strip()}")
             else:
-                self._log("❌ get_emp_list脚本执行失败")
+                self._log("[ERROR] get_emp_list脚本执行失败")
                 for line in result.stderr.split('\n'):
                     if line.strip():
                         self._log(f"  {line.strip()}")
@@ -544,12 +549,12 @@ class ResumeGeneratorGUI:
             result = subprocess.run(excel_2_json_cmd, capture_output=True, text=True)
             
             if result.returncode == 0:
-                self._log("✅ excel_2_info_json脚本执行成功")
+                self._log("[OK] excel_2_info_json脚本执行成功")
                 for line in result.stdout.split('\n'):
                     if line.strip():
                         self._log(f"  {line.strip()}")
             else:
-                self._log("❌ excel_2_info_json脚本执行失败")
+                self._log("[ERROR] excel_2_info_json脚本执行失败")
                 for line in result.stderr.split('\n'):
                     if line.strip():
                         self._log(f"  {line.strip()}")
@@ -908,13 +913,13 @@ class ResumeGeneratorGUI:
             result = subprocess.run(get_emp_cmd, capture_output=True, text=True)
             
             if result.returncode == 0:
-                self._log("✅ get_emp_list脚本执行成功")
+                self._log("[OK] get_emp_list脚本执行成功")
                 # 输出脚本的部分关键信息
                 for line in result.stdout.split('\n'):
                     if any(keyword in line for keyword in ['成功保存', '共保存', '部门统计']):
                         self._log(f"  {line.strip()}")
             else:
-                self._log("❌ get_emp_list脚本执行失败")
+                self._log("[ERROR] get_emp_list脚本执行失败")
                 for line in result.stderr.split('\n'):
                     if line.strip():
                         self._log(f"  {line.strip()}")
@@ -922,7 +927,7 @@ class ResumeGeneratorGUI:
             # 加载员工信息
             self._update_progress(60)
             if not self._load_employee_info():
-                self._log("⚠️ 未找到员工信息，请先更新人员名单")
+                self._log("[WARNING] 未找到员工信息，请先更新人员名单")
                 return
             
             # 清空现有列表

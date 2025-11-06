@@ -41,9 +41,15 @@ def parse_employee_numbers(employee_arg):
         print("3. 工号1,工号2 - 逗号分隔的字符串")
         sys.exit(1)
 
-def update_resume_jsons(employee_numbers, excel_data, base_dir="output"):
+def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_dir=""):
     """
     更新简历JSON文件
+    
+    :param employee_numbers: 员工工号列表或"ALL"
+    :param excel_data: Excel数据
+    :param base_dir: 基础目录
+    :param word_dir: Word文档目录（可选）
+    :return: 更新的文件数量
     """
     resume_dir = os.path.join(base_dir, "modify_json")
     if not os.path.exists(resume_dir):
@@ -61,7 +67,102 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output"):
         # 格式化工号为5位数
         target_emp_numbers = [emp_no.zfill(5) for emp_no in employee_numbers]
     
-    # 查找并更新对应的简历JSON文件
+    # 如果提供了Word目录，先从Word文档生成/更新JSON
+    if word_dir and os.path.exists(word_dir):
+        print(f"\n正在从Word文档更新简历JSON...")
+        # 遍历Word目录中的文件，找到匹配的工号文件
+        for root, _, files in os.walk(word_dir):
+            for file in files:
+                if file.lower().endswith(('.doc', '.docx')):
+                    # 尝试从文件名提取工号
+                    file_emp_no = None
+                    # 文件名格式：工号+姓名.docx
+                    if '+' in file:
+                        file_emp_no = file.split('+')[0].strip()
+                    elif '_' in file:
+                        file_emp_no = file.split('_')[0].strip()
+                    
+                    # 如果文件名中提取到了工号，并且在目标工号列表中
+                    if file_emp_no and file_emp_no.zfill(5) in target_emp_numbers:
+                        file_path = os.path.join(root, file)
+                        print(f"  - 处理文件: {file}")
+                        
+                        try:
+                            # 动态导入doc_2_json模块
+                            import importlib.util
+                            dj_file_path = os.path.join(os.path.dirname(__file__), "doc_2_json.py")
+                            if os.path.exists(dj_file_path):
+                                spec = importlib.util.spec_from_file_location("doc_2_json", dj_file_path)
+                                dj = importlib.util.module_from_spec(spec)
+                                spec.loader.exec_module(dj)
+                                
+                                # 处理doc格式文件
+                                processed_doc_path = file_path
+                                if file_path.lower().endswith('.doc'):
+                                    print(f"  - 检测到doc格式文件，正在转换为docx...")
+                                    # 动态导入doc_converter模块
+                                    dc_file_path = os.path.join(os.path.dirname(__file__), "doc_converter.py")
+                                    if os.path.exists(dc_file_path):
+                                        spec = importlib.util.spec_from_file_location("doc_converter", dc_file_path)
+                                        dc = importlib.util.module_from_spec(spec)
+                                        spec.loader.exec_module(dc)
+                                        
+                                        # 创建临时目录
+                                        temp_dir = os.path.join(word_dir, "temp_converted")
+                                        os.makedirs(temp_dir, exist_ok=True)
+                                        
+                                        processed_doc_path = dc.convert_doc_to_docx(file_path, temp_dir)
+                                        print(f"  - 转换成功")
+                                    else:
+                                        print(f"  - [ERROR] 未找到doc_converter模块")
+                                        continue
+                                
+                                # 提取原始数据
+                                raw_resume_data = dj.extract_resume_universal(processed_doc_path)
+                                if not raw_resume_data:
+                                    print(f"  - [ERROR] 文档信息提取失败")
+                                    continue
+                                
+                                # 转换为模板格式
+                                template_data = dj.convert_to_template_format(raw_resume_data, file_emp_no)
+                                if not template_data:
+                                    print(f"  - [ERROR] 数据转换失败")
+                                    continue
+                                
+                                # 生成JSON文件名
+                                if template_data:
+                                    name = list(template_data.keys())[0]
+                                    json_filename = f"{file_emp_no.zfill(5)}_{name}_人员简历.json"
+                                    json_file = os.path.join(resume_dir, json_filename)
+                                    
+                                    # 保存JSON文件
+                                    with open(json_file, 'w', encoding='utf-8') as f:
+                                        json.dump(template_data, f, ensure_ascii=False, indent=4)
+                                    
+                                    print(f"  - [OK] 成功从Word文档生成JSON: {json_filename}")
+                                    
+                                    # 如果在Excel数据中找到该员工，更新AddtionInfo
+                                    if file_emp_no.zfill(5) in emp_map:
+                                        try:
+                                            resume_data = template_data
+                                            emp_data = emp_map[file_emp_no.zfill(5)]
+                                            if name in resume_data:
+                                                resume_data[name]["AddtionInfo"] = emp_data
+                                                # 写回文件
+                                                updated_content = json.dumps(resume_data, ensure_ascii=False, indent=4)
+                                                with open(json_file, 'w', encoding='utf-8') as f:
+                                                    f.write(updated_content)
+                                                print(f"  - [OK] 已更新AddtionInfo信息")
+                                        except Exception as e:
+                                            print(f"  - [ERROR] 更新AddtionInfo时出错: {e}")
+                                
+                        except Exception as e:
+                            print(f"  - [ERROR] 处理文件时出错: {e}")
+                            import traceback
+                            traceback.print_exc()
+    
+    # 查找并更新对应的简历JSON文件（使用Excel数据更新AddtionInfo）
+    print(f"\n正在更新简历JSON的AddtionInfo信息...")
     for emp_no in target_emp_numbers:
         if emp_no not in emp_map:
             print(f"警告: 工号 {emp_no} 在Excel数据中未找到")
@@ -82,28 +183,30 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output"):
                         # 解析JSON字符串为Python字典
                         resume_data = json.loads(file_content)
                     except json.JSONDecodeError as e:
-                        print(f"❌ 解析简历文件 {filename} 失败: {e}")
+                        print(f"[ERROR] 解析简历文件 {filename} 失败: {e}")
                         continue
                     
-                    # 获取员工姓名
+                    # 获取员工信息
                     emp_data = emp_map[emp_no]
-                    name = emp_data.get("Name", "未知")
                     
                     # 更新AddtionInfo
-                    if name in resume_data:
-                        resume_data[name]["AddtionInfo"] = emp_data
-                        # 将字典转换为JSON字符串并写回文件
-                        updated_content = json.dumps(resume_data, ensure_ascii=False, indent=2)
-                        write_file(file_path, updated_content)
-                        print(f"[OK] 已更新简历JSON: {filename}")
-                        updated_count += 1
-                        found = True
-                        break
+                    if resume_data:
+                        # 获取第一个键（通常是姓名）
+                        person_name = list(resume_data.keys())[0]
+                        if person_name in resume_data:
+                            resume_data[person_name]["AddtionInfo"] = emp_data
+                            # 将字典转换为JSON字符串并写回文件
+                            updated_content = json.dumps(resume_data, ensure_ascii=False, indent=2)
+                            write_file(file_path, updated_content)
+                            print(f"[OK] 已更新简历JSON: {filename}")
+                            updated_count += 1
+                            found = True
+                            break
                 except Exception as e:
-                    print(f"❌ 更新简历文件 {filename} 时出错: {e}")
+                    print(f"[ERROR] 更新简历文件 {filename} 时出错: {e}")
         
         if not found:
-            print(f"⚠️  未找到工号 {emp_no} 对应的简历JSON文件")
+            print(f"[WARNING] 未找到工号 {emp_no} 对应的简历JSON文件")
     
     return updated_count
 
@@ -190,7 +293,8 @@ def main():
             except Exception as e:
                 print(f"执行批量更新时出错: {e}")
         else:
-            resume_updated = update_resume_jsons(employee_numbers, excel_data)
+            # 如果提供了word参数，传递给update_resume_jsons函数
+            resume_updated = update_resume_jsons(employee_numbers, excel_data, word_dir=args.word)
             total_updated += resume_updated
     
     if args.update_option in [2, 3]:  # 更新信息JSON

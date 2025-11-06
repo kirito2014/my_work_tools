@@ -204,7 +204,7 @@ def save_employee_list(employee_list, output_file):
         
         return True
     except Exception as e:
-        print(f"❌ 保存员工列表时出错: {str(e)}")
+        print(f"[ERROR] 保存员工列表时出错: {str(e)}")
         traceback.print_exc()
         return False
 
@@ -243,7 +243,7 @@ def main():
     employee_list = get_employee_info(excel_file_path)
     
     if not employee_list:
-        print("❌ 没有成功提取任何员工数据，程序退出")
+        print("[ERROR] 没有成功提取任何员工数据，程序退出")
         sys.exit(1)
     
     # 保存员工列表

@@ -59,7 +59,7 @@ def convert_doc_to_docx(doc_path: str, output_dir: Optional[str] = None) -> str:
         # 等待一下确保文件保存完成
         time.sleep(1)
         
-        print(f"✅ 成功将 {file_name} 转换为 {docx_file_name}")
+        print(f"[OK] 成功将 {file_name} 转换为 {docx_file_name}")
         return docx_path
         
     except Exception as e:
