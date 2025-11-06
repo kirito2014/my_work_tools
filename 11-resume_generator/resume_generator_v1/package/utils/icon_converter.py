@@ -56,7 +56,7 @@ def convert_png_to_ico(png_path, ico_path=None, size=64):
                 # 保存为 ICO 文件
                 ico_img.save(ico_path, format='ICO', sizes=[(size, size)])
             
-            print(f"✓ 转换完成: {os.path.basename(ico_path)}")
+            print(f"[OK] 转换完成: {os.path.basename(ico_path)}")
             print(f"  尺寸: {size}x{size} 像素")
             print(f"  位置: {ico_path}")
             
@@ -76,14 +76,14 @@ def convert_png_to_ico(png_path, ico_path=None, size=64):
             # 保存为ICO
             img.save(ico_path, format='ICO', sizes=[(size, size)])
             
-            print(f"✓ 创建了占位ICO文件: {os.path.basename(ico_path)}")
+            print(f"[OK] 创建了占位ICO文件: {os.path.basename(ico_path)}")
             print("  警告: 无法正常处理PNG文件")
             print("  建议: 检查PNG文件是否损坏或格式正确")
             
             return True
                 
     except Exception as e:
-        print(f"✗ 转换失败: {str(e)}")
+        print(f"[ERR] 转换失败: {str(e)}")
         return False
 
 def batch_convert_png_to_ico(input_folder, output_folder=None, size=64):

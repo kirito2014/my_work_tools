@@ -137,6 +137,13 @@ class ResumeGeneratorGUI:
         # 将特殊更新菜单添加到菜单栏
         menubar.add_cascade(label="特殊更新", menu=special_menu)
         
+        # 创建银行管理菜单
+        bank_menu = tk.Menu(menubar, tearoff=0, font=self.font_config['button'])
+        bank_menu.add_command(label="银行管理", command=self._show_bank_management_dialog)
+        
+        # 将银行管理菜单添加到菜单栏
+        menubar.add_cascade(label="银行管理", menu=bank_menu)
+        
         # 设置菜单栏
         self.root.config(menu=menubar)
         
@@ -1222,6 +1229,20 @@ class ResumeGeneratorGUI:
             self._log(f"更新人员名单时出错: {str(e)}")
             import traceback
             self._log(traceback.format_exc())
+    
+    def _show_bank_management_dialog(self):
+        """显示银行管理对话框 - 调用独立子程序"""
+        try:
+            # 获取银行管理子程序的路径
+            bank_management_path = os.path.join(base_dir, 'package', 'utils', 'bank_management.py')
+            
+            # 在新进程中启动银行管理程序
+            subprocess.Popen([sys.executable, bank_management_path])
+            
+        except Exception as e:
+            messagebox.showerror("错误", f"启动银行管理程序失败: {str(e)}")
+        
+    # 银行管理相关方法已移至独立子程序 bank_management.py
     
     def _load_employee_info(self):
         """加载员工信息，用于部门筛选
