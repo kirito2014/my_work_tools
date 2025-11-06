@@ -410,26 +410,57 @@ class ResumeGeneratorGUI:
             success_count = 0
             failed_count = 0
             
-            for i, doc_file in enumerate(doc_files, 1):
-                self._preprocess_log(f"[PROCESS] 正在处理 ({i}/{total_files}): {os.path.basename(doc_file)}")
+            # 使用批处理函数进行转换，显著提高速度
+            if hasattr(doc_converter, 'batch_convert_docs_to_docx') and doc_files:
+                self._preprocess_log(f"[INFO] 开始批量转换文档...")
                 
-                try:
-                    # 调用doc_converter中的函数进行转换
-                    # 设置输出目录为原文件所在目录
-                    output_dir = os.path.dirname(doc_file)
-                    result = doc_converter.convert_doc_to_docx(doc_file, output_dir=output_dir)
+                # 分批处理，每批最多50个文件，避免Word处理太多文件时出现问题
+                batch_size = 50
+                for i in range(0, len(doc_files), batch_size):
+                    batch_files = doc_files[i:i + batch_size]
+                    batch_start = i + 1
+                    batch_end = min(i + batch_size, len(doc_files))
+                    self._preprocess_log(f"[INFO] 处理批次 {batch_start}-{batch_end}/{total_files}")
                     
-                    if result and os.path.exists(result):
-                        # 删除原doc文件
-                        os.remove(doc_file)
-                        success_count += 1
-                        self._preprocess_log(f"[OK] 已转换并删除原文件: {os.path.basename(doc_file)}")
-                    else:
+                    # 调用批处理函数
+                    results = doc_converter.batch_convert_docs_to_docx(batch_files)
+                    
+                    # 处理转换结果
+                    for doc_path, docx_path, success in results:
+                        file_name = os.path.basename(doc_path)
+                        if success and docx_path and os.path.exists(docx_path):
+                            # 删除原doc文件
+                            try:
+                                os.remove(doc_path)
+                                success_count += 1
+                                self._preprocess_log(f"[OK] 已转换并删除原文件: {file_name}")
+                            except Exception as e:
+                                self._preprocess_log(f"[WARNING] 转换成功但无法删除原文件 {file_name}: {str(e)}")
+                                success_count += 1
+                        else:
+                            failed_count += 1
+                            self._preprocess_log(f"[ERROR] 转换失败: {file_name}")
+            else:
+                # 降级使用单文件转换（兼容旧版本）
+                for i, doc_file in enumerate(doc_files, 1):
+                    self._preprocess_log(f"[PROCESS] 正在处理 ({i}/{total_files}): {os.path.basename(doc_file)}")
+                    
+                    try:
+                        # 调用doc_converter中的函数进行转换
+                        output_dir = os.path.dirname(doc_file)
+                        result = doc_converter.convert_doc_to_docx(doc_file, output_dir=output_dir)
+                        
+                        if result and os.path.exists(result):
+                            # 删除原doc文件
+                            os.remove(doc_file)
+                            success_count += 1
+                            self._preprocess_log(f"[OK] 已转换并删除原文件: {os.path.basename(doc_file)}")
+                        else:
+                            failed_count += 1
+                            self._preprocess_log(f"[ERROR] 转换失败: {os.path.basename(doc_file)}")
+                    except Exception as e:
                         failed_count += 1
-                        self._preprocess_log(f"[ERROR] 转换失败: {os.path.basename(doc_file)}")
-                except Exception as e:
-                    failed_count += 1
-                    self._preprocess_log(f"[ERROR] 处理{os.path.basename(doc_file)}时出错: {str(e)}")
+                        self._preprocess_log(f"[ERROR] 处理{os.path.basename(doc_file)}时出错: {str(e)}")
             
             # 输出处理结果
             self._preprocess_log(f"[DONE] 预处理完成!")
@@ -1517,8 +1548,37 @@ class ResumeGeneratorGUI:
                     self._log(f"目录不存在: {modify_dir}")
                     return
                 
+                # 初始化缺失员工列表和尝试更新的员工列表
+                missing_employees = []
+                updated_employees = []
+                
                 # 获取所有JSON文件
                 json_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
+                
+                # 检查是否需要按员工编号生成简历
+                if person_names != "all" and isinstance(person_names, list):
+                    self._log(f"开始处理 {len(person_names)} 个员工的简历生成请求")
+                    
+                    # 检查每个员工的JSON文件是否存在
+                    for emp_no in person_names:
+                        # 格式化员工编号为5位
+                        emp_no_padded = emp_no.zfill(5)
+                        # 查找匹配的JSON文件
+                        json_file_exists = any(f.startswith(emp_no_padded) for f in json_files)
+                        
+                        if not json_file_exists:
+                            self._log(f"未找到员工 {emp_no} 的简历JSON文件，尝试更新...")
+                            missing_employees.append(emp_no)
+                            
+                            # 尝试调用update_specific_jsons.py更新该员工的JSON文件
+                            updated = self._update_missing_employee_json(emp_no)
+                            if updated:
+                                updated_employees.append(emp_no)
+                    
+                    # 重新获取JSON文件列表，包含可能刚更新的文件
+                    json_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
+                
+                # 获取所有JSON文件
                 if not json_files:
                     self._log("未找到JSON文件，请先解析简历")
                     return
@@ -1551,10 +1611,23 @@ class ResumeGeneratorGUI:
                     # 记录结果
                     self._log(f"批生成完成！成功: {success_count}，失败: {failed_count}")
                     self._log(f"输出目录: {os.path.join(base_dir, 'output', bankname)}")
+                    
+                    # 记录缺失员工信息
+                    if missing_employees:
+                        # 过滤掉已经更新成功的员工
+                        still_missing = [emp_no for emp_no in missing_employees if emp_no not in updated_employees]
+                        if still_missing:
+                            self._log(f"以下员工简历JSON文件仍然缺失，可能是对应人员的简历Word或信息不存在:")
+                            for emp_no in still_missing:
+                                self._log(f"  - 员工编号: {emp_no}")
+                        if updated_employees:
+                            self._log(f"成功更新了以下员工的简历JSON文件:")
+                            for emp_no in updated_employees:
+                                self._log(f"  - 员工编号: {emp_no}")
                 else:
                     # 如果模块导入失败，使用原有的生成逻辑
                     self._log("批生成模块不可用，使用备用生成逻辑")
-                    self._save_selected_emp_numbers(emp_numbers, None, bankname, person_names)
+                    self._save_selected_emp_numbers(person_names, None, bankname, person_names)
             except Exception as e:
                 self._log(f"生成简历过程中出错: {str(e)}")
         
@@ -1670,6 +1743,105 @@ class ResumeGeneratorGUI:
             
         except Exception as e:
             self._log(f"生成简历过程中出错: {str(e)}")
+    
+    def _update_missing_employee_json(self, emp_no):
+        """
+        更新缺失的员工JSON文件
+        
+        Args:
+            emp_no: 员工编号
+            
+        Returns:
+            bool: 更新是否成功
+        """
+        try:
+            # 构建update_specific_jsons.py的路径
+            update_script_path = os.path.join(base_dir, "package", "functions", "update_specific_jsons.py")
+            if not os.path.exists(update_script_path):
+                self._log(f"未找到更新脚本: {update_script_path}")
+                return False
+            
+            # 使用主程序中已选择的Excel文件路径
+            info_file = ""
+            # 检查是否有special_info_file变量(在特殊更新对话框中选择的)
+            if hasattr(self, 'special_info_file'):
+                info_file = self.special_info_file.get()
+            
+            # 如果没有特殊更新对话框中的文件，检查是否有其他可用的文件路径
+            if not info_file or not os.path.exists(info_file):
+                # 尝试默认的人员信息文件
+                default_info_file = os.path.join(base_dir, "input", "技术人员名单-11月.xlsx")
+                if os.path.exists(default_info_file):
+                    info_file = default_info_file
+                else:
+                    # 尝试其他可能的位置
+                    alt_info_file = os.path.join(base_dir, "input", "技术人员名单.xlsx")
+                    if os.path.exists(alt_info_file):
+                        info_file = alt_info_file
+                    else:
+                        self._log(f"未找到人员信息Excel文件")
+                        return False
+            
+            # 使用主程序中已选择的简历文件夹路径
+            resume_folder = ""
+            resume_folder_param = []
+            
+            # 检查是否有special_resume_folder变量(在特殊更新对话框中选择的)
+            if hasattr(self, 'special_resume_folder'):
+                resume_folder = self.special_resume_folder.get()
+            
+            # 如果没有特殊更新对话框中的文件夹，检查resume_file_path变量
+            if not resume_folder or not os.path.exists(resume_folder):
+                if hasattr(self, 'resume_file_path'):
+                    resume_folder = os.path.dirname(self.resume_file_path.get()) if self.resume_file_path.get() else ""
+                
+                # 如果还是没有，尝试默认的简历文件夹
+                if not resume_folder or not os.path.exists(resume_folder):
+                    default_resume_folder = os.path.join(base_dir, "input")
+                    if os.path.exists(default_resume_folder):
+                        resume_folder = default_resume_folder
+            
+            # 添加简历文件夹参数
+            if resume_folder and os.path.exists(resume_folder):
+                resume_folder_param = ["--word", resume_folder]
+                self._log(f"使用简历文件夹: {resume_folder}")
+            
+            # 调用update_specific_jsons.py更新简历和信息JSON
+            cmd = [
+                sys.executable,
+                update_script_path,
+                "3",  # 同时更新简历和信息JSON
+                emp_no,
+                "--excel",
+                info_file
+            ]
+            cmd.extend(resume_folder_param)
+            
+            self._log(f"正在执行更新脚本: {' '.join(cmd)}")
+            
+            # 执行命令
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                shell=True  # 在Windows上使用shell=True可能更可靠
+            )
+            
+            # 检查输出
+            if result.returncode == 0:
+                self._log(f"员工 {emp_no} 的JSON文件更新成功")
+                # 检查更新后的文件是否存在
+                modify_dir = os.path.join(base_dir, "output", "modify_json")
+                json_files = [f for f in os.listdir(modify_dir) if f.startswith(emp_no.zfill(5)) and f.endswith('.json')]
+                return len(json_files) > 0
+            else:
+                self._log(f"员工 {emp_no} 的JSON文件更新失败")
+                self._log(f"错误输出: {result.stderr}")
+                return False
+                
+        except Exception as e:
+            self._log(f"更新员工 {emp_no} 的JSON文件时出错: {str(e)}")
+            return False
     
     def _log(self, message):
         """在日志区域显示消息"""
