@@ -164,12 +164,7 @@ class ResumeGeneratorGUI:
         ttk.Label(emp_frame, text="人员编号:", font=dialog_font).pack(side=tk.LEFT, padx=5)
         self.employee_numbers_var = tk.StringVar()
         ttk.Entry(emp_frame, textvariable=self.employee_numbers_var, width=30, font=dialog_font).pack(side=tk.LEFT, padx=5)
-        ttk.Label(emp_frame, text="多个用逗号分隔，全部更新请输入ALL", font=dialog_font).pack(side=tk.LEFT, padx=5)
-        
-        # 提示标签 - 放在更新选项下面，更新方式上面
-        tip_frame = ttk.Frame(option_frame)
-        tip_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(tip_frame, text="提示: 全部更新时必须选择简历文件夹", font=("Microsoft YaHei", 9, "italic"), foreground="#3366CC").pack(anchor=tk.W, padx=5)
+        #ttk.Label(emp_frame, text="多个用逗号分隔，全部更新请输入ALL", font=dialog_font).pack(side=tk.LEFT, padx=5)
         
         # 更新方式下拉框
         update_type_frame = ttk.Frame(option_frame)
@@ -181,12 +176,21 @@ class ResumeGeneratorGUI:
         update_type_combobox['values'] = ["1-只更新简历信息", "2-只更新人员信息", "3-更新全部信息"]
         update_type_combobox.pack(side=tk.LEFT, padx=5)
         
+        # 提示标签 - 放在更新选项下面，更新方式上面
+        tip_frame = ttk.Frame(option_frame)
+        tip_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(tip_frame, text="使用提示:\n1-选择简历文件夹\n2-选择人员文件\n3-输入人员编号多个用逗号分隔，全部更新请输入ALL\n4-选择更新方式\n5-点击执行更新", font=("Microsoft YaHei", 9, "italic"), foreground="#3366CC").pack(anchor=tk.W, padx=5)
+        
         # 3. 按钮部分
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=10)
         
-        ttk.Button(button_frame, text="执行更新", command=self._execute_special_update, style="Accent.TButton").pack(side=tk.LEFT, padx=10)
-        ttk.Button(button_frame, text="取消", command=self.special_dialog.destroy).pack(side=tk.LEFT, padx=10)
+        # 创建执行操作frame包裹按钮
+        action_frame = ttk.LabelFrame(button_frame, text="执行操作", padding="10")
+        action_frame.pack(fill=tk.X, padx=10)
+        
+        ttk.Button(action_frame, text="执行更新", command=self._execute_special_update, style="Accent.TButton").pack(side=tk.LEFT, padx=10)
+        ttk.Button(action_frame, text="取消", command=self.special_dialog.destroy).pack(side=tk.LEFT, padx=10)
         
         # 4. 日志栏 - 集成到对话框内部
         log_frame = ttk.LabelFrame(main_frame, text="执行日志", padding="10")
