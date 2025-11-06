@@ -65,6 +65,23 @@ try:
             spec.loader.exec_module(batch_render_module)
         else:
             print(f"警告: 未找到 batch_render_from_docx.py 文件在路径: {batch_render_path}")
+    
+    # 动态导入doc_converter模块
+    doc_converter = None
+    try:
+        from package.functions import doc_converter
+    except ImportError:
+        try:
+            import package.functions.doc_converter
+        except ImportError:
+            doc_converter_path = os.path.join(base_dir, 'package', 'functions', 'doc_converter.py')
+            if os.path.exists(doc_converter_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("doc_converter", doc_converter_path)
+                doc_converter = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(doc_converter)
+            else:
+                print(f"警告: 未找到 doc_converter.py 文件在路径: {doc_converter_path}")
 except Exception as e:
     print(f"导入模块时出错: {e}")
 
@@ -101,6 +118,8 @@ class ResumeGeneratorGUI:
         
         # 创建文件菜单
         file_menu = tk.Menu(menubar, tearoff=0, font=self.font_config['button'])
+        file_menu.add_command(label="预处理", command=self._show_preprocess_dialog)
+        file_menu.add_separator()
         file_menu.add_command(label="退出", command=self._quit_app)
         
         # 将文件菜单添加到菜单栏
@@ -298,6 +317,159 @@ class ResumeGeneratorGUI:
         """退出应用程序"""
         if messagebox.askyesno("确认退出", "确定要退出简历生成器吗？"):
             self.root.quit()
+    
+    def _show_preprocess_dialog(self):
+        """显示预处理对话框"""
+        # 创建新窗口
+        self.preprocess_dialog = tk.Toplevel(self.root)
+        self.preprocess_dialog.title("预处理")
+        self.preprocess_dialog.geometry("600x500")
+        self.preprocess_dialog.resizable(False, False)
+        
+        # 设置字体
+        dialog_font = self.font_config['label']
+        
+        # 创建主框架
+        main_frame = ttk.Frame(self.preprocess_dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 1. 文件夹选择部分
+        folder_frame = ttk.LabelFrame(main_frame, text="文件夹选择", padding="10")
+        folder_frame.pack(fill=tk.X, pady=10)
+        
+        # 简历文件夹选择
+        resume_folder_frame = ttk.Frame(folder_frame)
+        resume_folder_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(resume_folder_frame, text="简历文件夹:", font=dialog_font).pack(side=tk.LEFT, padx=5)
+        self.preprocess_resume_folder = tk.StringVar()
+        ttk.Entry(resume_folder_frame, textvariable=self.preprocess_resume_folder, width=40, font=dialog_font).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        ttk.Button(resume_folder_frame, text="浏览", command=lambda: self._select_folder(self.preprocess_resume_folder)).pack(side=tk.LEFT, padx=5)
+        
+        # 2. 执行操作部分 - 添加外框
+        action_frame = ttk.LabelFrame(main_frame, text="执行操作", padding="10")
+        action_frame.pack(fill=tk.X, pady=10)
+        
+        # 添加开始处理和取消按钮到执行操作外框内
+        button_frame = ttk.Frame(action_frame)
+        button_frame.pack(fill=tk.X, pady=5, side=tk.RIGHT)
+        ttk.Button(button_frame, text="开始处理", command=self._execute_preprocess).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(button_frame, text="取消", command=self.preprocess_dialog.destroy).pack(side=tk.RIGHT, padx=5)
+        
+        # 3. 日志显示部分 - 放在最下方
+        log_frame = ttk.LabelFrame(main_frame, text="处理日志", padding="10")
+        log_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        # 创建日志文本框
+        self.preprocess_log = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, width=60, height=8, font=dialog_font)
+        self.preprocess_log.pack(fill=tk.BOTH, expand=True)
+        self.preprocess_log.config(state=tk.DISABLED)
+        
+        # 设置对话框属性，确保在选择文件夹后保持可见
+        self.preprocess_dialog.transient(self.root)
+        self.preprocess_dialog.grab_set()
+    
+    def _execute_preprocess(self):
+        """执行预处理操作"""
+        resume_folder = self.preprocess_resume_folder.get()
+        
+        if not resume_folder or not os.path.exists(resume_folder):
+            messagebox.showerror("错误", "请选择有效的简历文件夹")
+            return
+        
+        # 清空日志
+        self.preprocess_log.config(state=tk.NORMAL)
+        self.preprocess_log.delete(1.0, tk.END)
+        self.preprocess_log.config(state=tk.DISABLED)
+        
+        # 在后台线程中执行预处理
+        threading.Thread(target=self._preprocess_thread, args=(resume_folder,), daemon=True).start()
+    
+    def _preprocess_thread(self, resume_folder):
+        """预处理线程"""
+        try:
+            # 检查doc_converter模块是否加载成功
+            if doc_converter is None:
+                self._preprocess_log(f"[ERROR] 未找到doc_converter模块，无法进行预处理")
+                messagebox.showerror("错误", "未找到doc_converter模块，无法进行预处理")
+                return
+            
+            self._preprocess_log(f"[INFO] 开始预处理文件夹: {resume_folder}")
+            
+            # 获取文件夹中的所有doc文件
+            doc_files = []
+            for root, _, files in os.walk(resume_folder):
+                for file in files:
+                    if file.lower().endswith('.doc') and not file.startswith('~$'):
+                        doc_files.append(os.path.join(root, file))
+            
+            total_files = len(doc_files)
+            self._preprocess_log(f"[INFO] 找到 {total_files} 个doc文件")
+            
+            # 转换每个doc文件
+            success_count = 0
+            failed_count = 0
+            
+            for i, doc_file in enumerate(doc_files, 1):
+                self._preprocess_log(f"[PROCESS] 正在处理 ({i}/{total_files}): {os.path.basename(doc_file)}")
+                
+                try:
+                    # 调用doc_converter中的函数进行转换
+                    # 设置输出目录为原文件所在目录
+                    output_dir = os.path.dirname(doc_file)
+                    result = doc_converter.convert_doc_to_docx(doc_file, output_dir=output_dir)
+                    
+                    if result and os.path.exists(result):
+                        # 删除原doc文件
+                        os.remove(doc_file)
+                        success_count += 1
+                        self._preprocess_log(f"[OK] 已转换并删除原文件: {os.path.basename(doc_file)}")
+                    else:
+                        failed_count += 1
+                        self._preprocess_log(f"[ERROR] 转换失败: {os.path.basename(doc_file)}")
+                except Exception as e:
+                    failed_count += 1
+                    self._preprocess_log(f"[ERROR] 处理{os.path.basename(doc_file)}时出错: {str(e)}")
+            
+            # 输出处理结果
+            self._preprocess_log(f"[DONE] 预处理完成!")
+            self._preprocess_log(f"[INFO] 成功: {success_count} 个文件")
+            self._preprocess_log(f"[INFO] 失败: {failed_count} 个文件")
+            
+            # 显示完成消息
+            self.root.after(0, lambda: messagebox.showinfo("完成", f"预处理完成!\n成功: {success_count} 个文件\n失败: {failed_count} 个文件"))
+            
+        except Exception as e:
+            error_msg = f"预处理过程中出错: {str(e)}"
+            self._preprocess_log(f"[ERROR] {error_msg}")
+            self.root.after(0, lambda: messagebox.showerror("错误", error_msg))
+    
+    def _preprocess_log(self, message):
+        """向预处理日志添加消息"""
+        self.root.after(0, lambda: self._append_preprocess_log(message))
+    
+    def _append_preprocess_log(self, message):
+        """追加日志消息"""
+        try:
+            # 确保文本框状态为可编辑
+            if self.preprocess_log['state'] == tk.DISABLED:
+                self.preprocess_log.config(state=tk.NORMAL)
+            
+            # 插入日志消息并添加换行
+            self.preprocess_log.insert(tk.END, message + "\n")
+            
+            # 确保滚动到底部显示最新日志
+            self.preprocess_log.see(tk.END)
+            
+            # 更新界面显示
+            self.preprocess_log.update_idletasks()
+            
+        except Exception as e:
+            # 发生异常时也确保恢复文本框状态
+            print(f"追加日志时出错: {str(e)}")
+        finally:
+            # 无论如何都将文本框设置为只读状态
+            self.preprocess_log.config(state=tk.DISABLED)
         
     def _setup_fonts(self):
         # 设置中文字体为微软雅黑
