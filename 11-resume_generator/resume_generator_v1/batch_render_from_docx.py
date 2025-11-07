@@ -467,4 +467,10 @@ if __name__ == "__main__":
     print(f"模板文件: {template_path}")
     print(f"银行名称: {bankname}")
     
+    # 首先处理文件（转换doc到docx）
     batch_process_resumes(input_folder, template_path, bankname)
+    
+    # 然后批量生成简历
+    modify_json_dir = os.path.join(project_root, 'output', 'modify_json')
+    print(f"\n开始批量生成简历...")
+    batch_generate_resumes(modify_json_dir, template_path, bankname)

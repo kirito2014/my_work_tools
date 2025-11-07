@@ -60,11 +60,32 @@ def generate_resume_from_json(person_data, template_path, output_folder, person_
     :return: 生成的简历文件路径。
     """
     try:
+        # 修复可能的类型错误，确保数字类型才会被round操作处理
+        # 递归检查并转换可能存在的数字字符串
+        def sanitize_data(data):
+            if isinstance(data, dict):
+                return {key: sanitize_data(value) for key, value in data.items()}
+            elif isinstance(data, list):
+                return [sanitize_data(item) for item in data]
+            elif isinstance(data, str):
+                # 尝试将数字字符串转换为数字类型
+                try:
+                    if '.' in data:
+                        return float(data)
+                    else:
+                        return int(data)
+                except ValueError:
+                    return data
+            return data
+        
+        # 清理数据以避免类型错误
+        sanitized_data = sanitize_data(person_data)
+        
         # 加载Word模板
         doc = DocxTemplate(template_path)
 
         # 渲染模板
-        doc.render(person_data)
+        doc.render(sanitized_data)
 
         # 生成文件名
         current_date = datetime.now().strftime("%Y%m%d")
