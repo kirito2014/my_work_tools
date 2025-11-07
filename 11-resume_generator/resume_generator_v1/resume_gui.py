@@ -7,6 +7,11 @@ import json
 import subprocess
 import threading
 from datetime import datetime, date
+# 导入PIL用于图像处理
+try:
+    from PIL import Image, ImageTk
+except ImportError:
+    print("警告: 未找到PIL模块，请先安装: pip install pillow")
 
 # 导入ttkthemes以使用arc主题
 try:
@@ -644,9 +649,10 @@ class ResumeGeneratorGUI:
         bank_frame = ttk.Frame(generate_frame)
         bank_frame.pack(fill=tk.X, pady=5)
         
-        # Logo占位
-        logo_label = ttk.Label(bank_frame, text="LOGO", width=10, relief="solid")
-        logo_label.pack(side=tk.LEFT, padx=5)
+        # Logo显示
+        self.logo_label = ttk.Label(bank_frame, width=10, relief="solid")
+        # 使用padding来控制大小
+        self.logo_label.pack(side=tk.LEFT, padx=5, pady=5)
         
         # 银行下拉框
         ttk.Label(bank_frame, text="银行:", font=self.font_config['label']).pack(side=tk.LEFT, padx=5)
@@ -655,6 +661,12 @@ class ResumeGeneratorGUI:
         self.bank_combobox['values'] = self._get_bank_list()
         self.bank_combobox.pack(side=tk.LEFT, padx=5)
         self.bank_combobox.current(0)
+        
+        # 绑定银行选择事件，更新logo
+        self.bank_combobox.bind("<<ComboboxSelected>>", self._update_bank_logo)
+        
+        # 初始加载默认银行的logo
+        self._update_bank_logo()
         
         # 生成简历按钮
         ttk.Button(bank_frame, text="生成简历", command=self._generate_resumes, width=10, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
@@ -696,8 +708,68 @@ class ResumeGeneratorGUI:
         style.configure("TTreeview", font=self.font_config['text'])
     
     def _get_bank_list(self):
-        # 模拟银行列表
-        return ["长亮科技", "测试银行", "招商银行", "建设银行", "工商银行", "农业银行"]
+        # 从配置文件读取银行列表
+        bank_list = []
+        config_path = os.path.join(base_dir, 'config', 'bank_list.config')
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    bank_list = [line.strip() for line in f if line.strip()]
+        except Exception as e:
+            self._log(f"读取银行列表出错: {str(e)}")
+        
+        # 如果没有读取到银行列表，使用默认值
+        if not bank_list:
+            bank_list = ["长亮科技", "测试银行", "招商银行", "建设银行", "工商银行", "农业银行"]
+        
+        return bank_list
+    
+    def _update_bank_logo(self, event=None):
+        """根据选择的银行更新logo显示"""
+        bank_name = self.bank_var.get()
+        if not bank_name:
+            return
+        
+        # 查找logo文件路径（支持ico和png格式）
+        bank_pics_dir = os.path.join(base_dir, 'resources', 'bank_pics')
+        logo_path = None
+        
+        # 尝试不同的扩展名
+        for ext in ['.ico', '.png']:
+            candidate = os.path.join(bank_pics_dir, f'{bank_name}{ext}')
+            if os.path.exists(candidate):
+                logo_path = candidate
+                break
+        
+        # 如果找到了logo文件，加载并显示
+        if logo_path and 'Image' in globals() and 'ImageTk' in globals():
+            try:
+                # 加载图像
+                image = Image.open(logo_path)
+                # 调整大小为32x32像素
+                image = image.resize((32, 32), Image.LANCZOS)
+                
+                # 处理透明背景问题，创建白色背景
+                if image.mode == 'RGBA':
+                    # 创建一个白色背景的新图像
+                    background = Image.new('RGB', (32, 32), (255, 255, 255))
+                    # 将原图粘贴到白色背景上，保留透明度
+                    background.paste(image, mask=image.split()[3])  # 3是alpha通道
+                    image = background
+                
+                # 转换为Tkinter可用的格式
+                photo = ImageTk.PhotoImage(image)
+                # 更新标签图像
+                self.logo_label.config(image=photo)
+                # 保存引用防止被垃圾回收
+                self.logo_label.photo = photo
+            except Exception as e:
+                self._log(f"加载银行logo出错: {str(e)}")
+                # 显示默认文本
+                self.logo_label.config(image='', text="无Logo")
+        else:
+            # 没有找到logo或缺少PIL模块
+            self.logo_label.config(image='', text="无Logo")
     
     def _select_file(self):
         """选择简历文件夹路径"""
