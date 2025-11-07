@@ -407,6 +407,7 @@ class ResumeGeneratorGUI:
         self.preprocess_log.config(state=tk.DISABLED)
         
         # 在后台线程中执行预处理
+        self._log("启动简历预处理工具...")
         threading.Thread(target=self._preprocess_thread, args=(resume_folder,), daemon=True).start()
     
     def _preprocess_thread(self, resume_folder):
@@ -1316,6 +1317,7 @@ class ResumeGeneratorGUI:
             bank_management_path = os.path.join(base_dir, 'package', 'utils', 'bank_management.py')
             
             # 在新进程中启动银行管理程序
+            self._log("启动银行管理工具...")
             process = subprocess.Popen([sys.executable, bank_management_path])
             
             # 创建一个线程来等待银行管理程序关闭并刷新银行列表

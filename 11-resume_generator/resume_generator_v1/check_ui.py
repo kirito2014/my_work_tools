@@ -66,7 +66,7 @@ class ResumeValidationUI:
         self.start_button = ttk.Button(control_frame, text="开始校验", command=self._start_validation)
         self.start_button.pack(side=tk.LEFT, padx=5, pady=5)
         
-        self.cancel_button = ttk.Button(control_frame, text="取消", command=self._cancel_validation, state=tk.DISABLED)
+        self.cancel_button = ttk.Button(control_frame, text="取消", command=self._cancel_validation, state=tk.NORMAL)
         self.cancel_button.pack(side=tk.LEFT, padx=5, pady=5)
         
         # 进度条区域
@@ -138,10 +138,12 @@ class ResumeValidationUI:
         self._check_thread_status()
     
     def _cancel_validation(self):
-        """取消校验"""
+        """取消校验并关闭窗口"""
         if hasattr(self, 'stop_event'):
             self.stop_event.set()
             self._log("正在取消校验...")
+        # 关闭窗口
+        self.root.destroy()
     
     def _validation_thread(self, folder_path, json_files):
         """校验线程"""
