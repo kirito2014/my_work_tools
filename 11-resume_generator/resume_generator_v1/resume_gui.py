@@ -1096,14 +1096,81 @@ class ResumeGeneratorGUI:
             self._log(f"文件夹不存在或不是有效文件夹: {folder_path}")
             return
         
-        self._log(f"开始批量解析文件夹: {folder_path}")
+        self._log(f"===== 开始批量解析文件夹: {folder_path} =====")
         self.progress_var.set(0)
         self.progress_label.config(text="0%")
         
-        # 在新线程中执行批量转换
-        thread = threading.Thread(target=self._batch_convert_to_json, args=(folder_path,))
-        thread.daemon = True
-        thread.start()
+        # 使用事件来同步线程
+        conversion_completed = threading.Event()
+        conversion_result = {"success": False, "error": None}
+        
+        # 定义文件转换线程函数
+        def convert_files():
+            try:
+                self._log("【步骤1】开始执行文件批量转换...")
+                # 直接调用_batch_convert_to_json执行转换
+                self._batch_convert_to_json(folder_path)
+                conversion_result["success"] = True
+                self._log("文件批量转换完成")
+            except Exception as e:
+                error_msg = f"文件转换出错: {str(e)}"
+                self._log(error_msg)
+                conversion_result["error"] = error_msg
+                import traceback
+                self._log(f"错误堆栈: {traceback.format_exc()}")
+            finally:
+                # 无论成功失败，都设置事件
+                conversion_completed.set()
+        
+        # 定义主处理线程函数
+        def main_process():
+            try:
+                # 启动转换线程
+                convert_thread = threading.Thread(target=convert_files)
+                convert_thread.daemon = True
+                convert_thread.start()
+                
+                # 等待转换完成
+                self._log("正在等待文件转换完成...")
+                conversion_completed.wait()
+                
+                # 额外等待1秒确保文件系统操作完成
+                import time
+                time.sleep(1)
+                
+                # 检查转换结果
+                if not conversion_result["success"]:
+                    self._log(f"转换失败，无法继续更新AdditionInfo: {conversion_result['error']}")
+                    return
+                
+                # 转换完成后更新AdditionInfo信息
+                self._log("【步骤2】开始执行AdditionInfo信息更新...")
+                # 连续执行两次更新，确保信息正确写入
+                update_success1 = self._update_addition_info()
+                self._log("执行第二次AdditionInfo信息更新以确保可靠性...")
+                update_success2 = self._update_addition_info()
+                
+                if update_success1 and update_success2:
+                    self._log("===== 解析和AdditionInfo更新任务完成 =====")
+                    # 显示成功消息给用户
+                    self.root.after(0, lambda: messagebox.showinfo("成功", "文件解析和AdditionInfo更新已完成！"))
+                else:
+                    self._log("警告: AdditionInfo更新未成功或部分失败")
+                    self.root.after(0, lambda: messagebox.showwarning("警告", "文件解析完成，但AdditionInfo更新可能未成功，请检查日志。"))
+            except Exception as e:
+                self._log(f"===== 执行解析和更新过程中出错 =====")
+                self._log(f"错误详情: {str(e)}")
+                import traceback
+                self._log(f"错误堆栈: {traceback.format_exc()}")
+                self.root.after(0, lambda: messagebox.showerror("错误", f"执行过程中出错: {str(e)}"))
+            finally:
+                self.progress_var.set(0)
+                self.progress_label.config(text="0%")
+        
+        # 在新线程中执行主处理流程
+        main_thread = threading.Thread(target=main_process)
+        main_thread.daemon = True
+        main_thread.start()
     
     def _toggle_person_list(self):
         """根据生成方式切换人员列表的显示状态"""
@@ -1694,14 +1761,188 @@ class ResumeGeneratorGUI:
         # 调用批量生成简历功能
         self._batch_generate_resumes_in_thread(bankname, person_names)
     
+    def _update_addition_info(self, person_names=None):
+        """更新modify_json目录下简历JSON文件的AdditionInfo信息，与update_specific_jsons.py选项1逻辑一致
+        
+        Args:
+            person_names: 可选的员工编号列表，若为None或"all"则更新所有文件
+        
+        Returns:
+            bool: 更新是否成功
+        """
+        try:
+            import os
+            import json
+            import importlib
+            
+            self._log("===== 开始更新AdditionInfo信息 ====")
+            
+            # 获取info_json和modify_json目录
+            info_dir = os.path.join(base_dir, "output", "info_json")
+            modify_dir = os.path.join(base_dir, "output", "modify_json")
+            
+            self._log(f"检查目录: info_dir={info_dir}, modify_dir={modify_dir}")
+            
+            if not os.path.exists(info_dir):
+                self._log(f"错误: info_json目录不存在: {info_dir}")
+                return False
+            
+            if not os.path.exists(modify_dir):
+                self._log(f"错误: modify_json目录不存在: {modify_dir}")
+                return False
+            
+            # 获取所有info_json文件
+            info_files = [f for f in os.listdir(info_dir) if f.endswith('.json')]
+            self._log(f"发现 {len(info_files)} 个info_json文件")
+            
+            if not info_files:
+                self._log("警告: 未找到info_json文件")
+                return False
+            
+            # 构建员工编号到AdditionInfo的映射
+            emp_addition_info_map = {}
+            for info_file in info_files:
+                try:
+                    with open(os.path.join(info_dir, info_file), 'r', encoding='utf-8') as f:
+                        info_data = json.load(f)
+                    
+                    # 检查文件中是否有员工编号信息
+                    if isinstance(info_data, dict):
+                        # 从文件名提取员工编号
+                        emp_no = info_file.split('_')[0]  # 假设文件名格式为 "工号_姓名_信息.json"
+                        
+                        # 查找AdditionInfo字段
+                        if 'AdditionInfo' in info_data and info_data['AdditionInfo']:
+                            emp_addition_info_map[emp_no] = info_data['AdditionInfo']
+                            self._log(f"  找到员工 {emp_no} 的AdditionInfo信息")
+                except Exception as e:
+                    self._log(f"  处理info文件 {info_file} 时出错: {e}")
+            
+            self._log(f"成功构建 {len(emp_addition_info_map)} 条员工AdditionInfo映射")
+            
+            # 获取所有简历JSON文件
+            resume_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
+            self._log(f"发现 {len(resume_files)} 个简历JSON文件")
+            
+            if not resume_files:
+                self._log("警告: 未找到简历JSON文件")
+                return False
+            
+            # 根据person_names过滤要更新的文件
+            files_to_update = []
+            if person_names and person_names != "all" and isinstance(person_names, list):
+                self._log(f"根据提供的工号列表过滤文件，工号数量: {len(person_names)}")
+                for resume_file in resume_files:
+                    file_emp_no = resume_file.split('_')[0]  # 从文件名提取工号
+                    if file_emp_no in person_names:
+                        files_to_update.append(resume_file)
+                self._log(f"过滤后需要更新的文件数量: {len(files_to_update)}")
+            else:
+                files_to_update = resume_files
+                self._log(f"将更新所有 {len(files_to_update)} 个简历文件")
+            
+            # 更新每个文件
+            updated_count = 0
+            skipped_count = 0
+            for resume_file in files_to_update:
+                try:
+                    file_emp_no = resume_file.split('_')[0]
+                    resume_path = os.path.join(modify_dir, resume_file)
+                    
+                    # 检查文件是否存在
+                    if not os.path.exists(resume_path):
+                        self._log(f"  跳过: 文件不存在 {resume_path}")
+                        skipped_count += 1
+                        continue
+                    
+                    # 检查是否有对应的AdditionInfo
+                    if file_emp_no in emp_addition_info_map:
+                        # 读取简历文件
+                        with open(resume_path, 'r', encoding='utf-8') as f:
+                            resume_data = json.load(f)
+                        
+                        # 更新AdditionInfo字段
+                        resume_data['AdditionInfo'] = emp_addition_info_map[file_emp_no]
+                        
+                        # 写回文件
+                        with open(resume_path, 'w', encoding='utf-8') as f:
+                            json.dump(resume_data, f, ensure_ascii=False, indent=4)
+                        
+                        updated_count += 1
+                        self._log(f"  已更新: {resume_file} - 成功添加AdditionInfo")
+                    else:
+                        self._log(f"  跳过: 未找到员工 {file_emp_no} 的AdditionInfo信息")
+                        skipped_count += 1
+                except Exception as e:
+                    self._log(f"  错误: 更新简历文件 {resume_file} 时出错: {e}")
+            
+            self._log(f"===== AdditionInfo信息更新完成 =====")
+            self._log(f"成功更新: {updated_count} 个文件")
+            self._log(f"跳过: {skipped_count} 个文件")
+            return updated_count > 0
+        except Exception as e:
+            self._log(f"===== 更新AdditionInfo信息时发生严重错误 =====")
+            self._log(f"错误详情: {str(e)}")
+            import traceback
+            self._log(f"错误堆栈: {traceback.format_exc()}")
+            return False
+    
     def _batch_generate_resumes_in_thread(self, bankname, person_names):
         """在新线程中执行批量生成简历，避免GUI卡顿"""
+        self._log(f"===== 开始生成简历 ===== 银行: {bankname}, 人员: {len(person_names) if isinstance(person_names, list) else '全部'}")
+        
         def generate_thread():
             try:
+                import time
+                
+                # 使用事件来同步AdditionInfo更新操作
+                addition_info_updated = threading.Event()
+                update_result = {"success": False}
+                
+                # 定义AdditionInfo更新线程函数
+                def update_addition_info():
+                    try:
+                        self._log("【步骤1】开始执行AdditionInfo信息更新...")
+                        # 执行两次更新以确保可靠性
+                        update_success1 = self._update_addition_info(person_names)
+                        self._log("执行第二次AdditionInfo信息更新以确保可靠性...")
+                        update_success2 = self._update_addition_info(person_names)
+                        update_result["success"] = update_success1 and update_success2
+                        
+                        if update_result["success"]:
+                            self._log("AdditionInfo信息更新成功完成")
+                        else:
+                            self._log("警告: AdditionInfo信息更新未完全成功")
+                    except Exception as e:
+                        self._log(f"AdditionInfo更新过程中出错: {str(e)}")
+                        import traceback
+                        self._log(f"错误堆栈: {traceback.format_exc()}")
+                    finally:
+                        addition_info_updated.set()
+                
+                # 启动AdditionInfo更新线程
+                update_thread = threading.Thread(target=update_addition_info)
+                update_thread.daemon = True
+                update_thread.start()
+                
+                # 等待更新完成
+                self._log("正在等待AdditionInfo更新操作完成...")
+                addition_info_updated.wait()
+                
+                # 额外等待1秒确保文件系统操作完成
+                time.sleep(1)
+                
+                if not update_result["success"]:
+                    self._log("警告: AdditionInfo信息更新失败或部分失败，将继续执行生成任务")
+                
                 # 从output/modify_json目录获取所有JSON文件
                 modify_dir = os.path.join(base_dir, "output", "modify_json")
+                self._log(f"【步骤2】检查JSON文件目录: {modify_dir}")
+                
                 if not os.path.exists(modify_dir):
-                    self._log(f"目录不存在: {modify_dir}")
+                    self._log(f"错误: 目录不存在: {modify_dir}")
+                    # 显示错误消息给用户
+                    self.root.after(0, lambda: messagebox.showerror("错误", f"JSON文件目录不存在: {modify_dir}"))
                     return
                 
                 # 初始化缺失员工列表和尝试更新的员工列表
@@ -1710,10 +1951,11 @@ class ResumeGeneratorGUI:
                 
                 # 获取所有JSON文件
                 json_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
+                self._log(f"发现 {len(json_files)} 个JSON文件")
                 
                 # 检查是否需要按员工编号生成简历
                 if person_names != "all" and isinstance(person_names, list):
-                    self._log(f"开始处理 {len(person_names)} 个员工的简历生成请求")
+                    self._log(f"【步骤3】开始处理 {len(person_names)} 个员工的简历生成请求")
                     
                     # 检查每个员工的JSON文件是否存在
                     for emp_no in person_names:
@@ -1727,32 +1969,43 @@ class ResumeGeneratorGUI:
                             missing_employees.append(emp_no)
                             
                             # 尝试调用update_specific_jsons.py更新该员工的JSON文件
+                            self._log(f"调用_update_missing_employee_json更新员工 {emp_no} 的信息...")
                             updated = self._update_missing_employee_json(emp_no)
                             if updated:
                                 updated_employees.append(emp_no)
+                                self._log(f"成功更新员工 {emp_no} 的JSON文件")
+                            else:
+                                self._log(f"更新员工 {emp_no} 的JSON文件失败")
                     
                     # 重新获取JSON文件列表，包含可能刚更新的文件
                     json_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
+                    self._log(f"重新扫描后发现 {len(json_files)} 个JSON文件")
                 
                 # 获取所有JSON文件
                 if not json_files:
-                    self._log("未找到JSON文件，请先解析简历")
+                    self._log("错误: 未找到JSON文件，请先解析简历")
                     return
                 
                 # 设置模板文件路径 - 根据银行名称动态查找对应的模板
                 # 查找格式："银行名称_简历模板.docx"
                 template_path = os.path.join(base_dir, "template", f"{bankname}_简历模板.docx")
+                self._log(f"【步骤4】检查模板文件: {template_path}")
                 
                 # 如果找不到银行特定模板，直接弹窗提示
                 if not os.path.exists(template_path):
-                    self._log(f"未找到银行特定模板: {bankname}_简历模板.docx")
+                    self._log(f"错误: 未找到银行特定模板: {bankname}_简历模板.docx")
                     # 使用主线程显示弹窗
                     self.root.after(0, lambda: messagebox.showinfo("提示", f"没有对应{bankname}的模板，请先配置银行简历模板"))
                     return
                 
+                # 再次执行AdditionInfo更新，确保最新文件也包含AdditionInfo
+                self._log("【步骤5】再次执行AdditionInfo信息更新，确保所有文件都包含最新信息...")
+                self._update_addition_info(person_names)
+                time.sleep(1)  # 短暂等待
+                
                 # 检查是否成功导入batch_render_module
                 if batch_render_module and hasattr(batch_render_module, 'batch_generate_resumes'):
-                    self._log(f"调用批生成功能，JSON目录: {modify_dir}，模板: {os.path.basename(template_path)}")
+                    self._log(f"【步骤6】调用批生成功能，JSON目录: {modify_dir}，模板: {os.path.basename(template_path)}")
                     
                     # 调用批生成函数
                     success_count, failed_count = batch_render_module.batch_generate_resumes(
@@ -1767,7 +2020,7 @@ class ResumeGeneratorGUI:
                     self.progress_label.config(text="100%")
                     
                     # 记录结果
-                    self._log(f"批生成完成！成功: {success_count}，失败: {failed_count}")
+                    self._log(f"===== 批生成完成！===== 成功: {success_count}，失败: {failed_count}")
                     self._log(f"输出目录: {os.path.join(base_dir, 'output', bankname)}")
                     
                     # 记录缺失员工信息
@@ -1787,7 +2040,13 @@ class ResumeGeneratorGUI:
                     self._log("批生成模块不可用，使用备用生成逻辑")
                     self._save_selected_emp_numbers(person_names, None, bankname, person_names)
             except Exception as e:
-                self._log(f"生成简历过程中出错: {str(e)}")
+                self._log(f"===== 生成简历过程中出错 =====")
+                self._log(f"错误详情: {str(e)}")
+                import traceback
+                self._log(f"错误堆栈: {traceback.format_exc()}")
+            finally:
+                self.progress_var.set(0)
+                self.progress_label.config(text="0%")
         
         # 启动新线程执行生成任务
         thread = threading.Thread(target=generate_thread)
