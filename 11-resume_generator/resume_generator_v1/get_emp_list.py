@@ -215,7 +215,7 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
     # 设置默认的Excel文件路径
-    default_excel_path = os.path.join(script_dir, "input", "技术人员名单-8月（删减版）.xlsx")
+    default_excel_path = os.path.join(script_dir, "input", "技术人员名单-11月.xlsx")
     
     # 允许用户通过命令行参数指定Excel文件路径
     if len(sys.argv) > 1:
