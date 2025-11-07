@@ -150,15 +150,14 @@ class ResumeValidationUI:
             self._log(f"正在校验: {json_file}")
             
             try:
-                # 调用校验脚本，指定输出文件路径并设置追加模式
+                # 调用校验脚本，指定输出文件路径
                 cmd = [
                     sys.executable,
                     self.check_script_path,
                     "--json",
                     json_file_path,
                     "--output",
-                    self.check_result_file,
-                    "--append"
+                    self.check_result_file
                 ]
                 
                 result = subprocess.run(
