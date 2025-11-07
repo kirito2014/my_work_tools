@@ -489,6 +489,8 @@ def main():
     parser.add_argument("--excel", help="输入的Excel文件路径")
     # 添加一个参数，用于指定输出的Excel文件路径
     parser.add_argument("--output", help="输出的Excel文件路径")
+    # 添加一个参数，用于指定是否追加模式
+    parser.add_argument("--append", action="store_true", help="是否以追加模式写入Excel文件")
     # 解析参数
     args = parser.parse_args()
     
@@ -525,14 +527,22 @@ def main():
             os.makedirs(output_dir)
         output_file = os.path.join(output_dir, "check_result.xlsx")
     
-    # 检查并删除已存在的输出文件
-    if os.path.exists(output_file):
-        os.remove(output_file)
-        print(f"已删除现有文件: {output_file}")
-    
-    # 创建新文件
-    with pd.ExcelWriter(output_file) as writer:
-        df.to_excel(writer, sheet_name="校验结果", index_label="校验序号")
+    # 检查是否需要追加模式
+    if args.append and os.path.exists(output_file):
+        # 读取现有文件
+        existing_df = pd.read_excel(output_file, index_col=None)
+        # 移除可能存在的校验序号列
+        if '校验序号' in existing_df.columns:
+            existing_df = existing_df.drop('校验序号', axis=1)
+        # 合并数据
+        combined_df = pd.concat([existing_df, df], ignore_index=True)
+        # 保存合并后的数据
+        with pd.ExcelWriter(output_file) as writer:
+            combined_df.to_excel(writer, sheet_name="校验结果", index=True, index_label="校验序号")
+    else:
+        # 首次创建或覆盖模式
+        with pd.ExcelWriter(output_file) as writer:
+            df.to_excel(writer, sheet_name="校验结果", index=True, index_label="校验序号")
     
     # 打印提示信息
     print(f"校验结果已保存至 {output_file}")

@@ -109,6 +109,14 @@ class ResumeValidationUI:
             messagebox.showinfo("提示", "所选文件夹中没有JSON文件")
             return
         
+        # 删除现有的校验结果文件
+        if os.path.exists(self.check_result_file):
+            try:
+                os.remove(self.check_result_file)
+                print(f"已删除现有校验结果文件: {self.check_result_file}")
+            except Exception as e:
+                messagebox.showwarning("警告", f"无法删除现有文件: {str(e)}")
+        
         # 初始化进度条
         self.progress_var.set(0)
         self.progress_label.config(text="开始校验...")
@@ -150,14 +158,15 @@ class ResumeValidationUI:
             self._log(f"正在校验: {json_file}")
             
             try:
-                # 调用校验脚本，指定输出文件路径
+                # 调用校验脚本，指定输出文件路径并设置追加模式
                 cmd = [
                     sys.executable,
                     self.check_script_path,
                     "--json",
                     json_file_path,
                     "--output",
-                    self.check_result_file
+                    self.check_result_file,
+                    "--append"
                 ]
                 
                 result = subprocess.run(
