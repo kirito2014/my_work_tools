@@ -10,31 +10,37 @@
 
 ## 键名中英文对照表
 
-| 中文名称 | 英文键名 | 说明 |
-|---------|---------|------|
-| 员工编号 | EmpNo | 员工工号，格式化为5位数 |
-| 工作名 | Name | 员工姓名，不包含数字 |
-| 管理关系一级部门 | DepartmentLevel1 | 员工所属一级部门 |
-| 管理关系二级部门 | DepartmentLevel2 | 员工所属二级部门 |
-| 岗位 | Position | 员工岗位名称 |
-| 专业级别 | ProfessionalLevel | 员工专业技术级别 |
-| 公司邮箱 | CompanyEmail | 员工公司电子邮箱 |
-| 入职日期 | EntryDate | 员工入职日期 |
-| 初次入职日期 | FirstEntryDate | 员工首次入职公司的日期 |
-| 司龄 | CompanyYears | 员工在公司的工作年限 |
-| 工龄 | WorkYears | 员工总工作年限 |
-| base地 | BaseLocation | 员工工作地点 |
-| 性别 | Gender | 员工性别 |
-| 出生日期 | BirthDate | 员工出生日期 |
-| 年龄 | Age | 员工年龄 |
-| 政治面貌 | PoliticalStatus | 员工政治面貌 |
-| 证件号码 | IDNumber | 员工身份证号或其他证件号码 |
-| 手机号码 | PhoneNumber | 员工手机号码 |
-| 毕业日期 | GraduationTime | 员工毕业日期 |
-| 毕业院校 | GraduationSchool | 员工毕业院校名称 |
-| 学历 | HighestEducation | 员工最高学历 |
-| 专业 | Major | 员工所学专业 |
-| 合同签订法人 | ContractLegalPerson | 员工劳动合同签订法人 |
+| 中文名称 | 英文键名 | Jinja2占位符 | 说明 |
+|---------|---------|------------|------|
+| 员工编号 | EmpNo | {{BasicInfo.EmpNo}} | 员工工号，格式化为5位数 |
+| 工作名 | Name | {{BasicInfo.Name}} | 员工姓名，不包含数字 |
+| 管理关系一级部门 | DepartmentLevel1 | {{BasicInfo.DepartmentLevel1}} | 员工所属一级部门 |
+| 管理关系二级部门 | DepartmentLevel2 | {{BasicInfo.DepartmentLevel2}} | 员工所属二级部门 |
+| 岗位 | Position | {{BasicInfo.Position}} | 员工岗位名称 |
+| 专业级别 | ProfessionalLevel | {{BasicInfo.ProfessionalLevel}} | 员工专业技术级别 |
+| 公司邮箱 | CompanyEmail | {{BasicInfo.CompanyEmail}} | 员工公司电子邮箱 |
+| 入职日期 | EntryDate | {{BasicInfo.EntryDate}} | 员工入职日期 |
+| 初次入职日期 | FirstEntryDate | {{BasicInfo.FirstEntryDate}} | 员工首次入职公司的日期 |
+| 司龄 | CompanyYears | {{BasicInfo.CompanyYears}} | 员工在公司的工作年限 |
+| 工龄 | WorkYears | {{BasicInfo.WorkYears}} | 员工总工作年限 |
+| base地 | BaseLocation | {{BasicInfo.BaseLocation}} | 员工工作地点 |
+| 性别 | Gender | {{BasicInfo.Gender}} | 员工性别 |
+| 出生日期 | BirthDate | {{BasicInfo.BirthDate}} | 员工出生日期 |
+| 年龄 | Age | {{BasicInfo.Age}} | 员工年龄 |
+| 政治面貌 | PoliticalStatus | {{BasicInfo.PoliticalStatus}} | 员工政治面貌 |
+| 证件号码 | IDNumber | {{BasicInfo.IDNumber}} | 员工身份证号或其他证件号码 |
+| 手机号码 | PhoneNumber | {{BasicInfo.PhoneNumber}} | 员工手机号码 |
+| 毕业日期 | GraduationTime | {{BasicInfo.GraduationTime}} | 员工毕业日期 |
+| 毕业院校 | GraduationSchool | {{BasicInfo.GraduationSchool}} | 员工毕业院校名称 |
+| 学历 | HighestEducation | {{BasicInfo.HighestEducation}} | 员工最高学历 |
+| 专业 | Major | {{BasicInfo.Major}} | 员工所学专业 |
+| 合同签订法人 | ContractLegalPerson | {{BasicInfo.ContractLegalPerson}} | 员工劳动合同签订法人 |
+| 个人简介 | PersonalProfile | {{BasicInfo.PersonalProfile}} | 员工个人简介信息 |
+| 部门 | Department | {{BasicInfo.Department}} | 员工所属部门 |
+| 职称 | Title | {{BasicInfo.Title}} | 员工职称信息 |
+| 工作经历 | WorkExperience | {{WorkExperience}} | 员工工作经历列表 |
+| 项目经历 | ProjectExperience | {{ProjectExperience}} | 员工项目经历列表 |
+| 工作能力 | WorkAbility | {{WorkAbility}} | 员工工作能力相关信息 |
 
 ## 主要脚本说明
 
@@ -169,13 +175,69 @@ python package\functions\excel_2_info_json.py input\技术人员名单.xlsx
 ### 2. 更新特定人员的JSON文件
 ```bash
 # 更新特定员工的简历JSON
-python package\functions\update_specific_jsons.py 1 ['07003','02794']
+python package\functions\update_specific_jsons.py 1 ['示例工号1','示例工号2']
 
 # 更新所有员工的信息JSON
 python package\functions\update_specific_jsons.py 2 ALL
 
 # 更新特定员工的所有JSON文件
-python package\functions\update_specific_jsons.py 3 07003,02794
+python package\functions\update_specific_jsons.py 3 示例工号1,示例工号2
+```
+
+## 简历模板示例
+
+以下是简历模板中Jinja2占位符的填写示例，使用脱敏后的示例数据：
+
+```
+基本情况 
+ 姓    名 	 张三 	 工作年限 	 X年 
+ 毕业时间 	 YYYY年MM月 	 毕业学校 	 示例大学
+ 专    业 	 示例专业 	 最高学历 	 本科 
+ 所在部门 	 示例部门 	 职    称 	 示例职称 
+ 个人简介 	 1、多年行业相关工作经验，具备项目管理能力。 2、熟悉常用技术工具和平台。 3、具备良好的团队协作能力和沟通能力。 
+工作经历（由近至远） 
+开始时间 	 结束时间 	 公司名称 	 担任职务 	 工作职责说明 
+YYYY/MM 	 至今 	 示例科技公司 	 示例职位 	 负责项目管理和团队协作 
+YYYY/MM 	 YYYY/MM 	 示例软件公司 	 示例职位 	 参与项目实施和技术支持 
+项目经历（由近至远） 
+开始时间 	 结束时间 	 项目名称 	 项目角色 	 项目职责说明 
+YYYY/MM 	 至今 	 示例银行数据项目 	 项目经理/实施工程师 	 负责项目整体规划和实施 
+YYYY/MM 	 YYYY/MM 	 示例数据迁移项目 	 项目经理/实施工程师 	 负责数据模型设计和迁移 
+YYYY/MM 	 YYYY/MM 	 示例平台建设项目 	 咨询工程师 	 参与项目架构设计和文档编写 
+YYYY/MM 	 YYYY/MM 	 示例分析报表项目 	 项目经理 	 负责项目计划制定和资源协调 
+能力与资质 
+业务与技术 
+能力详述 	 1、熟悉常用数据库和开发工具； 2、具备项目管理和团队领导能力； 3、具有良好的沟通和问题解决能力。 
+资质认证 	 1、示例认证1 2、示例认证2 3、示例认证3 
+参与培训 	 1、示例培训1 2、示例培训2 
+技能标签 	 技术类【示例技能】 开发类【示例开发】
+```
+
+**注**：以上为实际数据填充示例，实际使用时请使用以下Jinja2占位符格式：
+
+```
+基本情况 
+ 姓    名 	 {{BasicInfo.Name}} 	 工作年限 	 {{BasicInfo.WorkYears}} 
+ 毕业时间 	 {{BasicInfo.GraduationTime}} 	 毕业学校 	 {{AddtionInfo.GraduationSchool}}
+ 专    业 	 {{BasicInfo.Major}} 	 最高学历 	 {{AddtionInfo.HighestEducation}} 
+ 所在部门 	 {{BasicInfo.Department}} 	 职    称 	 {{BasicInfo.Title}} 
+ 个人简介 	 {{BasicInfo.PersonalProfile}} 
+工作经历（由近至远） 
+开始时间 	 结束时间 	 公司名称 	 担任职务 	 工作职责说明 
+{%tr for experience in WorkExperience %} 
+{{experience.StartTime}} 	 {{experience.EndTime}} 	 {{experience.CompanyName}} 	 {{experience.Position}} 	 {{experience.JobDescription}} 
+{%tr endfor %} 
+项目经历（由近至远） 
+开始时间 	 结束时间 	 项目名称 	 项目角色 	 项目职责说明 
+{%tr for project in ProjectExperience %} 
+{{project.StartTime}} 	 {{project.EndTime}} 	 {{project.ProjectName}} 	 {{project.ProjectRole}} 	 {{project.JobDescription}} 
+{%tr endfor %} 
+能力与资质 
+业务与技术 
+能力详述 	 {{WorkAbility.BusinessAbility}} 
+资质认证 	 {{WorkAbility.Certification}} 
+参与培训 	 {{WorkAbility.Training}} 
+技能标签 	 {{WorkAbility.SkillTag}}
 ```
 
 ## 注意事项
