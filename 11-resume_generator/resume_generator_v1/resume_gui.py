@@ -1303,17 +1303,50 @@ class ResumeGeneratorGUI:
             self._log(traceback.format_exc())
     
     def _show_bank_management_dialog(self):
-        """显示银行管理对话框 - 调用独立子程序"""
+        """显示银行管理对话框 - 调用独立子程序，并在关闭后刷新银行列表"""
         try:
             # 获取银行管理子程序的路径
             bank_management_path = os.path.join(base_dir, 'package', 'utils', 'bank_management.py')
             
             # 在新进程中启动银行管理程序
-            subprocess.Popen([sys.executable, bank_management_path])
+            process = subprocess.Popen([sys.executable, bank_management_path])
+            
+            # 创建一个线程来等待银行管理程序关闭并刷新银行列表
+            threading.Thread(target=self._wait_for_bank_management_and_refresh, args=(process,)).start()
             
         except Exception as e:
             messagebox.showerror("错误", f"启动银行管理程序失败: {str(e)}")
         
+    def _wait_for_bank_management_and_refresh(self, process):
+        """等待银行管理程序关闭并刷新银行列表"""
+        # 等待进程结束
+        process.wait()
+        
+        # 在主线程中刷新银行列表
+        self.root.after(0, self._refresh_bank_list)
+    
+    def _refresh_bank_list(self):
+        """刷新银行下拉框列表"""
+        try:
+            # 获取最新的银行列表
+            new_bank_list = self._get_bank_list()
+            
+            # 更新下拉框值
+            self.bank_combobox['values'] = new_bank_list
+            
+            # 如果当前选中的银行仍然在列表中，保持选中；否则选择第一个
+            current_selection = self.bank_combobox.get()
+            if current_selection and current_selection in new_bank_list:
+                self.bank_combobox.set(current_selection)
+            elif new_bank_list:
+                self.bank_combobox.set(new_bank_list[0])
+                # 触发logo更新
+                self._update_bank_logo()
+            
+            self._log("银行列表已刷新")
+        except Exception as e:
+            self._log(f"刷新银行列表时出错: {str(e)}")
+    
     # 银行管理相关方法已移至独立子程序 bank_management.py
     
     def _load_employee_info(self):
