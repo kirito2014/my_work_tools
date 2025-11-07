@@ -149,6 +149,13 @@ class ResumeGeneratorGUI:
         # 将银行管理菜单添加到菜单栏
         menubar.add_cascade(label="银行管理", menu=bank_menu)
         
+        # 创建简历校验菜单
+        validate_menu = tk.Menu(menubar, tearoff=0, font=self.font_config['button'])
+        validate_menu.add_command(label="简历校验", command=self._show_resume_validation)
+        
+        # 将简历校验菜单添加到菜单栏
+        menubar.add_cascade(label="简历校验", menu=validate_menu)
+        
         # 设置菜单栏
         self.root.config(menu=menubar)
         
@@ -1348,6 +1355,22 @@ class ResumeGeneratorGUI:
             self._log(f"刷新银行列表时出错: {str(e)}")
     
     # 银行管理相关方法已移至独立子程序 bank_management.py
+    
+    def _show_resume_validation(self):
+        """显示简历校验界面"""
+        try:
+            # 获取check_ui.py的路径
+            check_ui_path = os.path.join(base_dir, 'check_ui.py')
+            if os.path.exists(check_ui_path):
+                self._log("启动简历校验工具...")
+                # 在新进程中启动校验UI
+                subprocess.Popen([sys.executable, check_ui_path])
+            else:
+                messagebox.showerror("错误", f"未找到校验UI脚本: {check_ui_path}")
+                self._log(f"错误: 未找到校验UI脚本: {check_ui_path}")
+        except Exception as e:
+            messagebox.showerror("错误", f"启动简历校验工具时出错: {str(e)}")
+            self._log(f"错误: 启动简历校验工具时出错: {str(e)}")
     
     def _load_employee_info(self):
         """加载员工信息，用于部门筛选

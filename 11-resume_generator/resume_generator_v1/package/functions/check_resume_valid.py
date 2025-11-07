@@ -482,6 +482,10 @@ def main():
     parser.add_argument("--json", help="输入的JSON文件路径")
     # 添加一个参数，用于指定输入的Excel文件路径
     parser.add_argument("--excel", help="输入的Excel文件路径")
+    # 添加一个参数，用于指定输出的Excel文件路径
+    parser.add_argument("--output", help="输出的Excel文件路径")
+    # 添加一个参数，用于指定是否追加模式
+    parser.add_argument("--append", action="store_true", help="是否以追加模式写入Excel文件")
     # 解析参数
     args = parser.parse_args()
     
@@ -504,22 +508,38 @@ def main():
     # 调用generate_check_results函数，生成校验结果
     df = generate_check_results(data)
     
-    # 确保output/checkExcel目录存在
-    check_dir = os.path.join(base_dir, "output/checkExcel")
-    if not os.path.exists(check_dir):
-        os.makedirs(check_dir)
+    # 确定输出文件路径
+    if args.output:
+        output_file = args.output
+        # 确保输出目录存在
+        output_dir = os.path.dirname(output_file)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+    else:
+        # 默认输出路径为项目根目录的output\checkExcel
+        output_dir = os.path.join(base_dir, "..", "output", "checkExcel")
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        output_file = os.path.join(output_dir, "check_result.xlsx")
     
-    #文件存在检测，没有写入，有则删除后写入
-    if os.path.exists(os.path.join(base_dir, "output/checkExcel/check_result.xlsx")):
-        os.remove(os.path.join(base_dir, "output/checkExcel/check_result.xlsx"))
-
-    # 将校验结果保存到根目录output/checkExcel文件夹的check_result.xlsx文件中
-    with pd.ExcelWriter(os.path.join(base_dir, "output/checkExcel/check_result.xlsx")) as writer:
-        # 将DataFrame写入Excel文件，指定sheet名称和索引列名称
-        df.to_excel(writer, sheet_name="校验结果", index_label="校验序号")
+    # 检查是否需要追加模式
+    if args.append and os.path.exists(output_file):
+        # 读取现有文件
+        existing_df = pd.read_excel(output_file)
+        # 合并数据
+        combined_df = pd.concat([existing_df, df], ignore_index=True)
+        # 重新索引
+        combined_df.index = combined_df.index + 1
+        # 保存合并后的数据
+        with pd.ExcelWriter(output_file) as writer:
+            combined_df.to_excel(writer, sheet_name="校验结果", index_label="校验序号")
+    else:
+        # 首次创建或覆盖模式
+        with pd.ExcelWriter(output_file) as writer:
+            df.to_excel(writer, sheet_name="校验结果", index_label="校验序号")
     
     # 打印提示信息
-    print(f"校验结果已保存至 check_result.xlsx")
+    print(f"校验结果已保存至 {output_file}")
 
 if __name__ == "__main__":
     main()
