@@ -1681,14 +1681,16 @@ class ResumeGeneratorGUI:
                     self._log("未找到JSON文件，请先解析简历")
                     return
                 
-                # 设置模板文件路径
-                template_path = os.path.join(base_dir, "template", "人员简历_模板.docx")
+                # 设置模板文件路径 - 根据银行名称动态查找对应的模板
+                # 查找格式："银行名称_简历模板.docx"
+                template_path = os.path.join(base_dir, "template", f"{bankname}_简历模板.docx")
+                
+                # 如果找不到银行特定模板，直接弹窗提示
                 if not os.path.exists(template_path):
-                    # 尝试备选模板路径
-                    template_path = os.path.join(base_dir, "template", "人员简历_模板_01.docx")
-                    if not os.path.exists(template_path):
-                        self._log("未找到简历模板文件")
-                        return
+                    self._log(f"未找到银行特定模板: {bankname}_简历模板.docx")
+                    # 使用主线程显示弹窗
+                    self.root.after(0, lambda: messagebox.showinfo("提示", f"没有对应{bankname}的模板，请先配置银行简历模板"))
+                    return
                 
                 # 检查是否成功导入batch_render_module
                 if batch_render_module and hasattr(batch_render_module, 'batch_generate_resumes'):
