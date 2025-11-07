@@ -59,6 +59,28 @@ except ImportError:
         print(f"导入 render_from_docx 模块失败: {e}")
         sys.exit(1)
 
+# 导入doc_2_json模块作为dj
+dj = None
+try:
+    from package.functions import doc_2_json as dj
+except ImportError:
+    try:
+        # 尝试动态加载
+        import importlib.util
+        dj_path = os.path.join(project_root, "package", "functions", "doc_2_json.py")
+        if os.path.exists(dj_path):
+            spec = importlib.util.spec_from_file_location("doc_2_json", dj_path)
+            dj = importlib.util.module_from_spec(spec)
+            sys.modules["doc_2_json"] = dj
+            spec.loader.exec_module(dj)
+            print(f"通过动态加载成功导入 doc_2_json.py 文件")
+        else:
+            print(f"错误: 未找到 doc_2_json.py 文件")
+            sys.exit(1)
+    except Exception as e:
+        print(f"导入 doc_2_json 模块失败: {e}")
+        sys.exit(1)
+
 
 def batch_generate_resumes(json_files_dir, template_path, bankname, person_names="all"):
     """
