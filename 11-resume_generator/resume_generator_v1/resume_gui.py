@@ -2214,7 +2214,7 @@ class ResumeGeneratorGUI:
                 
                 # 检查是否成功导入batch_render_module
                 if batch_render_module and hasattr(batch_render_module, 'batch_generate_resumes'):
-                    self._log(f"【步骤6】调用批生成功能，JSON目录: {modify_dir}，模板: {os.path.basename(template_path)}")
+                    self._log(f"【步骤5】调用批生成功能，JSON目录: {modify_dir}，模板: {os.path.basename(template_path)}")
                     
                     # 调用批生成函数
                     success_count, failed_count = batch_render_module.batch_generate_resumes(

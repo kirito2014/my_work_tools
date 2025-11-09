@@ -157,11 +157,11 @@ def batch_generate_resumes(json_files_dir, template_path, bankname, person_names
     
     # 输出统计信息
     print("\n" + "=" * 50)
-    print(f"批量生成完成！")
-    print(f"总JSON文件数: {total_files}")
-    print(f"成功生成: {success_count}")
-    print(f"生成失败: {failed_count}")
-    print(f"输出目录: {output_dir}")
+    print(f"批量生成简历完成！")
+    print(f"总简历JSON文件数: {total_files}")
+    print(f"成功生成简历: {success_count}")
+    print(f"生成失败简历: {failed_count}")
+    print(f"简历输出目录: {output_dir}")
     
     return success_count, failed_count
 
