@@ -1773,7 +1773,6 @@ class ResumeGeneratorGUI:
         try:
             import os
             import json
-            import importlib
             
             self._log("===== 开始更新AdditionInfo信息 =====")
             
@@ -1791,6 +1790,9 @@ class ResumeGeneratorGUI:
                 self._log(f"错误: modify_json目录不存在: {modify_dir}")
                 return False
             
+            # 优化：将person_names转换为集合以提高查找效率
+            target_emp_nos = set(person_names) if person_names and person_names != "all" and isinstance(person_names, list) else None
+            
             # 获取所有info_json文件
             info_files = [f for f in os.listdir(info_dir) if f.endswith('.json')]
             self._log(f"发现 {len(info_files)} 个info_json文件")
@@ -1799,24 +1801,33 @@ class ResumeGeneratorGUI:
                 self._log("警告: 未找到info_json文件")
                 return False
             
-            # 构建员工编号到info数据的映射
+            # 构建员工编号到info数据的映射（优化：只加载需要的员工信息）
             emp_info_map = {}
             for info_file in info_files:
                 try:
-                    # 从文件名提取员工编号（格式：工号_姓名_人员信息.json）
+                    # 从文件名提取员工编号
                     emp_no = info_file.split('_')[0]
+                    
+                    # 优化：如果指定了目标员工且当前员工不在其中，跳过
+                    if target_emp_nos and emp_no not in target_emp_nos:
+                        continue
+                    
                     info_path = os.path.join(info_dir, info_file)
                     
                     with open(info_path, 'r', encoding='utf-8') as f:
                         info_data = json.load(f)
                     
-                    # 保存整个info_data作为AdditionInfo
                     emp_info_map[emp_no] = info_data
                     self._log(f"  找到员工 {emp_no} 的信息文件: {info_file}")
                 except Exception as e:
                     self._log(f"  处理info文件 {info_file} 时出错: {e}")
             
             self._log(f"成功构建 {len(emp_info_map)} 条员工信息映射")
+            
+            # 如果没有需要更新的员工信息，直接返回
+            if not emp_info_map:
+                self._log("警告: 没有有效的员工信息可以更新")
+                return False
             
             # 获取所有简历JSON文件
             resume_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
@@ -1826,70 +1837,61 @@ class ResumeGeneratorGUI:
                 self._log("警告: 未找到简历JSON文件")
                 return False
             
-            # 根据person_names过滤要更新的文件
+            # 优化：直接过滤出需要更新的文件，避免多次遍历
             files_to_update = []
-            if person_names and person_names != "all" and isinstance(person_names, list):
-                self._log(f"根据提供的工号列表过滤文件，工号数量: {len(person_names)}")
-                for resume_file in resume_files:
-                    file_emp_no = resume_file.split('_')[0]  # 从文件名提取工号
-                    if file_emp_no in person_names:
-                        files_to_update.append(resume_file)
-                self._log(f"过滤后需要更新的文件数量: {len(files_to_update)}")
-            else:
-                files_to_update = resume_files
-                self._log(f"将更新所有 {len(files_to_update)} 个简历文件")
+            for resume_file in resume_files:
+                file_emp_no = resume_file.split('_')[0]  # 从文件名提取工号
+                
+                # 检查是否有对应的员工信息
+                if file_emp_no in emp_info_map:
+                    # 如果指定了目标员工且当前员工不在其中，跳过
+                    if target_emp_nos and file_emp_no not in target_emp_nos:
+                        continue
+                    files_to_update.append(resume_file)
+            
+            self._log(f"过滤后需要更新的文件数量: {len(files_to_update)}")
             
             # 更新每个文件
             updated_count = 0
             skipped_count = 0
             for resume_file in files_to_update:
                 try:
-                    file_emp_no = resume_file.split('_')[0]  # 从文件名提取工号
+                    file_emp_no = resume_file.split('_')[0]
                     resume_path = os.path.join(modify_dir, resume_file)
                     
-                    # 检查文件是否存在
-                    if not os.path.exists(resume_path):
-                        self._log(f"  跳过: 文件不存在 {resume_path}")
-                        skipped_count += 1
-                        continue
+                    # 使用已构建的映射，避免重复查找
+                    info_data = emp_info_map[file_emp_no]
                     
-                    # 检查是否有对应的员工信息
-                    if file_emp_no in emp_info_map:
-                        # 读取简历文件
-                        with open(resume_path, 'r', encoding='utf-8') as f:
-                            resume_data = json.load(f)
-                        
-                        # 更新AdditionInfo字段
-                        if resume_data:
-                            # 获取第一个键（通常是姓名）
-                            person_name = list(resume_data.keys())[0]
-                            if person_name in resume_data:
-                                # 检查emp_info_map中是否已包含AddtionInfo键，避免嵌套层级
-                                info_data = emp_info_map[file_emp_no]
-                                if isinstance(info_data, dict) and "AddtionInfo" in info_data:
-                                    # 如果info_data中已包含AddtionInfo键，直接使用其值
-                                    resume_data[person_name]["AddtionInfo"] = info_data["AddtionInfo"]
-                                else:
-                                    # 否则使用整个info_data作为AddtionInfo内容
-                                    resume_data[person_name]["AddtionInfo"] = info_data
-                                
-                                # 写回文件
-                                with open(resume_path, 'w', encoding='utf-8') as f:
-                                    json.dump(resume_data, f, ensure_ascii=False, indent=4)
-                                
-                                updated_count += 1
-                                self._log(f"  已更新: {resume_file} - 成功添加AdditionInfo")
+                    # 读取简历文件
+                    with open(resume_path, 'r', encoding='utf-8') as f:
+                        resume_data = json.load(f)
+                    
+                    # 更新AdditionInfo字段
+                    if resume_data:
+                        # 获取第一个键（通常是姓名）
+                        person_name = list(resume_data.keys())[0]
+                        if person_name in resume_data:
+                            # 检查info_data中是否已包含AddtionInfo键，避免嵌套层级
+                            if isinstance(info_data, dict) and "AddtionInfo" in info_data:
+                                resume_data[person_name]["AddtionInfo"] = info_data["AddtionInfo"]
                             else:
-                                self._log(f"  跳过: 在 {resume_file} 中未找到键 {person_name}")
-                                skipped_count += 1
+                                resume_data[person_name]["AddtionInfo"] = info_data
+                            
+                            # 写回文件
+                            with open(resume_path, 'w', encoding='utf-8') as f:
+                                json.dump(resume_data, f, ensure_ascii=False, indent=4)
+                            
+                            updated_count += 1
+                            self._log(f"  已更新: {resume_file} - 成功添加AdditionInfo")
                         else:
-                            self._log(f"  跳过: {resume_file} 内容为空")
+                            self._log(f"  跳过: 在 {resume_file} 中未找到键 {person_name}")
                             skipped_count += 1
                     else:
-                        self._log(f"  跳过: 未找到员工 {file_emp_no} 的info信息")
+                        self._log(f"  跳过: {resume_file} 内容为空")
                         skipped_count += 1
                 except Exception as e:
                     self._log(f"  错误: 更新简历文件 {resume_file} 时出错: {e}")
+                    skipped_count += 1
             
             self._log(f"===== AdditionInfo信息更新完成 =====")
             self._log(f"成功更新: {updated_count} 个文件")
@@ -1918,11 +1920,9 @@ class ResumeGeneratorGUI:
                 def update_addition_info():
                     try:
                         self._log("【步骤1】开始执行AdditionInfo信息更新...")
-                        # 执行两次更新以确保可靠性
-                        update_success1 = self._update_addition_info(person_names)
-                        self._log("执行第二次AdditionInfo信息更新以确保可靠性...")
-                        update_success2 = self._update_addition_info(person_names)
-                        update_result["success"] = update_success1 and update_success2
+                        # 执行一次优化后的更新
+                        update_success = self._update_addition_info(person_names)
+                        update_result["success"] = update_success
                         
                         if update_result["success"]:
                             self._log("AdditionInfo信息更新成功完成")
