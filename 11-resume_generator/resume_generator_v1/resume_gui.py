@@ -720,6 +720,9 @@ class ResumeGeneratorGUI:
         
         # 设置样式
         self._setup_styles()
+        
+        # 初始化显示正确的人员选择框架
+        self._toggle_person_list()
     
     def _setup_styles(self):
         # 设置按钮样式，基于arc主题
