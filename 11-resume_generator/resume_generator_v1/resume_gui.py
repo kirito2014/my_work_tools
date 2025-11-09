@@ -1057,7 +1057,7 @@ class ResumeGeneratorGUI:
         json_files_validated = 0
         if processed_files > 0:
             self._log("=" * 50)
-            self._log(f"开始验证生成的JSON文件...")
+            self._log(f"开始验证生成的简历JSON文件...")
             for json_file in os.listdir(modify_dir):
                 if json_file.endswith('.json'):
                     json_path = os.path.join(modify_dir, json_file)
@@ -1070,18 +1070,18 @@ class ResumeGeneratorGUI:
                             # 记录验证成功的文件名（可选）
                             # self._log(f"  ✓ {json_file}")
                     except Exception as e:
-                        self._log(f"  ✗ 验证JSON文件失败 {json_file}: {e}")
+                        self._log(f"  ✗ 验证简历JSON文件失败 {json_file}: {e}")
         
         # 输出统计信息
         self._log("=" * 50)
-        self._log(f"批处理完成！")
-        self._log(f"总文件数: {total_files}")
-        self._log(f"成功处理: {processed_files}")
+        self._log(f"简历批处理完成！")
+        self._log(f"总简历文件数: {total_files}")
+        self._log(f"成功入库处理: {processed_files}")
         self._log(f"转换文件数: {converted_files}")
-        self._log(f"处理失败: {failed_files}")
+        self._log(f"处理入库失败: {failed_files}")
         if processed_files > 0:
-            self._log(f"JSON文件验证成功: {json_files_validated}/{processed_files}")
-        self._log(f"JSON目录: {modify_dir}")
+            self._log(f"简历JSON文件验证成功: {json_files_validated}/{processed_files}")
+        self._log(f"简历JSON目录: {modify_dir}")
         
         # 更新人员名单
         self._update_person_list()
@@ -1145,12 +1145,10 @@ class ResumeGeneratorGUI:
                 
                 # 转换完成后更新AdditionInfo信息
                 self._log("【步骤2】开始执行AdditionInfo信息更新...")
-                # 连续执行两次更新，确保信息正确写入
-                update_success1 = self._update_addition_info()
-                self._log("执行第二次AdditionInfo信息更新以确保可靠性...")
-                update_success2 = self._update_addition_info()
+                # 执行一次更新
+                update_success = self._update_addition_info()
                 
-                if update_success1 and update_success2:
+                if update_success:
                     self._log("===== 解析和AdditionInfo更新任务完成 =====")
                     # 显示成功消息给用户
                     self.root.after(0, lambda: messagebox.showinfo("成功", "文件解析和AdditionInfo更新已完成！"))
@@ -1793,34 +1791,52 @@ class ResumeGeneratorGUI:
             # 优化：将person_names转换为集合以提高查找效率
             target_emp_nos = set(person_names) if person_names and person_names != "all" and isinstance(person_names, list) else None
             
-            # 获取所有info_json文件
-            info_files = [f for f in os.listdir(info_dir) if f.endswith('.json')]
-            self._log(f"发现 {len(info_files)} 个info_json文件")
-            
-            if not info_files:
-                self._log("警告: 未找到info_json文件")
-                return False
-            
-            # 构建员工编号到info数据的映射（优化：只加载需要的员工信息）
+            # 构建员工编号到info数据的映射
             emp_info_map = {}
-            for info_file in info_files:
-                try:
-                    # 从文件名提取员工编号
-                    emp_no = info_file.split('_')[0]
+            
+            # 优化：优先尝试直接根据文件命名格式匹配
+            if target_emp_nos:
+                self._log(f"根据指定的 {len(target_emp_nos)} 个员工编号直接匹配信息文件")
+                for emp_no in target_emp_nos:
+                    # 尝试查找匹配的info文件（可能有不同的后缀格式）
+                    found = False
+                    for info_file in os.listdir(info_dir):
+                        if info_file.startswith(f"{emp_no}_") and info_file.endswith('.json'):
+                            try:
+                                info_path = os.path.join(info_dir, info_file)
+                                with open(info_path, 'r', encoding='utf-8') as f:
+                                    info_data = json.load(f)
+                                emp_info_map[emp_no] = info_data
+                                self._log(f"  找到员工 {emp_no} 的信息文件: {info_file}")
+                                found = True
+                                break
+                            except Exception as e:
+                                self._log(f"  处理info文件 {info_file} 时出错: {e}")
+                                found = True  # 即使出错也标记为已处理
+                                break
                     
-                    # 优化：如果指定了目标员工且当前员工不在其中，跳过
-                    if target_emp_nos and emp_no not in target_emp_nos:
-                        continue
-                    
-                    info_path = os.path.join(info_dir, info_file)
-                    
-                    with open(info_path, 'r', encoding='utf-8') as f:
-                        info_data = json.load(f)
-                    
-                    emp_info_map[emp_no] = info_data
-                    self._log(f"  找到员工 {emp_no} 的信息文件: {info_file}")
-                except Exception as e:
-                    self._log(f"  处理info文件 {info_file} 时出错: {e}")
+                    if not found:
+                        self._log(f"  未找到员工 {emp_no} 的信息文件")
+            else:
+                # 如果没有指定员工，才遍历所有info文件
+                info_files = [f for f in os.listdir(info_dir) if f.endswith('.json')]
+                self._log(f"发现 {len(info_files)} 个info_json文件")
+                
+                if not info_files:
+                    self._log("警告: 未找到info_json文件")
+                    return False
+                
+                for info_file in info_files:
+                    try:
+                        emp_no = info_file.split('_')[0]
+                        info_path = os.path.join(info_dir, info_file)
+                        
+                        with open(info_path, 'r', encoding='utf-8') as f:
+                            info_data = json.load(f)
+                        
+                        emp_info_map[emp_no] = info_data
+                    except Exception as e:
+                        self._log(f"  处理info文件 {info_file} 时出错: {e}")
             
             self._log(f"成功构建 {len(emp_info_map)} 条员工信息映射")
             
@@ -1829,25 +1845,42 @@ class ResumeGeneratorGUI:
                 self._log("警告: 没有有效的员工信息可以更新")
                 return False
             
-            # 获取所有简历JSON文件
-            resume_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
-            self._log(f"发现 {len(resume_files)} 个简历JSON文件")
-            
-            if not resume_files:
-                self._log("警告: 未找到简历JSON文件")
-                return False
-            
-            # 优化：直接过滤出需要更新的文件，避免多次遍历
-            files_to_update = []
-            for resume_file in resume_files:
-                file_emp_no = resume_file.split('_')[0]  # 从文件名提取工号
+            # 获取简历JSON文件（针对有员工信息的文件进行优化匹配）
+            if target_emp_nos:
+                # 如果指定了目标员工，只查找这些员工的简历文件
+                self._log(f"根据员工编号集合直接查找需要更新的简历文件")
+                files_to_update = []
+                existing_files = set(os.listdir(modify_dir))
                 
-                # 检查是否有对应的员工信息
-                if file_emp_no in emp_info_map:
-                    # 如果指定了目标员工且当前员工不在其中，跳过
-                    if target_emp_nos and file_emp_no not in target_emp_nos:
-                        continue
-                    files_to_update.append(resume_file)
+                # 对于每个有员工信息的工号，尝试找到对应的简历文件
+                for emp_no in emp_info_map:
+                    resume_files_found = False
+                    # 查找所有可能的简历文件
+                    for file in existing_files:
+                        if file.startswith(f"{emp_no}_") and file.endswith('.json'):
+                            files_to_update.append(file)
+                            resume_files_found = True
+                            break
+                    
+                    if not resume_files_found:
+                        self._log(f"  未找到员工 {emp_no} 对应的简历JSON文件")
+            else:
+                # 没有指定目标员工，才遍历所有简历文件
+                resume_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
+                self._log(f"发现 {len(resume_files)} 个简历JSON文件")
+                
+                if not resume_files:
+                    self._log("警告: 未找到简历JSON文件")
+                    return False
+                
+                # 过滤出有对应员工信息的文件
+                files_to_update = []
+                for resume_file in resume_files:
+                    file_emp_no = resume_file.split('_')[0]  # 从文件名提取工号
+                    if file_emp_no in emp_info_map:
+                        files_to_update.append(resume_file)
+                    else:
+                        self._log(f"  跳过: 未找到员工 {file_emp_no} 的人员信息文件")
             
             self._log(f"过滤后需要更新的文件数量: {len(files_to_update)}")
             
@@ -1865,6 +1898,12 @@ class ResumeGeneratorGUI:
                     # 读取简历文件
                     with open(resume_path, 'r', encoding='utf-8') as f:
                         resume_data = json.load(f)
+                    
+                    # 检查文件是否存在
+                    if not os.path.exists(resume_path):
+                        self._log(f"  错误: 简历文件不存在: {resume_path}")
+                        skipped_count += 1
+                        continue
                     
                     # 更新AdditionInfo字段
                     if resume_data:
@@ -2013,10 +2052,7 @@ class ResumeGeneratorGUI:
                     self.root.after(0, lambda: messagebox.showinfo("提示", f"没有对应{bankname}的模板，请先配置银行简历模板"))
                     return
                 
-                # 再次执行AdditionInfo更新，确保最新文件也包含AdditionInfo
-                self._log("【步骤5】再次执行AdditionInfo信息更新，确保所有文件都包含最新信息...")
-                self._update_addition_info(person_names)
-                time.sleep(1)  # 短暂等待
+                # 已在步骤1中执行过AdditionInfo更新，无需再次执行
                 
                 # 检查是否成功导入batch_render_module
                 if batch_render_module and hasattr(batch_render_module, 'batch_generate_resumes'):
