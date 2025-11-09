@@ -14,33 +14,35 @@
 |---------|---------|------------|------|
 | 员工编号 | EmpNo | {{BasicInfo.EmpNo}} | 员工工号，格式化为5位数 |
 | 工作名 | Name | {{BasicInfo.Name}} | 员工姓名，不包含数字 |
-| 管理关系一级部门 | DepartmentLevel1 | {{BasicInfo.DepartmentLevel1}} | 员工所属一级部门 |
-| 管理关系二级部门 | DepartmentLevel2 | {{BasicInfo.DepartmentLevel2}} | 员工所属二级部门 |
-| 岗位 | Position | {{BasicInfo.Position}} | 员工岗位名称 |
-| 专业级别 | ProfessionalLevel | {{BasicInfo.ProfessionalLevel}} | 员工专业技术级别 |
-| 公司邮箱 | CompanyEmail | {{BasicInfo.CompanyEmail}} | 员工公司电子邮箱 |
-| 入职日期 | EntryDate | {{BasicInfo.EntryDate}} | 员工入职日期 |
-| 初次入职日期 | FirstEntryDate | {{BasicInfo.FirstEntryDate}} | 员工首次入职公司的日期 |
-| 司龄 | CompanyYears | {{BasicInfo.CompanyYears}} | 员工在公司的工作年限 |
-| 工龄 | WorkYears | {{BasicInfo.WorkYears}} | 员工总工作年限 |
-| base地 | BaseLocation | {{BasicInfo.BaseLocation}} | 员工工作地点 |
-| 性别 | Gender | {{BasicInfo.Gender}} | 员工性别 |
-| 出生日期 | BirthDate | {{BasicInfo.BirthDate}} | 员工出生日期 |
-| 年龄 | Age | {{BasicInfo.Age}} | 员工年龄 |
-| 政治面貌 | PoliticalStatus | {{BasicInfo.PoliticalStatus}} | 员工政治面貌 |
-| 证件号码 | IDNumber | {{BasicInfo.IDNumber}} | 员工身份证号或其他证件号码 |
-| 手机号码 | PhoneNumber | {{BasicInfo.PhoneNumber}} | 员工手机号码 |
-| 毕业日期 | GraduationTime | {{BasicInfo.GraduationTime}} | 员工毕业日期 |
-| 毕业院校 | GraduationSchool | {{BasicInfo.GraduationSchool}} | 员工毕业院校名称 |
-| 学历 | HighestEducation | {{BasicInfo.HighestEducation}} | 员工最高学历 |
-| 专业 | Major | {{BasicInfo.Major}} | 员工所学专业 |
-| 合同签订法人 | ContractLegalPerson | {{BasicInfo.ContractLegalPerson}} | 员工劳动合同签订法人 |
+| 管理关系一级部门 | DepartmentLevel1 | {{AdditionInfo.DepartmentLevel1}} | 员工所属一级部门 |
+| 管理关系二级部门 | DepartmentLevel2 | {{AdditionInfo.DepartmentLevel2}} | 员工所属二级部门 |
+| 岗位 | Position | {{AdditionInfo.Position}} | 员工岗位名称 |
+| 专业级别 | ProfessionalLevel | {{AdditionInfo.ProfessionalLevel}} | 员工专业技术级别 |
+| 入职日期 | EntryDate | {{AdditionInfo.EntryDate}} | 员工入职日期 |
+| 初次入职日期 | FirstEntryDate | {{AdditionInfo.FirstEntryDate}} | 员工首次入职公司的日期 |
+| 司龄 | CompanyYears | {{AdditionInfo.CompanyYears}} | 员工在公司的工作年限 |
+| 工龄 | WorkYears | {{AdditionInfo.WorkYears}} | 员工总工作年限 |
+| base地 | BaseLocation | {{AdditionInfo.BaseLocation}} | 员工工作地点 |
+| 性别 | Gender | {{AdditionInfo.Gender}} | 员工性别 |
+| 出生日期 | BirthDate | {{AdditionInfo.BirthDate}} | 员工出生日期 |
+| 年龄 | Age | {{AdditionInfo.Age}} | 员工年龄 |
+| 政治面貌 | PoliticalStatus | {{AdditionInfo.PoliticalStatus}} | 员工政治面貌 |
+| 证件号码 | IDNumber | {{AdditionInfo.IDNumber}} | 员工身份证号或其他证件号码 |
+| 手机号码 | PhoneNumber | {{AdditionInfo.PhoneNumber}} | 员工手机号码 |
+| 毕业日期 | GraduationTime | {{AdditionInfo.GraduationTime}} | 员工毕业日期 |
+| 毕业院校 | GraduationSchool | {{AdditionInfo.GraduationSchool}} | 员工毕业院校名称 |
+| 学历 | HighestEducation | {{AdditionInfo.HighestEducation}} | 员工最高学历 |
+| 专业 | Major | {{AdditionInfo.Major}} | 员工所学专业 |
+| 合同签订法人 | ContractLegalPerson | {{AdditionInfo.ContractLegalPerson}} | 员工劳动合同签订法人 |
 | 个人简介 | PersonalProfile | {{BasicInfo.PersonalProfile}} | 员工个人简介信息 |
 | 部门 | Department | {{BasicInfo.Department}} | 员工所属部门 |
 | 职称 | Title | {{BasicInfo.Title}} | 员工职称信息 |
 | 工作经历 | WorkExperience | {{WorkExperience}} | 员工工作经历列表 |
 | 项目经历 | ProjectExperience | {{ProjectExperience}} | 员工项目经历列表 |
-| 工作能力 | WorkAbility | {{WorkAbility}} | 员工工作能力相关信息 |
+| 业务能力 | BusinessAbility | {{WorkAbility.BusinessAbility}} | 员工业务能力描述 |
+| 证书 | Certification | {{WorkAbility.Certification}} | 员工获得的证书 |
+| 培训经历 | Training | {{WorkAbility.Training}} | 员工培训经历 |
+| 技能标签 | SkillTag | {{WorkAbility.SkillTag}} | 员工技能标签 |
 
 ## 主要脚本说明
 
