@@ -107,6 +107,8 @@ class ResumeGeneratorGUI:
         self.selected_persons = []
         self.selected_list = []  # 存储选中的员工编号
         self.hidden_items = {}  # 存储被隐藏的项目
+        self.selected_list_file_path = tk.StringVar()  # 名单文件路径
+        self.selected_count_var = tk.StringVar(value="未选择文件")  # 选中人数显示
         
         # 设置中文字体
         self.font_config = {}
@@ -574,8 +576,8 @@ class ResumeGeneratorGUI:
         method_frame.pack(fill=tk.X, pady=5)
         
         self.generate_method = tk.StringVar(value="all")
-        ttk.Radiobutton(method_frame, text="全量简历生成", variable=self.generate_method, value="all", command=self._toggle_person_list).pack(side=tk.LEFT, padx=10)
-        ttk.Radiobutton(method_frame, text="按名单生成简历", variable=self.generate_method, value="selected", command=self._toggle_person_list).pack(side=tk.LEFT, padx=10)
+        ttk.Radiobutton(method_frame, text="按名单生成简历", variable=self.generate_method, value="all", command=self._toggle_person_list).pack(side=tk.LEFT, padx=10)
+        ttk.Radiobutton(method_frame, text="自定义生成简历", variable=self.generate_method, value="selected", command=self._toggle_person_list).pack(side=tk.LEFT, padx=10)
         
         # 人员名单框架
         self.person_list_frame = ttk.LabelFrame(generate_frame, text="点选人员名单", padding="10")
@@ -678,6 +680,24 @@ class ResumeGeneratorGUI:
         
         # 生成简历按钮
         ttk.Button(bank_frame, text="生成简历", command=self._generate_resumes, width=10, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
+        
+        # 新增按名单选择人员框架
+        self.list_select_frame = ttk.LabelFrame(generate_frame, text="按名单选择人员", padding="10")
+        self.list_select_frame.pack(fill=tk.X, pady=5)
+        self.list_select_frame.pack_forget()  # 初始隐藏
+        
+        # 文件选择和显示
+        file_select_frame = ttk.Frame(self.list_select_frame)
+        file_select_frame.pack(fill=tk.X, pady=5)
+        
+        self.selected_list_file_path = tk.StringVar(value="")
+        ttk.Entry(file_select_frame, textvariable=self.selected_list_file_path, width=50, font=self.font_config['entry']).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        ttk.Button(file_select_frame, text="选择名单文件", command=self._select_list_file, width=12).pack(side=tk.LEFT, padx=5)
+        ttk.Button(file_select_frame, text="确认选择", command=self._confirm_list_selection, width=10, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
+        
+        # 选择状态显示
+        self.selected_count_var = tk.StringVar(value="未选择任何人员")
+        ttk.Label(self.list_select_frame, textvariable=self.selected_count_var, font=self.font_config['label'], foreground="blue").pack(anchor="w", padx=5)
         
         # 3. 进度条
         progress_frame = ttk.Frame(main_frame)
@@ -1171,8 +1191,9 @@ class ResumeGeneratorGUI:
         main_thread.start()
     
     def _toggle_person_list(self):
-        """根据生成方式切换人员列表的显示状态"""
+        """根据生成方式切换人员列表和名单选择框架的显示状态"""
         if self.generate_method.get() == "selected":
+            # 自定义生成简历：显示人员列表，隐藏名单选择框架
             # 隐藏取消折叠按钮
             self.unfold_button.pack_forget()
             # 显示人员列表
@@ -1180,7 +1201,11 @@ class ResumeGeneratorGUI:
             # 自动更新人员名单，确保有数据显示
             self._update_person_list()
             self._person_list_visible = True
+            # 隐藏名单选择框架
+            if hasattr(self, 'list_select_frame'):
+                self.list_select_frame.pack_forget()
         else:
+            # 按名单生成简历：隐藏人员列表，显示名单选择框架
             # 隐藏取消折叠按钮
             self.unfold_button.pack_forget()
             # 隐藏人员列表
@@ -1191,6 +1216,9 @@ class ResumeGeneratorGUI:
             self.progress_label.pack(pady=2)
             # 确保日志区域可见
             self.log_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+            # 显示名单选择框架
+            if hasattr(self, 'list_select_frame'):
+                self.list_select_frame.pack(fill=tk.X, pady=5)
     
     def _toggle_person_list_visibility(self):
         """切换人员列表的折叠/展开状态"""
@@ -1244,6 +1272,76 @@ class ResumeGeneratorGUI:
             self._log(f"选中的员工编号: {', '.join(self.selected_list)}")
         else:
             self._log("未选择任何人员")
+    
+    def _select_list_file(self):
+        """选择名单文件"""
+        file_path = filedialog.askopenfilename(
+            title="选择人员名单文件",
+            filetypes=[("文本文件", "*.txt"), ("所有文件", "*.*")]
+        )
+        if file_path:
+            self.selected_list_file_path.set(file_path)
+            # 显示已选择的文件
+            self.selected_count_var.set("已选择文件，请点击'确认选择'导入名单")
+            self._log(f"已选择名单文件: {file_path}")
+    
+    def _confirm_list_selection(self):
+        """确认名单选择并更新select_list"""
+        file_path = self.selected_list_file_path.get()
+        if not file_path:
+            messagebox.showwarning("警告", "请先选择名单文件")
+            return
+        
+        try:
+            # 读取文件内容
+            with open(file_path, 'r', encoding='utf-8') as file:
+                content = file.read().strip()
+            
+            # 解析工号，支持逗号、空格、换行等分隔符
+            emp_numbers = []
+            # 替换所有非数字字符为逗号，然后分割
+            import re
+            cleaned_content = re.sub(r'[^0-9]', ',', content)
+            emp_numbers = [num.strip() for num in cleaned_content.split(',') if num.strip()]
+            
+            if emp_numbers:
+                # 更新selected_list
+                self.selected_list = emp_numbers
+                # 更新人员列表选择状态
+                self._update_person_list_selection()
+                # 更新状态显示
+                self.selected_count_var.set(f"已选择 {len(emp_numbers)} 人")
+                self._log(f"成功导入名单，共 {len(emp_numbers)} 人")
+                self._log(f"导入的员工编号: {', '.join(emp_numbers)}")
+                # 保存到最近选择
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                self._save_selected_emp_numbers(emp_numbers, timestamp)
+            else:
+                messagebox.showwarning("警告", "名单文件中未找到有效的工号")
+                self.selected_count_var.set("名单文件格式不正确，请重新选择")
+                self._log("名单文件格式不正确，未找到有效工号")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"读取名单文件时出错: {str(e)}")
+            self.selected_count_var.set("读取文件出错，请重新选择")
+            self._log(f"读取名单文件时出错: {str(e)}")
+    
+    def _update_person_list_selection(self):
+        """根据selected_list更新人员列表选择状态"""
+        if not hasattr(self, 'selected_list') or not self.selected_list:
+            return
+        
+        # 遍历所有人员，选中匹配的工号
+        for item in self.person_tree.get_children():
+            values = list(self.person_tree.item(item, "values"))
+            if values and len(values) > 1:
+                emp_no = values[1]
+                # 检查是否在selected_list中
+                if emp_no in self.selected_list:
+                    values[0] = "✓"
+                else:
+                    values[0] = ""
+                self.person_tree.item(item, values=values)
     
     def _on_tree_click(self, event):
         """处理树视图的点击事件，实现复选框功能"""
@@ -1722,9 +1820,29 @@ class ResumeGeneratorGUI:
         
         # 确定要处理的人员名单
         if self.generate_method.get() == "all":
-            person_names = "all"
-            self._log(f"开始全量生成简历，银行: {bankname}")
+            # 按名单生成简历：根据上传的名单内容决定生成范围
+            if not self.selected_list_file_path:
+                self._log("请先选择名单文件")
+                messagebox.showinfo("提示", "请先选择名单文件")
+                return
+            
+            # 检查名单内容是否包含'ALL'
+            if hasattr(self, 'selected_list') and self.selected_list and self.selected_list[0].upper() == 'ALL':
+                # 名单中包含'ALL'，执行全部生成
+                person_names = "all"
+                self._log(f"开始全量生成简历，银行: {bankname}")
+                self._log("名单中包含'ALL'，执行全部生成")
+            else:
+                # 名单中不包含'ALL'，只生成名单中的人员
+                if not self.selected_list:
+                    self._log("请先确认名单选择")
+                    messagebox.showinfo("提示", "请先点击'确认选择'按钮")
+                    return
+                person_names = self.selected_list
+                self._log(f"开始按名单生成简历，银行: {bankname}，人员数量: {len(person_names)}")
+                self._log(f"名单中的员工编号: {', '.join(person_names)}")
         else:
+            # 自定义生成简历：根据界面选择的人员生成
             # 检查是否有已确认选择的人员
             if not self.selected_list:
                 # 如果没有已确认的选择，尝试从复选框中获取

@@ -133,7 +133,7 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
         json_dir = os.path.dirname(json_data)
         if not os.path.exists(json_dir):
             os.makedirs(json_dir)
-            print(f"📁 已创建JSON目录：{json_dir}")
+            print(f"[INFO] 已创建JSON目录：{json_dir}")
         
         # ========== 前置检查阶段 ========== 
         # 验证模板文件存在性
@@ -164,7 +164,7 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
                     return
 
             # 处理Doc/Docx生成新JSON
-            print("\n🔨 正在转换Doc/Docx数据...")
+            print("\n[INFO] 正在转换Doc/Docx数据...")
             
             # 检查文件类型，如果是doc格式则先转换为docx
             processed_doc_path = input_file
@@ -212,13 +212,13 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
                 return
         else:
             # 如果input_file为None，说明是批量生成模式，直接使用已有JSON文件
-            print(f"\n📋 批量生成模式：使用现有JSON文件 {os.path.basename(json_data)}")
+            print(f"\n[INFO] 批量生成模式：使用现有JSON文件 {os.path.basename(json_data)}")
             if not os.path.exists(json_data):
                 print(f"[ERROR] JSON文件不存在：{json_data}")
                 return
 
         # ========== 简历生成阶段 ========== 
-        print("\n📑 开始生成简历文档...")
+        print("\n [INFO] 开始生成简历文档...")
         with open(json_data, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
@@ -240,38 +240,15 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
             # 构建正确格式的info_json文件路径：工号_姓名_人员信息.json
             info_json_file = os.path.join(info_json_dir, f"{emp_no}_{name_part}_人员信息.json")
             additional_info = None
-            
-            if os.path.exists(info_json_file):
-                try:
-                    with open(info_json_file, 'r', encoding='utf-8') as info_f:
-                        info_data = json.load(info_f)
-                        if "AdditionInfo" in info_data:
-                            additional_info = info_data["AdditionInfo"]
-                            print(f"[OK] 成功加载{emp_no}的额外信息")
-                except Exception as e:
-                    print(f"[WARNING] 读取额外信息文件出错: {str(e)}")
-            else:
-                # 直接使用正确的路径变量，确保没有额外字符
-                print(f"[INFO] 未找到{emp_no}的额外信息文件: {info_json_file}")
-            
-            # 将AdditionInfo添加到每个人员的数据中
-            if additional_info:
-                for person_name, person_data in data.items():
-                    # 确保BasicInfo存在
-                    if "BasicInfo" not in person_data:
-                        person_data["BasicInfo"] = {}
-                    # 添加AdditionInfo
-                    person_data["AdditionInfo"] = additional_info
-                    print(f"🔄 已将额外信息添加到{person_name}的数据中")
 
             # 动态获取处理人员名单
             valid_names = []
             if person_names == "all":
                 valid_names = list(data.keys())
-                print(f"🔍 检测到需处理全部 {len(valid_names)} 位人员")
+                print(f"[INFO] 检测到需处理全部 {len(valid_names)} 位人员")
             else:
                 valid_names = [name for name in person_names if name in data]
-                print(f"🔍 指定处理 {len(valid_names)} 位人员，过滤无效名称 {len(person_names)-len(valid_names)} 个")
+                print(f"[INFO] 指定处理 {len(valid_names)} 位人员，过滤无效名称 {len(person_names)-len(valid_names)} 个")
 
             # 创建输出目录（自动处理已存在情况）
             create_output_folder(output_folder)
@@ -291,8 +268,8 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
 
             # 生成统计报告
             print("\n" + "="*40)
-            print(f"🏁 处理完成！成功率 {success_count}/{len(valid_names)}")
-            print(f"📁 输出路径：{os.path.abspath(output_folder)}")
+            print(f"[OK] 处理完成！成功率 {success_count}/{len(valid_names)}")
+            print(f"[INFO] 输出路径：{os.path.abspath(output_folder)}")
             if len(valid_names) > success_count:
                 print("[WARNING] 失败详情请查看上方错误提示")
 
