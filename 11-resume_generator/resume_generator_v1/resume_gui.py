@@ -93,8 +93,8 @@ except Exception as e:
 class ResumeGeneratorGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("简历生成器")
-        self.root.geometry("900x700")
+        self.root.title("长亮科技简历生成器")
+        self.root.geometry("900x800")
         # 不再需要手动设置背景色，由主题处理
         
         # 设置窗口图标
