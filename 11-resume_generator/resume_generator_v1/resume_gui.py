@@ -1910,9 +1910,9 @@ class ResumeGeneratorGUI:
                         # 获取第一个键（通常是姓名）
                         person_name = list(resume_data.keys())[0]
                         if person_name in resume_data:
-                            # 检查info_data中是否已包含AddtionInfo键，避免嵌套层级
-                            if isinstance(info_data, dict) and "AddtionInfo" in info_data:
-                                resume_data[person_name]["AdditionInfo"] = info_data["AddtionInfo"]
+                            # 检查info_data中是否已包含AdditionInfo键，避免嵌套层级
+                            if isinstance(info_data, dict) and "AdditionInfo" in info_data:
+                                resume_data[person_name]["AdditionInfo"] = info_data["AdditionInfo"]
                             else:
                                 resume_data[person_name]["AdditionInfo"] = info_data
                             

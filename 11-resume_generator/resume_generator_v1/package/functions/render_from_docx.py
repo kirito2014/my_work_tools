@@ -245,8 +245,8 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
                 try:
                     with open(info_json_file, 'r', encoding='utf-8') as info_f:
                         info_data = json.load(info_f)
-                        if "AddtionInfo" in info_data:
-                            additional_info = info_data["AddtionInfo"]
+                        if "AdditionInfo" in info_data:
+                            additional_info = info_data["AdditionInfo"]
                             print(f"[OK] 成功加载{emp_no}的额外信息")
                 except Exception as e:
                     print(f"[WARNING] 读取额外信息文件出错: {str(e)}")
@@ -260,8 +260,8 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
                     # 确保BasicInfo存在
                     if "BasicInfo" not in person_data:
                         person_data["BasicInfo"] = {}
-                    # 添加AddtionInfo
-                    person_data["AddtionInfo"] = additional_info
+                    # 添加AdditionInfo
+                    person_data["AdditionInfo"] = additional_info
                     print(f"🔄 已将额外信息添加到{person_name}的数据中")
 
             # 动态获取处理人员名单

@@ -401,7 +401,7 @@ def batch_modify_json(input_folder, excel_file=None):
     print(f"处理失败: {failed_files}")
     print(f"JSON目录: {modify_json_dir}")
     
-    # 如果提供了Excel文件，更新JSON中的AddtionInfo
+    # 如果提供了Excel文件，更新JSON中的AdditionInfo
     if excel_file and os.path.exists(excel_file):
         print(f"\n正在从Excel文件更新JSON中的人员基本信息...")
         try:
@@ -417,7 +417,7 @@ def batch_modify_json(input_folder, excel_file=None):
                 # 创建工号到员工数据的映射
                 emp_map = {emp.get("EmpNo", "").zfill(5): emp for emp in excel_data}
                 
-                # 更新每个JSON文件的AddtionInfo
+                # 更新每个JSON文件的AdditionInfo
                 updated_count = 0
                 for filename in os.listdir(modify_json_dir):
                     if filename.endswith(".json"):
@@ -430,10 +430,10 @@ def batch_modify_json(input_folder, excel_file=None):
                                 file_content = read_file(file_path)
                                 if file_content:
                                     resume_data = json.loads(file_content)
-                                    # 更新AddtionInfo
+                                    # 更新AdditionInfo
                                     if resume_data:
                                         person_name = list(resume_data.keys())[0]
-                                        resume_data[person_name]["AddtionInfo"] = emp_map[emp_no]
+                                        resume_data[person_name]["AdditionInfo"] = emp_map[emp_no]
                                         # 写回文件
                                         updated_content = json.dumps(resume_data, ensure_ascii=False, indent=4)
                                         write_file(file_path, updated_content)

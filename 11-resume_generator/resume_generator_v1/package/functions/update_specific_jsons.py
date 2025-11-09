@@ -141,28 +141,28 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
                                     
                                     print(f"  - [OK] 成功从Word文档生成JSON: {json_filename}")
                                     
-                                    # 如果在Excel数据中找到该员工，更新AddtionInfo
+                                    # 如果在Excel数据中找到该员工，更新AdditionInfo
                                     if file_emp_no.zfill(5) in emp_map:
                                         try:
                                             resume_data = template_data
                                             emp_data = emp_map[file_emp_no.zfill(5)]
                                             if name in resume_data:
-                                                resume_data[name]["AddtionInfo"] = emp_data
+                                                resume_data[name]["AdditionInfo"] = emp_data
                                                 # 写回文件
                                                 updated_content = json.dumps(resume_data, ensure_ascii=False, indent=4)
                                                 with open(json_file, 'w', encoding='utf-8') as f:
                                                     f.write(updated_content)
-                                                print(f"  - [OK] 已更新AddtionInfo信息")
+                                                print(f"  - [OK] 已更新AdditionInfo信息")
                                         except Exception as e:
-                                            print(f"  - [ERROR] 更新AddtionInfo时出错: {e}")
+                                            print(f"  - [ERROR] 更新AdditionInfo时出错: {e}")
                                 
                         except Exception as e:
                             print(f"  - [ERROR] 处理文件时出错: {e}")
                             import traceback
                             traceback.print_exc()
     
-    # 查找并更新对应的简历JSON文件（使用Excel数据更新AddtionInfo）
-    print(f"\n正在更新简历JSON的AddtionInfo信息...")
+    # 查找并更新对应的简历JSON文件（使用Excel数据更新AdditionInfo）
+    print(f"\n正在更新简历JSON的AdditionInfo信息...")
     for emp_no in target_emp_numbers:
         if emp_no not in emp_map:
             print(f"警告: 工号 {emp_no} 在Excel数据中未找到")
@@ -189,12 +189,12 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
                     # 获取员工信息
                     emp_data = emp_map[emp_no]
                     
-                    # 更新AddtionInfo
+                    # 更新AdditionInfo
                     if resume_data:
                         # 获取第一个键（通常是姓名）
                         person_name = list(resume_data.keys())[0]
                         if person_name in resume_data:
-                            resume_data[person_name]["AddtionInfo"] = emp_data
+                            resume_data[person_name]["AdditionInfo"] = emp_data
                             # 将字典转换为JSON字符串并写回文件
                             updated_content = json.dumps(resume_data, ensure_ascii=False, indent=2)
                             write_file(file_path, updated_content)
@@ -226,7 +226,7 @@ def update_info_jsons(employee_numbers, excel_data, base_dir="output"):
         
         # 从modify_data中过滤出目标员工
         for name, data in modify_data.items():
-            emp_no = data["AddtionInfo"].get("EmpNo", "").zfill(5)
+            emp_no = data["AdditionInfo"].get("EmpNo", "").zfill(5)
             if emp_no in target_emp_numbers:
                 filtered_data[name] = data
         
