@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word模板占位符编辑器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            display: flex;
+            min-height: 100vh;
+            padding: 20px;
+            gap: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .document-panel {
+            flex: 3;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .fields-panel {
+            flex: 1;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            min-width: 300px;
+        }
+        
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eaeaea;
+        }
+        
+        .panel-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: #2ecc71;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #27ae60;
+            transform: translateY(-2px);
+        }
+        
+        .document-content {
+            flex: 1;
+            border: 1px dashed #bdc3c7;
+            border-radius: 8px;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            min-height: 500px;
+        }
+        
+        .drop-zone {
+            min-height: 50px;
+            border: 2px dashed #3498db;
+            border-radius: 5px;
+            margin: 10px 0;
+            padding: 15px;
+            background: rgba(52, 152, 219, 0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .drop-zone.highlight {
+            background: rgba(52, 152, 219, 0.15);
+            border-color: #2980b9;
+        }
+        
+        .field-item {
+            background: #f1f8ff;
+            border: 1px solid #c5e1ff;
+            border-radius: 6px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            cursor: grab;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .field-item:hover {
+            background: #e1f0ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .field-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .field-desc {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            margin-top: 3px;
+        }
+        
+        .field-preview {
+            color: #e74c3c;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        
+        .search-box {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .search-box:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+            outline: none;
+        }
+        
+        .fields-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .placeholder {
+            display: inline-block;
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 3px 8px;
+            margin: 0 5px;
+            font-family: monospace;
+            color: #e67e22;
+        }
+        
+        .instructions {
+            background: #e8f4fd;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-size: 0.95rem;
+        }
+        
+        .instructions h3 {
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+        
+        .instructions ol {
+            margin-left: 20px;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 20px;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 1024px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .fields-panel {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Word模板占位符编辑器</h1>
+        <p class="subtitle">拖放Jinja2字段到文档中，轻松创建模板</p>
+    </header>
+    
+    <div class="container">
+        <div class="document-panel">
+            <div class="panel-header">
+                <h2 class="panel-title">文档内容</h2>
+                <div>
+                    <button class="btn btn-primary" id="openBtn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                            <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                        </svg>
+                        打开Word文档
+                    </button>
+                    <button class="btn btn-success" id="saveBtn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
+                        </svg>
+                        保存文档
+                    </button>
+                </div>
+            </div>
+            
+            <div class="instructions">
+                <h3>使用说明</h3>
+                <ol>
+                    <li>点击"打开Word文档"按钮选择您的模板文件</li>
+                    <li>从右侧字段列表中找到需要的占位符字段</li>
+                    <li>将字段拖放到文档中需要插入的位置</li>
+                    <li>完成后点击"保存文档"按钮保存修改</li>
+                </ol>
+            </div>
+            
+            <div class="document-content" id="documentContent">
+                <p>请打开一个Word文档开始编辑...</p>
+                
+                <!-- 示例文档内容 -->
+                <div style="display: none;" id="sampleContent">
+                    <h2>员工信息表</h2>
+                    <p>姓名：<span class="drop-zone" data-field="name"></span></p>
+                    <p>部门：<span class="drop-zone" data-field="department"></span></p>
+                    <p>职位：<span class="drop-zone" data-field="position"></span></p>
+                    
+                    <h3>工作信息</h3>
+                    <table border="1" style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <th style="padding: 8px;">项目</th>
+                            <th style="padding: 8px;">内容</th>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px;">员工编号</td>
+                            <td style="padding: 8px;"><span class="drop-zone" data-field="employee_id"></span></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px;">入职日期</td>
+                            <td style="padding: 8px;"><span class="drop-zone" data-field="hire_date"></span></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px;">薪资等级</td>
+                            <td style="padding: 8px;"><span class="drop-zone" data-field="salary_grade"></span></td>
+                        </tr>
+                    </table>
+                    
+                    <h3>联系方式</h3>
+                    <p>电话：<span class="drop-zone" data-field="phone"></span></p>
+                    <p>邮箱：<span class="drop-zone" data-field="email"></span></p>
+                    <p>地址：<span class="drop-zone" data-field="address"></span></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="fields-panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Jinja2字段</h2>
+            </div>
+            
+            <input type="text" class="search-box" id="searchField" placeholder="搜索字段...">
+            
+            <div class="fields-list" id="fieldsList">
+                <!-- 字段将通过JavaScript动态生成 -->
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>Word模板占位符编辑器 &copy; 2023 | 使用Jinja2模板引擎</p>
+    </footer>
+
+    <script>
+        // 从后端获取Jinja2字段数据
+        let fieldData = [];
+
+        // 获取字段数据
+        async function fetchFields() {
+            try {
+                const response = await fetch('/api/fields');
+                if (!response.ok) throw new Error('无法获取字段数据');
+                fieldData = await response.json();
+                initializeFields();
+            } catch (error) {
+                console.error('获取字段失败:', error);
+                // 使用默认字段数据作为备选
+                fieldData = [
+                    { id: 'name', name: '姓名', description: '员工的完整姓名', preview: '[姓名]' },
+                    { id: 'employee_id', name: '员工编号', description: '员工的唯一识别编号', preview: '[员工编号]' }
+                ];
+                initializeFields();
+            }
+        }
+
+        // 初始化字段列表
+        function initializeFields() {
+            const fieldsList = document.getElementById('fieldsList');
+            fieldsList.innerHTML = '';
+            
+            fieldData.forEach(field => {
+                const fieldElement = document.createElement('div');
+                fieldElement.className = 'field-item';
+                fieldElement.draggable = true;
+                fieldElement.dataset.fieldId = field.id;
+                
+                fieldElement.innerHTML = `
+                    <div>
+                        <div class="field-name">${field.name}</div>
+                        <div class="field-desc">${field.description}</div>
+                    </div>
+                    <div class="field-preview">${field.preview}</div>
+                `;
+                
+                fieldElement.addEventListener('dragstart', handleDragStart);
+                fieldsList.appendChild(fieldElement);
+            });
+        }
+
+        // 处理拖拽开始
+        function handleDragStart(e) {
+            e.dataTransfer.setData('text/plain', e.target.dataset.fieldId);
+            e.dataTransfer.effectAllowed = 'copy';
+        }
+
+        // 初始化拖放区域
+        function initializeDropZones() {
+            const dropZones = document.querySelectorAll('.drop-zone');
+            
+            dropZones.forEach(zone => {
+                zone.addEventListener('dragover', handleDragOver);
+                zone.addEventListener('dragenter', handleDragEnter);
+                zone.addEventListener('dragleave', handleDragLeave);
+                zone.addEventListener('drop', handleDrop);
+            });
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            e.target.classList.add('highlight');
+        }
+
+        function handleDragLeave(e) {
+            e.target.classList.remove('highlight');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.target.classList.remove('highlight');
+            
+            const fieldId = e.dataTransfer.getData('text/plain');
+            const field = fieldData.find(f => f.id === fieldId);
+            
+            if (field) {
+                e.target.innerHTML = `<span class="placeholder">${field.preview}</span>`;
+                e.target.dataset.filled = 'true';
+            }
+        }
+
+        // 搜索功能
+        document.getElementById('searchField').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const fieldItems = document.querySelectorAll('.field-item');
+            
+            fieldItems.forEach(item => {
+                const fieldName = item.querySelector('.field-name').textContent.toLowerCase();
+                const fieldDesc = item.querySelector('.field-desc').textContent.toLowerCase();
+                
+                if (fieldName.includes(searchTerm) || fieldDesc.includes(searchTerm)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+
+        // 打开文档功能
+        document.getElementById('openBtn').addEventListener('click', function() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.docx';
+            
+            fileInput.onchange = async function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                try {
+                    // 显示加载状态
+                    document.getElementById('documentContent').innerHTML = '<div style="text-align:center;padding:50px;">加载中...</div>';
+                    
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        // 在实际应用中，这里应该渲染文档内容
+                        document.getElementById('documentContent').innerHTML = `
+                            <h2>文档内容 - ${file.name}</h2>
+                            <div class="drop-zone" style="min-height: 300px;">在此处拖放字段...</div>
+                            <p>文档已成功加载，您可以开始拖放字段。</p>
+                        `;
+                        initializeDropZones();
+                    } else {
+                        alert('打开文档失败: ' + (result.error || '未知错误'));
+                    }
+                } catch (error) {
+                    console.error('上传失败:', error);
+                    alert('上传文档时出错，请重试。');
+                }
+            };
+            
+            fileInput.click();
+        });
+
+        // 保存文档功能
+        document.getElementById('saveBtn').addEventListener('click', async function() {
+            const documentContent = document.getElementById('documentContent').innerHTML;
+            
+            try {
+                const response = await fetch('/api/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        content: documentContent,
+                        filename: 'template_with_placeholders.docx'
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    // 创建下载链接
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = result.download_url;
+                    downloadLink.download = 'resume_template.docx';
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                    alert('文档保存成功！');
+                } else {
+                    alert('保存文档失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('保存失败:', error);
+                alert('保存文档时出错，请重试。');
+            }
+        });
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchFields(); // 获取字段数据
+            initializeDropZones();
+        });
+    </script>
+</body>
+</html>
