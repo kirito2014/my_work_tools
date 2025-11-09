@@ -218,7 +218,7 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
                 return
 
         # ========== 简历生成阶段 ========== 
-        print("\n [INFO] 开始生成简历文档...")
+        print("\n[INFO] 开始生成简历文档...")
         with open(json_data, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
