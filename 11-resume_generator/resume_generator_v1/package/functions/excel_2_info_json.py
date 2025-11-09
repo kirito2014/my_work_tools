@@ -116,7 +116,7 @@ def create_modify_json_format(employee_data):
         
         # 按照modify_json格式组织数据
         modify_data[original_name] = {
-            "AddtionInfo": addition_info
+            "AdditionInfo": addition_info
         }
     
     return modify_data
@@ -129,8 +129,8 @@ def save_json_files(modify_data, output_dir):
     os.makedirs(output_dir, exist_ok=True)
     
     for name, data in modify_data.items():
-        # 从AddtionInfo中获取工号和姓名，并将工号格式化为5位数（补齐前导零）
-        emp_no = data["AddtionInfo"].get("EmpNo", "未知工号")
+        # 从AdditionInfo中获取工号和姓名，并将工号格式化为5位数（补齐前导零）
+        emp_no = data["AdditionInfo"].get("EmpNo", "未知工号")
         # 如果是数字工号，格式化为5位数
         if emp_no != "未知工号" and emp_no.isdigit():
             emp_no = emp_no.zfill(5)
