@@ -1912,9 +1912,9 @@ class ResumeGeneratorGUI:
                         if person_name in resume_data:
                             # 检查info_data中是否已包含AddtionInfo键，避免嵌套层级
                             if isinstance(info_data, dict) and "AddtionInfo" in info_data:
-                                resume_data[person_name]["AddtionInfo"] = info_data["AddtionInfo"]
+                                resume_data[person_name]["AdditionInfo"] = info_data["AddtionInfo"]
                             else:
-                                resume_data[person_name]["AddtionInfo"] = info_data
+                                resume_data[person_name]["AdditionInfo"] = info_data
                             
                             # 写回文件
                             with open(resume_path, 'w', encoding='utf-8') as f:
@@ -1932,10 +1932,47 @@ class ResumeGeneratorGUI:
                     self._log(f"  错误: 更新简历文件 {resume_file} 时出错: {e}")
                     skipped_count += 1
             
-            self._log(f"===== AdditionInfo信息更新完成 =====")
+            # 添加验证步骤，检查AdditionInfo是否成功合并
+            self._log("===== 开始验证AdditionInfo合并结果 =====")
+            validation_success = 0
+            validation_failed = 0
+            
+            for resume_file in files_to_update:
+                try:
+                    resume_path = os.path.join(modify_dir, resume_file)
+                    
+                    # 重新读取文件验证
+                    with open(resume_path, 'r', encoding='utf-8') as f:
+                        validated_data = json.load(f)
+                    
+                    if validated_data:
+                        person_name = list(validated_data.keys())[0]
+                        if person_name in validated_data and "AdditionInfo" in validated_data[person_name]:
+                            # 检查AdditionInfo是否有内容
+                            addition_info = validated_data[person_name]["AdditionInfo"]
+                            if addition_info and isinstance(addition_info, dict) and len(addition_info) > 0:
+                                validation_success += 1
+                                self._log(f"  验证成功: {resume_file} - AdditionInfo已正确合并")
+                            else:
+                                validation_failed += 1
+                                self._log(f"  验证失败: {resume_file} - AdditionInfo存在但为空或格式不正确")
+                        else:
+                            validation_failed += 1
+                            self._log(f"  验证失败: {resume_file} - 未找到AdditionInfo字段")
+                    else:
+                        validation_failed += 1
+                        self._log(f"  验证失败: {resume_file} - 文件内容为空")
+                except Exception as e:
+                    validation_failed += 1
+                    self._log(f"  验证错误: 检查文件 {resume_file} 时出错: {e}")
+            
+            self._log(f"===== AdditionInfo信息更新和验证完成 =====")
             self._log(f"成功更新: {updated_count} 个文件")
             self._log(f"跳过: {skipped_count} 个文件")
-            return updated_count > 0
+            self._log(f"验证结果 - 成功: {validation_success}, 失败: {validation_failed}")
+            
+            # 返回验证是否全部成功
+            return updated_count > 0 and validation_success == updated_count
         except Exception as e:
             self._log(f"===== 更新AdditionInfo信息时发生严重错误 =====")
             self._log(f"错误详情: {str(e)}")
