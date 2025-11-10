@@ -246,3 +246,7 @@ YYYY/MM 	 YYYY/MM 	 示例分析报表项目 	 项目经理 	 负责项目计划
 1. 确保Excel文件格式正确，表头与对照表中的中文名称一致
 2. 工号会自动格式化为5位数，不足5位的前面补零
 3. 姓名中的数字会被自动移除，确保与简历信息保持一致
+
+
+
+pyinstaller  --onefile --windowed  --console --name "简历生成器" --add-data "resources/icons/sunline.ico;resources/icons" --add-data "resources/bank_pics;resources/bank_pics" --add-data "template;template" --add-data "config;config" --hidden-import "package.functions.doc_2_json" --hidden-import "package.functions.render_from_docx" --hidden-import "package.utils.excel_reader" --icon "resources/icons/sunline.ico" resume_gui.py 
