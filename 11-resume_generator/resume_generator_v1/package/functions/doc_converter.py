@@ -9,6 +9,16 @@ import comtypes.client
 import time
 from typing import Optional, List, Tuple
 
+# 处理PyInstaller打包后的路径问题
+if getattr(sys, 'frozen', False):
+    # 打包后的环境
+    base_dir = os.path.dirname(sys.executable)
+    # 确保工作目录设置为当前目录（exe所在目录）
+    os.chdir(base_dir)
+else:
+    # 开发环境
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 def convert_doc_to_docx(doc_path: str, output_dir: Optional[str] = None) -> str:
     """

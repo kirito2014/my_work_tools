@@ -10,9 +10,18 @@ import sys
 import json
 from datetime import datetime
 
-# 导入项目根目录以便导入其他模块
-current_file = os.path.abspath(__file__)
-project_root = os.path.dirname(current_file)
+# 处理PyInstaller打包后的路径问题
+if getattr(sys, 'frozen', False):
+    # 打包后的环境
+    base_dir = os.path.dirname(sys.executable)
+    # 确保工作目录设置为当前目录（exe所在目录）
+    os.chdir(base_dir)
+    project_root = base_dir
+else:
+    # 开发环境
+    current_file = os.path.abspath(__file__)
+    project_root = os.path.dirname(current_file)
+    base_dir = project_root
 sys.path.append(project_root)
 
 # 导入doc_converter模块
@@ -100,8 +109,8 @@ def batch_generate_resumes(json_files_dir, template_path, bankname, person_names
         print(f"错误: 模板文件 '{template_path}' 不存在")
         return 0, 0
     
-    # 创建输出目录
-    output_dir = os.path.join(project_root, "output", bankname)
+    # 创建输出目录，使用base_dir确保在打包环境中正确
+    output_dir = os.path.join(base_dir, "output", bankname)
     os.makedirs(output_dir, exist_ok=True)
     
     # 获取所有JSON文件
@@ -249,7 +258,7 @@ def batch_process_resumes(input_folder, template_path, bankname):
                 json_filename = f"{base_name}.json"
             
             # 设置JSON文件路径
-            json_file = os.path.join(project_root, "output", "modify_json", json_filename)
+            json_file = os.path.join(base_dir, "output", "modify_json", json_filename)
             os.makedirs(os.path.dirname(json_file), exist_ok=True)
             
             processed_files += 1
@@ -286,8 +295,8 @@ def batch_modify_json(input_folder, excel_file=None):
     temp_dir = os.path.join(input_folder, "temp_converted")
     os.makedirs(temp_dir, exist_ok=True)
     
-    # 创建output/modify_json目录
-    modify_json_dir = os.path.join(project_root, "output", "modify_json")
+    # 创建output/modify_json目录，使用base_dir确保在打包环境中正确
+    modify_json_dir = os.path.join(base_dir, "output", "modify_json")
     os.makedirs(modify_json_dir, exist_ok=True)
     
     # 统计信息
@@ -471,6 +480,6 @@ if __name__ == "__main__":
     batch_process_resumes(input_folder, template_path, bankname)
     
     # 然后批量生成简历
-    modify_json_dir = os.path.join(project_root, 'output', 'modify_json')
+    modify_json_dir = os.path.join(base_dir, 'output', 'modify_json')
     print(f"\n开始批量生成简历...")
     batch_generate_resumes(modify_json_dir, template_path, bankname)

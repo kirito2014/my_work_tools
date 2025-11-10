@@ -214,8 +214,13 @@ def main():
     # 获取当前脚本的绝对路径
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # 设置默认的Excel文件路径
-    default_excel_path = os.path.join(script_dir, "input", "技术人员名单-11月.xlsx")
+    # 处理PyInstaller打包后的路径
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+        # 切换工作目录到EXE所在目录
+        os.chdir(base_dir)
+    else:
+        base_dir = script_dir
     
     # 允许用户通过命令行参数指定Excel文件路径
     if len(sys.argv) > 1:
@@ -224,15 +229,8 @@ def main():
         if not os.path.isabs(excel_file_path):
             excel_file_path = os.path.abspath(excel_file_path)
     else:
-        excel_file_path = default_excel_path
-        print(f"未指定Excel文件路径，使用默认路径: {excel_file_path}")
-    
-    # 确保Excel文件存在，如果不存在则打开文件选择对话框
-    if not os.path.exists(excel_file_path):
-        print(f"错误: Excel文件不存在: {excel_file_path}")
-        print("正在打开文件选择对话框...")
-        
-        # 尝试导入tkinter用于文件选择
+        # 没有命令行参数，直接打开文件选择对话框
+        print("未指定Excel文件路径，打开文件选择对话框...")
         try:
             import tkinter as tk
             from tkinter import filedialog
@@ -251,13 +249,25 @@ def main():
             if not excel_file_path:
                 print("未选择文件，程序退出")
                 sys.exit(1)
+            
+            # 转换为绝对路径
+            excel_file_path = os.path.abspath(excel_file_path)
                 
         except ImportError:
             print("无法打开文件选择对话框，请手动指定文件路径")
             sys.exit(1)
     
-    # 设置输出文件路径
-    output_file = os.path.join(script_dir, "config", "emp_list.json")
+    # 验证文件是否存在
+    if not os.path.exists(excel_file_path):
+        print(f"错误: 所选Excel文件不存在: {excel_file_path}")
+        sys.exit(1)
+    
+    # 设置输出文件路径，使用base_dir确保在打包环境中正确
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = script_dir
+    output_file = os.path.join(base_dir, "config", "emp_list.json")
     
     print(f"\n开始处理Excel文件，提取员工信息...")
     print(f"输入文件: {excel_file_path}")

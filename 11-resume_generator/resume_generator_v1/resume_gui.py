@@ -108,7 +108,6 @@ class ResumeGeneratorGUI:
         
         # 设置文件路径变量 - 使用base_dir确保在打包环境中正确
         self.base_dir = base_dir
-        self.input_dir = os.path.join(base_dir, "input")
         self.output_dir = os.path.join(base_dir, "output")
         self.template_dir = os.path.join(base_dir, "template")
         self.resources_dir = os.path.join(base_dir, "resources")
@@ -272,8 +271,8 @@ class ResumeGeneratorGUI:
     
     def _select_folder(self, string_var):
         """选择文件夹的通用方法，默认从应用程序所在目录开始"""
-        # 使用self.base_dir作为初始目录，确保在打包环境中正确
-        initial_dir = getattr(self, 'base_dir', os.getcwd())
+        # 使用用户选择的目录或当前工作目录作为初始目录
+        initial_dir = string_var.get() if string_var.get() else getattr(self, 'base_dir', os.getcwd())
         folder_path = filedialog.askdirectory(initialdir=initial_dir)
         if folder_path:
             string_var.set(folder_path)
@@ -903,7 +902,9 @@ class ResumeGeneratorGUI:
         self.progress_label.config(text="10%")
         
         # 在单独的线程中执行解析操作
-        threading.Thread(target=self._parse_tech_info_thread, args=(file_path,)).start()
+        # 确保传递绝对路径
+        absolute_path = os.path.abspath(file_path)
+        threading.Thread(target=self._parse_tech_info_thread, args=(absolute_path,)).start()
     
     def _parse_tech_info_thread(self, file_path):
         """在单独线程中解析技术人员信息"""
@@ -1531,12 +1532,17 @@ class ResumeGeneratorGUI:
                 # 检查模块是否有必要的函数
                 if get_emp_module and hasattr(get_emp_module, 'get_employee_info') and hasattr(get_emp_module, 'save_employee_list'):
                     # 使用默认Excel文件路径（与get_emp_list.py中的默认路径一致）
-                    default_file_path = os.path.join(base_dir, "input", "技术人员名单-11月.xlsx")
                     output_file = os.path.join(base_dir, "config", "emp_list.json")
                     
                     try:
+                        # 使用用户选择的文件路径
+                        file_path = self.tech_info_file_path.get()
+                        if not file_path:
+                            self._log("请先选择技术人员信息文件")
+                            return
+                        
                         # 获取员工信息
-                        employee_list = get_emp_module.get_employee_info(default_file_path)
+                        employee_list = get_emp_module.get_employee_info(file_path)
                         
                         if not employee_list:
                             self._log("[ERROR] 没有成功提取任何员工数据")
@@ -2684,20 +2690,12 @@ class ResumeGeneratorGUI:
             if hasattr(self, 'special_info_file'):
                 info_file = self.special_info_file.get()
             
-            # 如果没有特殊更新对话框中的文件，检查是否有其他可用的文件路径
+            # 使用用户选择的技术人员信息文件
             if not info_file or not os.path.exists(info_file):
-                # 尝试默认的人员信息文件
-                default_info_file = os.path.join(base_dir, "input", "技术人员名单-11月.xlsx")
-                if os.path.exists(default_info_file):
-                    info_file = default_info_file
-                else:
-                    # 尝试其他可能的位置
-                    alt_info_file = os.path.join(base_dir, "input", "技术人员名单.xlsx")
-                    if os.path.exists(alt_info_file):
-                        info_file = alt_info_file
-                    else:
-                        self._log(f"未找到人员信息Excel文件")
-                        return False
+                info_file = self.tech_info_file_path.get()
+                if not info_file or not os.path.exists(info_file):
+                    self._log(f"请先选择有效的人员信息Excel文件")
+                    return False
             
             # 使用主程序中已选择的简历文件夹路径
             resume_folder = ""

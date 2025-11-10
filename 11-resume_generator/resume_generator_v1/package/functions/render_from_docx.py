@@ -3,12 +3,19 @@ import json
 from datetime import datetime
 from docxtpl import DocxTemplate
 
-# 导入项目根目录以便导入其他模块
-current_file = os.path.abspath(__file__)
-current_dir = os.path.dirname(current_file)
-parent_dir = os.path.dirname(current_dir)
-project_root = os.path.dirname(parent_dir)
-sys.path.append(project_root)
+# 处理PyInstaller打包后的路径问题
+if getattr(sys, 'frozen', False):
+    # 打包后的环境
+    base_dir = os.path.dirname(sys.executable)
+    # 确保工作目录设置为当前目录（exe所在目录）
+    os.chdir(base_dir)
+else:
+    # 开发环境
+    current_file = os.path.abspath(__file__)
+    current_dir = os.path.dirname(current_file)
+    parent_dir = os.path.dirname(current_dir)
+    base_dir = os.path.dirname(parent_dir)
+    sys.path.append(base_dir)
 # print(f"当前文件路径: {current_file}")
 # print(f"当前目录: {current_dir}")
 # print(f"父级目录: {parent_dir}")
@@ -98,7 +105,13 @@ def generate_resume_from_json(person_data, template_path, output_folder, person_
 
         # 保存生成的文档
         doc.save(output_path)
-        print(f"{person_name} 简历已生成,保存到: {output_path}")
+        print(f"{person_name} 简历已生成,保存到: {os.path.abspath(output_path)}")
+        
+        # 特殊处理：如果在PyInstaller临时目录中，提示用户文件实际位置
+        if getattr(sys, 'frozen', False) and 'TEMP' in output_path.upper():
+            actual_output_path = os.path.join(base_dir, 'output', bankname, os.path.basename(output_path))
+            print(f"[注意] 实际输出位置: {actual_output_path}")
+            
         return output_path
 
     except Exception as e:
@@ -113,11 +126,15 @@ def create_output_folder(output_folder):
     :param output_folder: 输出文件夹路径。
     :return: None
     """
+    # 确保使用绝对路径
+    if not os.path.isabs(output_folder):
+        output_folder = os.path.join(base_dir, output_folder)
+        
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
-        print(f"输出文件夹已创建: {output_folder}")
+        print(f"输出文件夹已创建: {os.path.abspath(output_folder)}")
     else:
-        print(f"输出文件夹已存在: {output_folder}")
+        print(f"输出文件夹已存在: {os.path.abspath(output_folder)}")
 
 
 def process_json_data(json_data, template_path, input_file, output_folder, person_names="all", bankname=None):
@@ -233,8 +250,7 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
             
             # 尝试从info_json目录加载对应工号的额外信息
             # 直接使用项目根目录路径
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(current_file))))
-            info_json_dir = os.path.join(project_root, "output", "info_json")
+            info_json_dir = os.path.join(base_dir, "output", "info_json")
             # 从json_filename中提取姓名
             name_part = json_filename.split('_')[1]
             # 构建正确格式的info_json文件路径：工号_姓名_人员信息.json
@@ -250,6 +266,10 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
                 valid_names = [name for name in person_names if name in data]
                 print(f"[INFO] 指定处理 {len(valid_names)} 位人员，过滤无效名称 {len(person_names)-len(valid_names)} 个")
 
+            # 确保输出文件夹使用绝对路径
+            if not os.path.isabs(output_folder):
+                output_folder = os.path.join(base_dir, output_folder)
+            
             # 创建输出目录（自动处理已存在情况）
             create_output_folder(output_folder)
 
@@ -291,8 +311,8 @@ if __name__ == "__main__":
     template_file = sys.argv[2]
     bankname = sys.argv[3]
     
-    # 根据bankname设置输出目录
-    output_dir = os.path.join("output", bankname)
+    # 根据bankname设置输出目录，使用base_dir确保在打包环境中正确
+    output_dir = os.path.join(base_dir, "output", bankname)
     
     # 从文件名提取工号和姓名，生成不带temp标识的JSON文件名
     base_name = os.path.splitext(os.path.basename(docx_file))[0]
@@ -306,8 +326,8 @@ if __name__ == "__main__":
     else:
         # 如果文件名格式不符合预期，则使用原文件名但移除temp标识
         json_filename = f"{base_name}.json"
-    # 设置JSON文件路径为output/modify_json目录
-    json_file = os.path.join("output", "modify_json", json_filename)
+    # 设置JSON文件路径为output/modify_json目录，使用base_dir确保在打包环境中正确
+    json_file = os.path.join(base_dir, "output", "modify_json", json_filename)
 
     process_json_data(
         json_data=json_file,

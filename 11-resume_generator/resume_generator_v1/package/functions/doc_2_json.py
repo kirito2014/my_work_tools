@@ -6,8 +6,17 @@ import re
 from docx import Document
 from typing import Dict, List, Any  
 
+# 处理PyInstaller打包后的路径问题
+if getattr(sys, 'frozen', False):
+    # 打包后的环境
+    base_dir = os.path.dirname(sys.executable)
+    # 确保工作目录设置为当前目录（exe所在目录）
+    os.chdir(base_dir)
+else:
+    # 开发环境
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 添加项目根目录到Python路径，以便能够导入package模块
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(base_dir)
 
 # 导入doc转docx转换器
 try:
@@ -362,7 +371,8 @@ if __name__ == "__main__":
         if doc_path.lower().endswith('.doc'):
             print(f"检测到doc格式文件: {doc_path}")
             # 创建临时目录存储转换后的文件
-            temp_dir = os.path.join(os.path.dirname(doc_path), "temp_converted")
+            # 使用base_dir或当前文件目录作为临时目录的基础
+            temp_dir = os.path.join(base_dir, "temp_converted")
             os.makedirs(temp_dir, exist_ok=True)
             # 转换doc到docx
             doc_path = dc.convert_doc_to_docx(doc_path, temp_dir)
@@ -390,8 +400,9 @@ if __name__ == "__main__":
         #print(template_json)
 
         # 创建输出目录
-        original_dir = os.path.join("output", "original_json")
-        modify_dir = os.path.join("output", "modify_json")
+        # 使用base_dir确保在打包环境中输出到正确位置
+        original_dir = os.path.join(base_dir, "output", "original_json")
+        modify_dir = os.path.join(base_dir, "output", "modify_json")
         os.makedirs(original_dir, exist_ok=True)
         os.makedirs(modify_dir, exist_ok=True)
 
