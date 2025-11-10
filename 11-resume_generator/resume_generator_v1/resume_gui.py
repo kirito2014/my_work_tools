@@ -318,49 +318,81 @@ class ResumeGeneratorGUI:
             messagebox.showerror("错误", "请选择人员信息文件")
             return
         
-        # 构建命令
-        cmd = [sys.executable, os.path.join(base_dir, "package", "functions", "update_specific_jsons.py"), 
-               str(update_option), employee_numbers, "--excel", info_file]
-        
-        # 如果提供了简历文件夹，添加--word参数
-        if resume_folder:
-            cmd.extend(["--word", resume_folder])
-        
         # 清空日志栏
         self.output_text.delete(1.0, tk.END)
         self.output_text.insert(tk.END, "开始执行更新操作...\n")
         
-        # 实时更新输出的函数
-        def update_output(process):
-            while True:
-                line = process.stdout.readline()
-                if not line:
-                    break
-                self.special_dialog.after(0, lambda l=line: [
-                    self.output_text.insert(tk.END, l),
-                    self.output_text.see(tk.END)
-                ])
-            
-            # 处理完成后更新UI
+        # 定义实时更新输出的函数
+        def log_output(message):
             self.special_dialog.after(0, lambda: [
-                self.output_text.insert(tk.END, "\n更新完成！"),
+                self.output_text.insert(tk.END, message + "\n"),
                 self.output_text.see(tk.END)
             ])
         
-        # 在新线程中执行命令
+        # 在新线程中执行更新操作
         def execute_command():
             try:
-                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
-                                          text=True, cwd=base_dir)
-                
-                # 更新输出
-                update_output(process)
-                
-                # 等待进程完成
-                process.wait()
-            except Exception as e:
+                # 直接导入并执行update_specific_jsons模块
+                update_module = None
+                try:
+                    # 尝试直接导入模块
+                    try:
+                        from package.functions import update_specific_jsons as update_module
+                    except ImportError:
+                        # 如果直接导入失败，尝试通过文件路径加载
+                        update_path = os.path.join(base_dir, "package", "functions", "update_specific_jsons.py")
+                        if os.path.exists(update_path):
+                            import importlib.util
+                            spec = importlib.util.spec_from_file_location("update_specific_jsons", update_path)
+                            update_module = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(update_module)
+                        else:
+                            log_output(f"错误: 未找到update_specific_jsons.py文件: {update_path}")
+                            return
+                    
+                    # 检查模块是否有main函数
+                    if update_module and hasattr(update_module, 'main'):
+                        # 重定向stdout以捕获输出
+                        import io
+                        old_stdout = sys.stdout
+                        sys.stdout = io.StringIO()
+                        
+                        try:
+                            # 保存原始的sys.argv
+                            original_argv = sys.argv.copy()
+                            
+                            # 设置sys.argv以传递参数
+                            sys.argv = [sys.argv[0], str(update_option), employee_numbers, "--excel", info_file]
+                            if resume_folder:
+                                sys.argv.extend(["--word", resume_folder])
+                            
+                            # 执行main函数（不直接传递参数）
+                            log_output("正在执行更新操作...")
+                            update_module.main()
+                            
+                            # 获取输出并记录
+                            output = sys.stdout.getvalue()
+                            for line in output.split('\n'):
+                                if line.strip():
+                                    log_output(line.strip())
+                        except Exception as e:
+                            log_output(f"错误: 更新操作执行出错: {str(e)}")
+                            import traceback
+                            log_output(traceback.format_exc())
+                        finally:
+                            # 恢复sys.argv和stdout
+                            sys.argv = original_argv
+                            sys.stdout = old_stdout
+                    else:
+                        log_output("错误: update_specific_jsons模块没有main函数")
+                except Exception as e:
+                    log_output(f"错误: 导入或执行update_specific_jsons模块时出错: {str(e)}")
+                    import traceback
+                    log_output(traceback.format_exc())
+            finally:
+                # 处理完成后更新UI
                 self.special_dialog.after(0, lambda: [
-                    self.output_text.insert(tk.END, f"执行错误: {e}\n"),
+                    self.output_text.insert(tk.END, "\n更新完成！"),
                     self.output_text.see(tk.END)
                 ])
         
@@ -876,44 +908,116 @@ class ResumeGeneratorGUI:
     def _parse_tech_info_thread(self, file_path):
         """在单独线程中解析技术人员信息"""
         try:
-            # 执行get_emp_list脚本
-            self._log("正在执行get_emp_list脚本...")
+            # 执行get_emp_list功能
+            self._log("正在处理技术人员信息...")
             self._update_progress(30)
             
-            get_emp_cmd = [sys.executable, "get_emp_list.py", file_path]
-            result = subprocess.run(get_emp_cmd, capture_output=True, text=True)
-            
-            if result.returncode == 0:
-                self._log("[OK] get_emp_list脚本执行成功")
-                for line in result.stdout.split('\n'):
-                    if line.strip():
-                        self._log(f"  {line.strip()}")
-            else:
-                self._log("[ERROR] get_emp_list脚本执行失败")
-                for line in result.stderr.split('\n'):
-                    if line.strip():
-                        self._log(f"  {line.strip()}")
-                return
+            # 直接导入模块，获取并保存员工信息
+            get_emp_module = None
+            try:
+                # 尝试直接导入模块
+                try:
+                    import get_emp_list as get_emp_module
+                except ImportError:
+                    # 如果直接导入失败，尝试使用importlib加载
+                    self._log("尝试使用importlib加载get_emp_list模块...")
+                    import importlib.util
+                    get_emp_path = os.path.join(base_dir, 'get_emp_list.py')
+                    if os.path.exists(get_emp_path):
+                        spec = importlib.util.spec_from_file_location("get_emp_list", get_emp_path)
+                        get_emp_module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(get_emp_module)
+                    else:
+                        self._log(f"[ERROR] 未找到get_emp_list.py文件: {get_emp_path}")
+                        raise FileNotFoundError(f"get_emp_list.py not found at {get_emp_path}")
+                
+                # 确保模块成功导入并有必要的函数
+                if get_emp_module and hasattr(get_emp_module, 'get_employee_info') and hasattr(get_emp_module, 'save_employee_list'):
+                    # 设置输出文件路径
+                    output_file = os.path.join(base_dir, "config", "emp_list.json")
+                    
+                    # 获取员工信息
+                    employee_list = get_emp_module.get_employee_info(file_path)
+                    
+                    if not employee_list:
+                        self._log("[ERROR] 没有成功提取任何员工数据")
+                        raise ValueError("未提取到员工数据")
+                    
+                    # 保存员工列表
+                    if get_emp_module.save_employee_list(employee_list, output_file):
+                        self._log("[OK] 技术人员信息处理成功")
+                    else:
+                        self._log("[ERROR] 保存员工数据失败")
+                        raise ValueError("保存员工数据失败")
+                else:
+                    self._log("[ERROR] get_emp_list模块缺少必要的函数")
+                    raise AttributeError("get_emp_list模块缺少必要的函数")
+            except Exception as e:
+                self._log(f"[ERROR] 执行get_emp_list模块时出错: {str(e)}")
+                import traceback
+                self._log(traceback.format_exc())
+                raise
             
             self._update_progress(60)
             
-            # 执行excel_2_info_json脚本
-            self._log("正在执行excel_2_info_json脚本...")
+            # 直接导入并执行excel_2_info_json模块
+            self._log("正在执行excel_2_info_json功能...")
             
-            excel_2_json_path = os.path.join(base_dir, "package", "functions", "excel_2_info_json.py")
-            excel_2_json_cmd = [sys.executable, excel_2_json_path, file_path]
-            result = subprocess.run(excel_2_json_cmd, capture_output=True, text=True)
-            
-            if result.returncode == 0:
-                self._log("[OK] excel_2_info_json脚本执行成功")
-                for line in result.stdout.split('\n'):
-                    if line.strip():
-                        self._log(f"  {line.strip()}")
-            else:
-                self._log("[ERROR] excel_2_info_json脚本执行失败")
-                for line in result.stderr.split('\n'):
-                    if line.strip():
-                        self._log(f"  {line.strip()}")
+            excel_2_json_module = None
+            try:
+                # 尝试直接导入模块
+                try:
+                    from package.functions import excel_2_info_json as excel_2_json_module
+                except ImportError:
+                    # 如果直接导入失败，尝试通过文件路径加载
+                    excel_2_json_path = os.path.join(base_dir, "package", "functions", "excel_2_info_json.py")
+                    if os.path.exists(excel_2_json_path):
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location("excel_2_info_json", excel_2_json_path)
+                        excel_2_json_module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(excel_2_json_module)
+                    else:
+                        self._log(f"[ERROR] 未找到excel_2_info_json.py文件: {excel_2_json_path}")
+                        return
+                
+                # 检查模块是否有main函数
+                if excel_2_json_module and hasattr(excel_2_json_module, 'main'):
+                    # 重定向stdout以捕获输出
+                    import io
+                    old_stdout = sys.stdout
+                    sys.stdout = io.StringIO()
+                    
+                    try:
+                        # 保存原始的sys.argv
+                        original_argv = sys.argv.copy()
+                        
+                        # 设置sys.argv以传递文件路径参数
+                        sys.argv = [sys.argv[0], file_path]
+                        
+                        # 执行main函数（不直接传递参数）
+                        excel_2_json_module.main()
+                        
+                        # 获取输出并记录
+                        output = sys.stdout.getvalue()
+                        self._log("[OK] excel_2_info_json功能执行成功")
+                        for line in output.split('\n'):
+                            if line.strip():
+                                self._log(f"  {line.strip()}")
+                    except Exception as e:
+                        self._log(f"[ERROR] excel_2_info_json功能执行出错: {str(e)}")
+                        import traceback
+                        self._log(traceback.format_exc())
+                    finally:
+                        # 恢复sys.argv和stdout
+                        sys.argv = original_argv
+                        sys.stdout = old_stdout
+                else:
+                    self._log("[ERROR] excel_2_info_json模块没有main函数")
+                    return
+            except Exception as e:
+                self._log(f"[ERROR] 导入或执行excel_2_info_json模块时出错: {str(e)}")
+                import traceback
+                self._log(traceback.format_exc())
                 return
             
             self._update_progress(90)
@@ -1403,25 +1507,65 @@ class ResumeGeneratorGUI:
     def _update_person_list_thread(self):
         """在单独线程中更新人员名单"""
         try:
-            # 执行get_emp_list脚本
+            # 直接导入并执行get_emp_list模块
             self._update_progress(30)
-            self._log("正在执行get_emp_list脚本获取最新员工信息...")
+            self._log("正在获取最新员工信息...")
             
-            # 执行get_emp_list.py脚本
-            get_emp_cmd = [sys.executable, "get_emp_list.py"]
-            result = subprocess.run(get_emp_cmd, capture_output=True, text=True)
-            
-            if result.returncode == 0:
-                self._log("[OK] get_emp_list脚本执行成功")
-                # 输出脚本的部分关键信息
-                for line in result.stdout.split('\n'):
-                    if any(keyword in line for keyword in ['成功保存', '共保存', '部门统计']):
-                        self._log(f"  {line.strip()}")
-            else:
-                self._log("[ERROR] get_emp_list脚本执行失败")
-                for line in result.stderr.split('\n'):
-                    if line.strip():
-                        self._log(f"  {line.strip()}")
+            get_emp_module = None
+            try:
+                # 尝试直接导入模块
+                try:
+                    import get_emp_list as get_emp_module
+                except ImportError:
+                    # 如果直接导入失败，尝试通过文件路径加载
+                    get_emp_path = os.path.join(base_dir, "get_emp_list.py")
+                    if os.path.exists(get_emp_path):
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location("get_emp_list", get_emp_path)
+                        get_emp_module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(get_emp_module)
+                    else:
+                        self._log(f"[ERROR] 未找到get_emp_list.py文件: {get_emp_path}")
+                        return
+                
+                # 检查模块是否有必要的函数
+                if get_emp_module and hasattr(get_emp_module, 'get_employee_info') and hasattr(get_emp_module, 'save_employee_list'):
+                    # 使用默认Excel文件路径（与get_emp_list.py中的默认路径一致）
+                    default_file_path = os.path.join(base_dir, "input", "技术人员名单-11月.xlsx")
+                    output_file = os.path.join(base_dir, "config", "emp_list.json")
+                    
+                    try:
+                        # 获取员工信息
+                        employee_list = get_emp_module.get_employee_info(default_file_path)
+                        
+                        if not employee_list:
+                            self._log("[ERROR] 没有成功提取任何员工数据")
+                        else:
+                            # 保存员工列表
+                            if get_emp_module.save_employee_list(employee_list, output_file):
+                                self._log("[OK] 员工信息获取成功")
+                                # 计算并显示统计信息
+                                self._log(f"  共保存 {len(employee_list)} 条员工信息")
+                                # 统计部门信息
+                                department_count = {}
+                                for emp in employee_list:
+                                    dept = emp.get('部门', '未知')
+                                    department_count[dept] = department_count.get(dept, 0) + 1
+                                self._log("  部门统计:")
+                                for dept, count in department_count.items():
+                                    self._log(f"    {dept}: {count}人")
+                            else:
+                                self._log("[ERROR] 保存员工数据失败")
+                    except Exception as e:
+                        self._log(f"[ERROR] 获取员工信息时出错: {str(e)}")
+                        import traceback
+                        self._log(traceback.format_exc())
+                else:
+                    self._log("[ERROR] get_emp_list模块缺少必要的函数")
+            except Exception as e:
+                self._log(f"[ERROR] 导入或执行get_emp_list模块时出错: {str(e)}")
+                import traceback
+                self._log(traceback.format_exc())
             
             # 加载员工信息
             self._update_progress(60)
@@ -1511,20 +1655,65 @@ class ResumeGeneratorGUI:
             self._log(traceback.format_exc())
     
     def _show_bank_management_dialog(self):
-        """显示银行管理对话框 - 调用独立子程序，并在关闭后刷新银行列表"""
+        """显示银行管理对话框 - 直接创建对话框实例，作为模态窗口运行，并在完成后刷新银行列表"""
         try:
-            # 获取银行管理子程序的路径
-            bank_management_path = os.path.join(base_dir, 'package', 'utils', 'bank_management.py')
+            # 尝试直接导入bank_management模块
+            bank_management = None
+            try:
+                from package.utils import bank_management
+            except ImportError:
+                # 如果直接导入失败，尝试使用importlib从base_dir加载
+                bank_management_path = os.path.join(base_dir, 'package', 'utils', 'bank_management.py')
+                if os.path.exists(bank_management_path):
+                    import importlib.util
+                    spec = importlib.util.spec_from_file_location("bank_management", bank_management_path)
+                    bank_management = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(bank_management)
+                else:
+                    messagebox.showerror("错误", f"未找到bank_management.py文件: {bank_management_path}")
+                    return
             
-            # 在新进程中启动银行管理程序
+            # 如果成功导入模块，创建对话框实例
             self._log("启动银行管理工具...")
-            process = subprocess.Popen([sys.executable, bank_management_path])
             
-            # 创建一个线程来等待银行管理程序关闭并刷新银行列表
-            threading.Thread(target=self._wait_for_bank_management_and_refresh, args=(process,)).start()
+            # 保存原始stdout以便恢复
+            old_stdout = sys.stdout
             
+            # 捕获输出到日志
+            class LogCapture:
+                def __init__(self, gui):
+                    self.gui = gui
+                def write(self, text):
+                    if text.strip():
+                        self.gui._log(text.strip())
+                def flush(self):
+                    pass
+            
+            # 替换stdout
+            sys.stdout = LogCapture(self)
+            
+            try:
+                # 直接创建BankManagementDialog实例，传入主窗口作为父窗口
+                # 这样会创建一个模态窗口，不会自动切换回主界面
+                dialog = bank_management.BankManagementDialog(parent=self.root)
+                
+                # 等待对话框关闭
+                self.root.wait_window(dialog.root)
+                
+                # 对话框关闭后刷新银行列表
+                self._refresh_bank_list()
+            except Exception as e:
+                self._log(f"[ERROR] 执行银行管理功能时出错: {str(e)}")
+                import traceback
+                self._log(traceback.format_exc())
+            finally:
+                # 恢复原始stdout
+                sys.stdout = old_stdout
+                
         except Exception as e:
-            messagebox.showerror("错误", f"启动银行管理程序失败: {str(e)}")
+            messagebox.showerror("错误", f"执行银行管理功能失败: {str(e)}")
+            import traceback
+            self._log(traceback.format_exc())
         
     def _wait_for_bank_management_and_refresh(self, process):
         """等待银行管理程序关闭并刷新银行列表"""
@@ -1559,20 +1748,72 @@ class ResumeGeneratorGUI:
     # 银行管理相关方法已移至独立子程序 bank_management.py
     
     def _show_resume_validation(self):
-        """显示简历校验界面"""
+        """显示简历校验界面 - 直接创建窗口实例，作为模态窗口运行"""
         try:
-            # 获取check_ui.py的路径
-            check_ui_path = os.path.join(base_dir, 'check_ui.py')
-            if os.path.exists(check_ui_path):
-                self._log("启动简历校验工具...")
-                # 在新进程中启动校验UI
-                subprocess.Popen([sys.executable, check_ui_path])
-            else:
-                messagebox.showerror("错误", f"未找到校验UI脚本: {check_ui_path}")
-                self._log(f"错误: 未找到校验UI脚本: {check_ui_path}")
+            # 尝试直接导入check_ui模块
+            check_ui = None
+            try:
+                import check_ui
+            except ImportError:
+                # 如果直接导入失败，尝试使用importlib从base_dir加载
+                check_ui_path = os.path.join(base_dir, 'check_ui.py')
+                if os.path.exists(check_ui_path):
+                    import importlib.util
+                    spec = importlib.util.spec_from_file_location("check_ui", check_ui_path)
+                    check_ui = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(check_ui)
+                else:
+                    messagebox.showerror("错误", f"未找到校验UI脚本: {check_ui_path}")
+                    self._log(f"错误: 未找到校验UI脚本: {check_ui_path}")
+                    return
+            
+            # 如果成功导入模块，创建界面实例
+            self._log("启动简历校验工具...")
+            
+            # 保存原始stdout以便恢复
+            old_stdout = sys.stdout
+            
+            # 捕获输出到日志
+            class LogCapture:
+                def __init__(self, gui):
+                    self.gui = gui
+                def write(self, text):
+                    if text.strip():
+                        self.gui._log(text.strip())
+                def flush(self):
+                    pass
+            
+            # 替换stdout
+            sys.stdout = LogCapture(self)
+            
+            try:
+                # 创建一个新窗口作为简历校验工具的父窗口
+                validation_window = tk.Toplevel(self.root)
+                validation_window.title("简历校验工具")
+                validation_window.geometry("800x600")
+                
+                # 设置为模态窗口，确保它不会自动切换回主界面
+                validation_window.transient(self.root)
+                validation_window.grab_set()
+                
+                # 创建ResumeValidationUI实例
+                app = check_ui.ResumeValidationUI(validation_window)
+                
+                # 等待窗口关闭
+                self.root.wait_window(validation_window)
+            except Exception as e:
+                self._log(f"[ERROR] 执行简历校验功能时出错: {str(e)}")
+                import traceback
+                self._log(traceback.format_exc())
+            finally:
+                # 恢复原始stdout
+                sys.stdout = old_stdout
+            
         except Exception as e:
-            messagebox.showerror("错误", f"启动简历校验工具时出错: {str(e)}")
-            self._log(f"错误: 启动简历校验工具时出错: {str(e)}")
+            messagebox.showerror("错误", f"执行简历校验功能时出错: {str(e)}")
+            self._log(f"错误: 执行简历校验功能时出错: {str(e)}")
+            import traceback
+            self._log(traceback.format_exc())
     
     def _load_employee_info(self):
         """加载员工信息，用于部门筛选
@@ -2525,8 +2766,18 @@ class ResumeGeneratorGUI:
         self.log_text.insert(tk.END, message + "\n")
         self.log_text.see(tk.END)  # 滚动到最后
         self.log_text.config(state=tk.DISABLED)
-        # 同时打印到控制台
-        print(message)
+        # 避免无限递归：
+        # 1. 只有当stdout是原始文件对象时才打印（有name属性）
+        # 2. 或者使用sys.__stdout__直接打印到原始控制台
+        if hasattr(sys.stdout, 'name'):
+            print(message)
+        else:
+            # 使用原始stdout打印，避免递归
+            try:
+                sys.__stdout__.write(message + '\n')
+                sys.__stdout__.flush()
+            except:
+                pass  # 忽略可能的错误
 
 # 添加进程锁检查以防止重复启动应用程序
 def check_instance():

@@ -20,12 +20,23 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(base_dir)
 
 class ResumeValidationUI:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("简历校验工具")
-        self.root.geometry("800x600")
+    def __init__(self, parent_window=None):
+        # 如果提供了父窗口，则使用它，否则创建新窗口
+        if parent_window:
+            self.root = parent_window
+        else:
+            # 创建新窗口
+            try:
+                self.root = ThemedTk()
+                if hasattr(self.root, 'set_theme'):
+                    self.root.set_theme("arc")
+            except:
+                self.root = tk.Tk()
+            
+            self.root.title("简历校验工具")
+            self.root.geometry("800x600")
         
-        # 配置主题
+        # 配置主题（如果父窗口支持）
         if hasattr(self.root, 'set_theme'):
             self.root.set_theme("arc")
         
@@ -92,9 +103,22 @@ class ResumeValidationUI:
     
     def _select_folder(self):
         """选择文件夹"""
-        folder_path = filedialog.askdirectory(title="选择JSON文件所在文件夹")
+        # 确保窗口在对话框打开前获得焦点
+        self.root.lift()
+        self.root.focus_force()
+        
+        folder_path = filedialog.askdirectory(
+            title="选择JSON文件所在文件夹",
+            parent=self.root
+        )
+        
         if folder_path:
+            # 确保路径使用正斜杠或双反斜杠，避免显示问题
+            folder_path = folder_path.replace('/', '\\')
             self.folder_var.set(folder_path)
+            # 选择后再次确保窗口保持焦点
+            self.root.lift()
+            self.root.focus_force()
     
     def _start_validation(self):
         """开始校验"""

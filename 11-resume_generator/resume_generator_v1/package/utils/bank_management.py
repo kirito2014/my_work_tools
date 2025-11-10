@@ -147,9 +147,23 @@ class BankManagementDialog:
     
     def _select_png_file(self):
         """选择PNG文件"""
-        file_path = filedialog.askopenfilename(filetypes=[("PNG图片", "*.png")])
+        # 确保窗口在对话框打开前获得焦点
+        self.root.lift()
+        self.root.focus_force()
+        
+        file_path = filedialog.askopenfilename(
+            filetypes=[("PNG图片", "*.png")],
+            parent=self.root,
+            title="选择银行PNG图标"
+        )
+        
         if file_path:
+            # 确保路径使用正斜杠或双反斜杠，避免显示问题
+            file_path = file_path.replace('/', '\\')
             self.bank_png_path.set(file_path)
+            # 选择后再次确保窗口保持焦点
+            self.root.lift()
+            self.root.focus_force()
     
     def _load_bank_list(self):
         """加载银行列表到树状视图"""
