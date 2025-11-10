@@ -7,6 +7,7 @@ import json
 import subprocess
 import threading
 from datetime import datetime, date
+import socket  # 用于进程锁检查
 # 导入PIL用于图像处理
 try:
     from PIL import Image, ImageTk
@@ -22,7 +23,15 @@ except ImportError:
     ThemedTk = tk.Tk
 
 # 设置项目根目录
-base_dir = os.path.dirname(os.path.abspath(__file__))
+# 处理PyInstaller打包后的路径问题
+if getattr(sys, 'frozen', False):
+    # 打包后的环境
+    base_dir = os.path.dirname(sys.executable)
+    # 确保工作目录设置为当前目录（exe所在目录）
+    os.chdir(base_dir)
+else:
+    # 开发环境
+    base_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(base_dir)
 
 # 尝试导入必要的模块
@@ -97,10 +106,22 @@ class ResumeGeneratorGUI:
         self.root.geometry("900x800")
         # 不再需要手动设置背景色，由主题处理
         
-        # 设置窗口图标
-        icon_path = r"D:\github\11-resume_generator\resume_generator_v1\resources\icons\sunline.ico"  # 使用原始字符串避免转义序列
+        # 设置文件路径变量 - 使用base_dir确保在打包环境中正确
+        self.base_dir = base_dir
+        self.input_dir = os.path.join(base_dir, "input")
+        self.output_dir = os.path.join(base_dir, "output")
+        self.template_dir = os.path.join(base_dir, "template")
+        self.resources_dir = os.path.join(base_dir, "resources")
+        self.config_dir = os.path.join(base_dir, "config")
+        self.temp_dir = os.path.join(base_dir, "temp")
+        
+        # 设置窗口图标 - 处理打包和非打包环境
+        icon_path = os.path.join(self.resources_dir, "icons", "sunline.ico")
         if os.path.exists(icon_path):
-            self.root.iconbitmap(icon_path)
+            try:
+                self.root.iconbitmap(icon_path)
+            except Exception as e:
+                print(f"设置图标时出错: {e}")
         
         # 文件路径变量
         self.resume_file_path = tk.StringVar()
@@ -250,14 +271,21 @@ class ResumeGeneratorGUI:
         self.special_dialog.grab_set()
     
     def _select_folder(self, string_var):
-        """选择文件夹"""
-        folder_path = filedialog.askdirectory()
+        """选择文件夹的通用方法，默认从应用程序所在目录开始"""
+        # 使用self.base_dir作为初始目录，确保在打包环境中正确
+        initial_dir = getattr(self, 'base_dir', os.getcwd())
+        folder_path = filedialog.askdirectory(initialdir=initial_dir)
         if folder_path:
             string_var.set(folder_path)
     
     def _select_excel_file(self, string_var):
-        """选择Excel文件"""
-        file_path = filedialog.askopenfilename(filetypes=[("Excel文件", "*.xlsx;*.xls")])
+        """选择Excel文件，默认从应用程序所在目录开始"""
+        # 使用self.base_dir作为初始目录，确保在打包环境中正确
+        initial_dir = getattr(self, 'base_dir', os.getcwd())
+        file_path = filedialog.askopenfilename(
+            initialdir=initial_dir,
+            filetypes=[("Excel文件", "*.xlsx;*.xls")]
+        )
         if file_path:
             string_var.set(file_path)
     
@@ -803,8 +831,11 @@ class ResumeGeneratorGUI:
             self.logo_label.config(image='', text="无Logo")
     
     def _select_file(self):
-        """选择简历文件夹路径"""
+        """选择简历文件夹路径，默认从应用程序所在目录开始"""
+        # 使用self.base_dir作为初始目录，确保在打包环境中正确
+        initial_dir = getattr(self, 'base_dir', os.getcwd())
         folder_path = filedialog.askdirectory(
+            initialdir=initial_dir,
             title="选择简历文件夹"
         )
         if folder_path:
@@ -812,10 +843,13 @@ class ResumeGeneratorGUI:
             self._log(f"已选择文件夹: {folder_path}")
     
     def _select_tech_info_file(self):
-        """选择技术人员信息Excel文件"""
+        """选择技术人员信息Excel文件，默认从应用程序所在目录开始"""
+        # 使用self.base_dir作为初始目录，确保在打包环境中正确
+        initial_dir = getattr(self, 'base_dir', os.getcwd())
         file_path = filedialog.askopenfilename(
+            initialdir=initial_dir,
             title="选择技术人员信息Excel文件",
-            filetypes=[("Excel文件", "*.xlsx;*.xls"), ("所有文件", "*.*")]
+            filetypes=[("Excel文件", "*.xlsx;*.xls")]
         )
         if file_path:
             self.tech_info_file_path.set(file_path)
@@ -918,8 +952,8 @@ class ResumeGeneratorGUI:
         temp_dir = os.path.join(input_folder, "temp_converted")
         os.makedirs(temp_dir, exist_ok=True)
         
-        # 创建输出目录
-        modify_dir = os.path.join(base_dir, "output", "modify_json")
+        # 创建输出目录，使用当前工作目录确保在应用程序所在位置保存文件
+        modify_dir = os.path.join(os.getcwd(), "output", "modify_json")
         try:
             os.makedirs(modify_dir, exist_ok=True)
             # 验证目录创建成功
@@ -2494,7 +2528,29 @@ class ResumeGeneratorGUI:
         # 同时打印到控制台
         print(message)
 
+# 添加进程锁检查以防止重复启动应用程序
+def check_instance():
+    # 创建一个套接字锁用于检测是否已有实例运行
+    lock_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # 尝试绑定到一个固定端口（选择一个不太可能被使用的端口）
+        lock_socket.bind(('127.0.0.1', 65432))
+        # 成功绑定，表示没有其他实例在运行
+        return True
+    except socket.error:
+        # 绑定失败，表示已有实例在运行
+        return False
+
 if __name__ == "__main__":
+    # 检查是否已有实例在运行
+    if not check_instance():
+        # 创建一个临时Tk窗口显示错误信息
+        error_root = tk.Tk()
+        error_root.withdraw()  # 隐藏主窗口
+        messagebox.showerror("错误", "简历生成器已在运行中，请不要重复启动！")
+        error_root.destroy()
+        sys.exit(0)
+    
     # 使用ThemedTk并应用arc主题
     root = ThemedTk(theme="arc")
     # 创建应用实例
