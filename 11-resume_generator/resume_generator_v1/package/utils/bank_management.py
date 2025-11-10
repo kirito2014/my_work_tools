@@ -21,7 +21,7 @@ except ImportError:
     ThemedTk = tk.Tk
 
 # 获取当前脚本所在目录的父目录作为基础目录
-base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+base_dir = os.getcwd()
 
 class BankManagementDialog:
     """银行管理对话框"""
@@ -30,7 +30,10 @@ class BankManagementDialog:
         """初始化银行管理对话框"""
         # 创建主窗口，根据是否有父窗口选择窗口类型
         if parent:
-            self.root = tk.Toplevel(parent)
+              self.root = tk.Toplevel(parent)
+              self.root.transient(parent)  # 设置为父窗口的临时窗口
+              self.root.grab_set()  # 模态化，阻止父窗口交互
+              self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         else:
             # 如果没有父窗口，使用ThemedTk并应用arc主题
             self.root = ThemedTk(theme="arc")
@@ -172,7 +175,7 @@ class BankManagementDialog:
             self.bank_tree.delete(item)
         
         # 读取银行列表配置
-        bank_list_config = os.path.join(base_dir, 'config', 'bank_list.config')
+        bank_list_config = os.path.join(os.getcwd(), 'config', 'bank_list.config')
         try:
             if os.path.exists(bank_list_config):
                 with open(bank_list_config, 'r', encoding='utf-8') as f:
@@ -193,7 +196,7 @@ class BankManagementDialog:
             self.selected_bank = self.bank_tree.item(item, 'values')[0]
             self.bank_name.set(self.selected_bank)
             # 尝试加载对应的logo文件
-            ico_path = os.path.join(base_dir, 'resources', 'bank_pics', f"{self.selected_bank}.ico")
+            ico_path = os.path.join(os.getcwd(), 'resources', 'bank_pics', f"{self.selected_bank}.ico")
             if os.path.exists(ico_path):
                 # 由于我们不能直接设置ICO文件到PNG路径输入框，这里不设置路径
                 self.bank_png_path.set("")
@@ -232,7 +235,7 @@ class BankManagementDialog:
         def convert_icon():
             try:
                 # 设置输出路径
-                bank_pics_dir = os.path.join(base_dir, 'resources', 'bank_pics')
+                bank_pics_dir = os.path.join(os.getcwd(), 'resources', 'bank_pics')
                 os.makedirs(bank_pics_dir, exist_ok=True)
                 
                 # 输出ICO文件路径
@@ -243,7 +246,7 @@ class BankManagementDialog:
                 self.root.after(0, lambda: self.bank_log_text.insert(tk.END, f"输出路径: {ico_path}\n"))
                 
                 # 调用icon_converter.py进行转换
-                converter_path = os.path.join(base_dir, 'package', 'utils', 'icon_converter.py')
+                converter_path = os.path.join(os.getcwd(), 'package', 'utils', 'icon_converter.py')
                 cmd = [sys.executable, converter_path, png_path, ico_path, '--size', '32']
                 
                 self.root.after(0, lambda: self.bank_log_text.insert(tk.END, f"执行转换命令...\n"))
@@ -433,11 +436,18 @@ class BankManagementDialog:
         
         # 关闭窗口
         self.root.destroy()
+
+    def _on_close(self):
+        """处理窗口关闭事件"""
+        self.root.grab_release()
+        self.root.destroy()
     
     def run(self):
         """运行对话框（独立模式）"""
         if not hasattr(self.root, 'master') or not self.root.master:
             self.root.mainloop()
+        else:
+            self.root.deiconify()
 
 
 def main():
