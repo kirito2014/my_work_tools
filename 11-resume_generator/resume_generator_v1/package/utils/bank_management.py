@@ -36,7 +36,7 @@ class BankManagementDialog:
             self.root = ThemedTk(theme="arc")
         
         self.root.title("银行管理")
-        self.root.geometry("700x600")
+        self.root.geometry("700x800")
         
         # 设置字体配置 - 统一使用微软雅黑10号
         self.font_config = {
