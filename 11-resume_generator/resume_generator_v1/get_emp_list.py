@@ -227,10 +227,34 @@ def main():
         excel_file_path = default_excel_path
         print(f"未指定Excel文件路径，使用默认路径: {excel_file_path}")
     
-    # 确保Excel文件存在
+    # 确保Excel文件存在，如果不存在则打开文件选择对话框
     if not os.path.exists(excel_file_path):
         print(f"错误: Excel文件不存在: {excel_file_path}")
-        sys.exit(1)
+        print("正在打开文件选择对话框...")
+        
+        # 尝试导入tkinter用于文件选择
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            
+            # 创建一个隐藏的Tk窗口
+            root = tk.Tk()
+            root.withdraw()  # 隐藏主窗口
+            
+            # 打开文件选择对话框
+            excel_file_path = filedialog.askopenfilename(
+                title="选择技术人员名单Excel文件",
+                filetypes=[("Excel files", "*.xlsx;*.xls")]
+            )
+            
+            # 检查用户是否选择了文件
+            if not excel_file_path:
+                print("未选择文件，程序退出")
+                sys.exit(1)
+                
+        except ImportError:
+            print("无法打开文件选择对话框，请手动指定文件路径")
+            sys.exit(1)
     
     # 设置输出文件路径
     output_file = os.path.join(script_dir, "config", "emp_list.json")
