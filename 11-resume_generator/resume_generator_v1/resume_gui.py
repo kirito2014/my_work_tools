@@ -2031,11 +2031,27 @@ class ResumeGeneratorGUI:
                         # 获取第一个键（通常是姓名）
                         person_name = list(resume_data.keys())[0]
                         if person_name in resume_data:
-                            # 检查info_data中是否已包含AdditionInfo键，避免嵌套层级
-                            if isinstance(info_data, dict) and "AdditionInfo" in info_data:
-                                resume_data[person_name]["AdditionInfo"] = info_data["AdditionInfo"]
+                            # 正确处理info_data的嵌套结构
+                            # 检查info_data是否已经是嵌套的结构（从info_json读取的格式）
+                            if isinstance(info_data, dict):
+                                # 如果info_data有一个键（通常是姓名），并且该键下有AdditionInfo
+                                if len(info_data) == 1:
+                                    first_key = list(info_data.keys())[0]
+                                    if isinstance(info_data[first_key], dict) and "AdditionInfo" in info_data[first_key]:
+                                        # 这是从info_json读取的标准格式
+                                        resume_data[person_name]["AdditionInfo"] = info_data[first_key]["AdditionInfo"]
+                                    else:
+                                        # 其他情况，直接使用该键下的数据
+                                        resume_data[person_name]["AdditionInfo"] = info_data[first_key]
+                                # 如果info_data直接包含AdditionInfo键
+                                elif "AdditionInfo" in info_data:
+                                    resume_data[person_name]["AdditionInfo"] = info_data["AdditionInfo"]
+                                # 其他情况，直接使用info_data
+                                else:
+                                    resume_data[person_name]["AdditionInfo"] = info_data
                             else:
-                                resume_data[person_name]["AdditionInfo"] = info_data
+                                # 如果info_data不是字典，创建一个空字典
+                                resume_data[person_name]["AdditionInfo"] = {}
                             
                             # 写回文件
                             with open(resume_path, 'w', encoding='utf-8') as f:
@@ -2087,7 +2103,7 @@ class ResumeGeneratorGUI:
                     validation_failed += 1
                     self._log(f"  验证错误: 检查文件 {resume_file} 时出错: {e}")
             
-            self._log(f"===== AdditionInfo信息更新和验证完成 =====")
+            self._log(f"===== 人员信息更新和验证完成 =====")
             self._log(f"成功更新: {updated_count} 个文件")
             self._log(f"跳过: {skipped_count} 个文件")
             self._log(f"验证结果 - 成功: {validation_success}, 失败: {validation_failed}")
@@ -2095,7 +2111,7 @@ class ResumeGeneratorGUI:
             # 返回验证是否全部成功
             return updated_count > 0 and validation_success == updated_count
         except Exception as e:
-            self._log(f"===== 更新AdditionInfo信息时发生严重错误 =====")
+            self._log(f"===== 更新人员信息时发生严重错误 =====")
             self._log(f"错误详情: {str(e)}")
             import traceback
             self._log(f"错误堆栈: {traceback.format_exc()}")
