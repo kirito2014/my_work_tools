@@ -1172,9 +1172,9 @@ class ResumeGeneratorGUI:
                 update_success = self._update_addition_info()
                 
                 if update_success:
-                    self._log("===== 解析和AdditionInfo更新任务完成 =====")
+                    self._log("===== 解析和更新人员信息任务完成 =====")
                     # 显示成功消息给用户
-                    self.root.after(0, lambda: messagebox.showinfo("成功", "文件解析和AdditionInfo更新已完成！"))
+                    self.root.after(0, lambda: messagebox.showinfo("成功", "解析和更新人员信息任务完成"))
                 else:
                     self._log("警告: AdditionInfo更新未成功或部分失败")
                     self.root.after(0, lambda: messagebox.showwarning("警告", "文件解析完成，但AdditionInfo更新可能未成功，请检查日志。"))

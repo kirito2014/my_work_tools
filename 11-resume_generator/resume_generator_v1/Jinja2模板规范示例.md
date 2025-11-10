@@ -133,3 +133,7 @@
 ```jinja2
 {{ BasicInfo.PersonalProfile | replace("\n", "<br>") }}
 ```
+- 示例一：根据空格替换为换行
+```jinja2
+{{ BasicInfo.PersonalProfile | replace(" ", "<br>") }}
+```
