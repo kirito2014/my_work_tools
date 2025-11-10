@@ -279,7 +279,7 @@ def main():
             try:
                 # 导入batch_render_from_docx模块
                 import importlib.util
-                batch_render_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'batch_render_from_docx.py')
+                batch_render_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'batch_render_from_docx.py')
                 if os.path.exists(batch_render_path):
                     spec = importlib.util.spec_from_file_location("batch_render_from_docx", batch_render_path)
                     batch_render_module = importlib.util.module_from_spec(spec)

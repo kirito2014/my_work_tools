@@ -47,7 +47,7 @@ class ResumeValidationUI:
         self.check_script_path = os.path.join(base_dir, 'package', 'functions', 'check_resume_valid.py')
         
         # 确保output\checkExcel目录存在（使用正确的路径分隔符）
-        self.check_dir = os.path.join(base_dir, "output", "checkExcel")
+        self.check_dir = os.path.join(os.getcwd(), "output", "checkExcel")
         if not os.path.exists(self.check_dir):
             os.makedirs(self.check_dir)
         

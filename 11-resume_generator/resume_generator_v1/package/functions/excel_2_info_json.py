@@ -162,7 +162,7 @@ def main():
         sys.exit(1)
     
     # 设置输出目录（与modify_json同级）
-    output_dir = os.path.join("output", "info_json")
+    output_dir = os.path.join(os.getcwd(), "output", "info_json")
     
     print("开始处理Excel文件...")
     

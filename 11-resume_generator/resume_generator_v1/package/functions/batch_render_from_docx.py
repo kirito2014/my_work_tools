@@ -110,7 +110,7 @@ def batch_generate_resumes(json_files_dir, template_path, bankname, person_names
         return 0, 0
     
     # 创建输出目录，使用base_dir确保在打包环境中正确
-    output_dir = os.path.join(base_dir, "output", bankname)
+    output_dir = os.path.join(os.getcwd(), "output", bankname)
     os.makedirs(output_dir, exist_ok=True)
     
     # 获取所有JSON文件
@@ -296,7 +296,7 @@ def batch_modify_json(input_folder, excel_file=None):
     os.makedirs(temp_dir, exist_ok=True)
     
     # 创建output/modify_json目录，使用base_dir确保在打包环境中正确
-    modify_json_dir = os.path.join(base_dir, "output", "modify_json")
+    modify_json_dir = os.path.join(os.getcwd(), "output", "modify_json")
     os.makedirs(modify_json_dir, exist_ok=True)
     
     # 统计信息
@@ -480,6 +480,6 @@ if __name__ == "__main__":
     batch_process_resumes(input_folder, template_path, bankname)
     
     # 然后批量生成简历
-    modify_json_dir = os.path.join(base_dir, 'output', 'modify_json')
+    modify_json_dir = os.path.join(os.getcwd(), 'output', 'modify_json')
     print(f"\n开始批量生成简历...")
     batch_generate_resumes(modify_json_dir, template_path, bankname)

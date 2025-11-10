@@ -109,7 +109,7 @@ def generate_resume_from_json(person_data, template_path, output_folder, person_
         
         # 特殊处理：如果在PyInstaller临时目录中，提示用户文件实际位置
         if getattr(sys, 'frozen', False) and 'TEMP' in output_path.upper():
-            actual_output_path = os.path.join(base_dir, 'output', bankname, os.path.basename(output_path))
+            actual_output_path = os.path.join(os.getcwd(), 'output', bankname, os.path.basename(output_path))
             print(f"[注意] 实际输出位置: {actual_output_path}")
             
         return output_path
@@ -128,7 +128,7 @@ def create_output_folder(output_folder):
     """
     # 确保使用绝对路径
     if not os.path.isabs(output_folder):
-        output_folder = os.path.join(base_dir, output_folder)
+        output_folder = os.path.join(os.getcwd(), output_folder)
         
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -250,7 +250,7 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
             
             # 尝试从info_json目录加载对应工号的额外信息
             # 直接使用项目根目录路径
-            info_json_dir = os.path.join(base_dir, "output", "info_json")
+            info_json_dir = os.path.join(os.getcwd(), "output", "info_json")
             # 从json_filename中提取姓名
             name_part = json_filename.split('_')[1]
             # 构建正确格式的info_json文件路径：工号_姓名_人员信息.json
@@ -312,7 +312,7 @@ if __name__ == "__main__":
     bankname = sys.argv[3]
     
     # 根据bankname设置输出目录，使用base_dir确保在打包环境中正确
-    output_dir = os.path.join(base_dir, "output", bankname)
+    output_dir = os.path.join(os.getcwd(), "output", bankname)
     
     # 从文件名提取工号和姓名，生成不带temp标识的JSON文件名
     base_name = os.path.splitext(os.path.basename(docx_file))[0]
@@ -327,7 +327,7 @@ if __name__ == "__main__":
         # 如果文件名格式不符合预期，则使用原文件名但移除temp标识
         json_filename = f"{base_name}.json"
     # 设置JSON文件路径为output/modify_json目录，使用base_dir确保在打包环境中正确
-    json_file = os.path.join(base_dir, "output", "modify_json", json_filename)
+    json_file = os.path.join(os.getcwd(), "output", "modify_json", json_filename)
 
     process_json_data(
         json_data=json_file,

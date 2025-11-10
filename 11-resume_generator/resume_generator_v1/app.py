@@ -31,7 +31,7 @@ CORS(app)
 
 # 配置文件上传和输出目录
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
-OUTPUT_FOLDER = os.path.join(os.path.dirname(__file__), 'output')
+OUTPUT_FOLDER = os.path.join(os.getcwd(), 'output')
 for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER]:
     if not os.path.exists(folder):
         os.makedirs(folder)
@@ -185,7 +185,7 @@ def get_departments():
 def get_persons():
     try:
         # 尝试调用get_emp_list.py获取人员信息
-        script_path = os.path.join(PROJECT_ROOT, 'get_emp_list.py')
+        script_path = os.path.join(PROJECT_ROOT, 'package', 'functions', 'get_emp_list.py')
         employees = []
         
         if os.path.exists(script_path):
@@ -656,7 +656,7 @@ def generate_resumes():
         logger.info(f"开始生成简历 - 银行: {bank_id}, 生成方式: {generate_method}")
         
         # 调用batch_render_from_docx.py生成简历
-        script_path = os.path.join(PROJECT_ROOT, 'batch_render_from_docx.py')
+        script_path = os.path.join(PROJECT_ROOT, 'package', 'functions', 'batch_render_from_docx.py')
         
         if os.path.exists(script_path):
             # 构建命令参数
@@ -712,7 +712,7 @@ def generate_resumes():
                     'message': '已加入生成队列'
                 })
             else:
-                return jsonify({"status": "error", "message": "按名单生成功能需要batch_render_from_docx.py脚本"}), 500
+                return jsonify({"status": "error", "message": "按名单生成功能需要package/functions/batch_render_from_docx.py脚本"}), 500
     except Exception as e:
         logger.error(f"生成简历时发生错误: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500

@@ -401,8 +401,8 @@ if __name__ == "__main__":
 
         # 创建输出目录
         # 使用base_dir确保在打包环境中输出到正确位置
-        original_dir = os.path.join(base_dir, "output", "original_json")
-        modify_dir = os.path.join(base_dir, "output", "modify_json")
+        original_dir = os.path.join(os.getcwd(), "output", "original_json")
+        modify_dir = os.path.join(os.getcwd(), "output", "modify_json")
         os.makedirs(original_dir, exist_ok=True)
         os.makedirs(modify_dir, exist_ok=True)
 

@@ -249,4 +249,4 @@ YYYY/MM 	 YYYY/MM 	 示例分析报表项目 	 项目经理 	 负责项目计划
 
 
 
-pyinstaller  --onefile --windowed  --console --name "简历生成器" --add-data "resources/icons/sunline.ico;resources/icons" --add-data "resources/bank_pics;resources/bank_pics" --add-data "template;template" --add-data "config;config" --hidden-import "package.functions.doc_2_json" --hidden-import "package.functions.render_from_docx" --hidden-import "package.utils.excel_reader" --icon "resources/icons/sunline.ico" resume_gui.py 
+pyinstaller  --onefile --windowed  --console --name "简历生成器" --add-data "resources/icons/sunline.ico;resources/icons" --add-data "resources/bank_pics;resources/bank_pics" --add-data "template;template" --add-data "config;config" --add-data "package/functions/batch_render_from_docx.py;package/functions" --add-data "package/functions/get_emp_list.py;package/functions" --hidden-import "package.functions.doc_2_json" --hidden-import "package.functions.render_from_docx" --hidden-import "package.utils.excel_reader" --icon "resources/icons/sunline.ico" resume_gui.py 

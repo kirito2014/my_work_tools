@@ -522,7 +522,7 @@ def main():
             os.makedirs(output_dir)
     else:
         # 默认输出路径为项目根目录的output\checkExcel
-        output_dir = os.path.join(base_dir, "..", "output", "checkExcel")
+        output_dir = os.path.join(os.getcwd(), "output", "checkExcel")
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         output_file = os.path.join(output_dir, "check_result.xlsx")

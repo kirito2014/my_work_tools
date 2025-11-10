@@ -26,7 +26,7 @@ except ImportError:
 # 处理PyInstaller打包后的路径问题
 if getattr(sys, 'frozen', False):
     # 打包后的环境
-    base_dir = os.path.dirname(sys.executable)
+    base_dir = sys._MEIPASS
     # 确保工作目录设置为当前目录（exe所在目录）
     os.chdir(base_dir)
 else:
@@ -71,14 +71,17 @@ try:
     try:
         import batch_render_from_docx as batch_render_module
     except ImportError:
-        batch_render_path = os.path.join(base_dir, 'batch_render_from_docx.py')
+        # 使用base_dir构建完整路径以兼容打包环境
+        batch_render_path = os.path.join(base_dir, 'package', 'functions', 'batch_render_from_docx.py')
         if os.path.exists(batch_render_path):
             import importlib.util
             spec = importlib.util.spec_from_file_location("batch_render_from_docx", batch_render_path)
             batch_render_module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(batch_render_module)
         else:
-            print(f"警告: 未找到 batch_render_from_docx.py 文件在路径: {batch_render_path}")
+            error_msg = f"错误: 未找到 batch_render_from_docx.py 文件在路径: {batch_render_path}\n请确保打包时包含该文件，使用命令: pyinstaller --add-data 'batch_render_from_docx.py;.' resume_gui.py"
+            print(error_msg)
+            messagebox.showerror("文件缺失", error_msg)
     
     # 动态导入doc_converter模块
     doc_converter = None
@@ -108,11 +111,11 @@ class ResumeGeneratorGUI:
         
         # 设置文件路径变量 - 使用base_dir确保在打包环境中正确
         self.base_dir = base_dir
-        self.output_dir = os.path.join(base_dir, "output")
-        self.template_dir = os.path.join(base_dir, "template")
-        self.resources_dir = os.path.join(base_dir, "resources")
-        self.config_dir = os.path.join(base_dir, "config")
-        self.temp_dir = os.path.join(base_dir, "temp")
+        self.output_dir = os.path.join(os.getcwd(), "output")
+        self.template_dir = os.path.join(os.getcwd(), "template")
+        self.resources_dir = os.path.join(os.getcwd(), "resources")
+        self.config_dir = os.path.join(os.getcwd(), "config")
+        self.temp_dir = os.path.join(os.getcwd(), "temp")
         
         # 设置窗口图标 - 处理打包和非打包环境
         icon_path = os.path.join(self.resources_dir, "icons", "sunline.ico")
@@ -923,7 +926,7 @@ class ResumeGeneratorGUI:
                     # 如果直接导入失败，尝试使用importlib加载
                     self._log("尝试使用importlib加载get_emp_list模块...")
                     import importlib.util
-                    get_emp_path = os.path.join(base_dir, 'get_emp_list.py')
+                    get_emp_path = os.path.join(base_dir, 'package', 'functions', 'get_emp_list.py')
                     if os.path.exists(get_emp_path):
                         spec = importlib.util.spec_from_file_location("get_emp_list", get_emp_path)
                         get_emp_module = importlib.util.module_from_spec(spec)
@@ -1519,7 +1522,7 @@ class ResumeGeneratorGUI:
                     import get_emp_list as get_emp_module
                 except ImportError:
                     # 如果直接导入失败，尝试通过文件路径加载
-                    get_emp_path = os.path.join(base_dir, "get_emp_list.py")
+                    get_emp_path = os.path.join(base_dir, 'package', 'functions', "get_emp_list.py")
                     if os.path.exists(get_emp_path):
                         import importlib.util
                         spec = importlib.util.spec_from_file_location("get_emp_list", get_emp_path)
@@ -1612,7 +1615,7 @@ class ResumeGeneratorGUI:
             # 如果从emp_list.json没有获取到姓名，回退到从modify_json目录读取
             if not all_persons and hasattr(self, 'employee_info') and self.employee_info:
                 self._log("从emp_list.json未获取到姓名信息，尝试从modify_json目录补充...")
-                modify_dir = os.path.join(base_dir, "output", "modify_json")
+                modify_dir = os.path.join(os.getcwd(), "output", "modify_json")
                 if os.path.exists(modify_dir):
                     # 创建工号到员工信息的映射
                     emp_map = {emp.get('EmpNo'): emp for emp in self.employee_info}
@@ -2177,9 +2180,12 @@ class ResumeGeneratorGUI:
             self._log("===== 开始更新AdditionInfo信息 =====")
             
             # 获取info_json和modify_json目录
-            info_dir = os.path.join(base_dir, "output", "info_json")
-            modify_dir = os.path.join(base_dir, "output", "modify_json")
+            info_dir = os.path.join(os.getcwd(), "output", "info_json")
+            modify_dir = os.path.join(os.getcwd(), "output", "modify_json")
             
+            # 创建目录（如果不存在）
+            os.makedirs(info_dir, exist_ok=True)
+            os.makedirs(modify_dir, exist_ok=True)
             self._log(f"检查目录: info_dir={info_dir}, modify_dir={modify_dir}")
             
             if not os.path.exists(info_dir):
@@ -2445,7 +2451,7 @@ class ResumeGeneratorGUI:
                     self._log("警告: AdditionInfo信息更新失败或部分失败，将继续执行生成任务")
                 
                 # 从output/modify_json目录获取所有JSON文件
-                modify_dir = os.path.join(base_dir, "output", "modify_json")
+                modify_dir = os.path.join(os.getcwd(), "output", "modify_json")
                 self._log(f"【步骤2】检查JSON文件目录: {modify_dir}")
                 
                 if not os.path.exists(modify_dir):
@@ -2497,7 +2503,7 @@ class ResumeGeneratorGUI:
                 
                 # 设置模板文件路径 - 根据银行名称动态查找对应的模板
                 # 查找格式："银行名称_简历模板.docx"
-                template_path = os.path.join(base_dir, "template", f"{bankname}_简历模板.docx")
+                template_path = os.path.join(os.getcwd(), "template", f"{bankname}_简历模板.docx")
                 self._log(f"【步骤4】检查模板文件: {template_path}")
                 
                 # 如果找不到银行特定模板，直接弹窗提示
@@ -2527,7 +2533,7 @@ class ResumeGeneratorGUI:
                     
                     # 记录结果
                     self._log(f"===== 批生成完成！===== 成功: {success_count}，失败: {failed_count}")
-                    self._log(f"输出目录: {os.path.join(base_dir, 'output', bankname)}")
+                    self._log(f"输出目录: {os.path.join(os.getcwd(), 'output', bankname)}")
                     
                     # 记录缺失员工信息
                     if missing_employees:
@@ -2595,7 +2601,7 @@ class ResumeGeneratorGUI:
             
         try:
             # 从output/modify_json目录获取所有JSON文件
-            modify_dir = os.path.join(base_dir, "output", "modify_json")
+            modify_dir = os.path.join(os.getcwd(), "output", "modify_json")
             if not os.path.exists(modify_dir):
                 self._log(f"目录不存在: {modify_dir}")
                 return
@@ -2622,7 +2628,7 @@ class ResumeGeneratorGUI:
                 return
             
             # 设置输出目录
-            output_dir = os.path.join(base_dir, "output", bankname)
+            output_dir = os.path.join(os.getcwd(), "output", bankname)
             os.makedirs(output_dir, exist_ok=True)
             
             # 生成简历（备用逻辑，当批生成模块不可用时使用）
@@ -2722,9 +2728,15 @@ class ResumeGeneratorGUI:
                 self._log(f"使用简历文件夹: {resume_folder}")
             
             # 调用update_specific_jsons.py更新简历和信息JSON
+            # 修复批处理脚本路径并添加打包提示
+            batch_render_script = os.path.join(base_dir, 'package', 'functions', 'batch_render_from_docx.py')
+            if not os.path.exists(batch_render_script):
+                error_msg = f"错误: 未找到批处理脚本 {batch_render_script}\n请使用以下命令打包: pyinstaller --add-data 'batch_render_from_docx.py;.' resume_gui.py"
+                messagebox.showerror("文件缺失", error_msg)
+                return
             cmd = [
                 sys.executable,
-                update_script_path,
+                batch_render_script,
                 "3",  # 同时更新简历和信息JSON
                 emp_no,
                 "--excel",
@@ -2746,7 +2758,7 @@ class ResumeGeneratorGUI:
             if result.returncode == 0:
                 self._log(f"员工 {emp_no} 的JSON文件更新成功")
                 # 检查更新后的文件是否存在
-                modify_dir = os.path.join(base_dir, "output", "modify_json")
+                modify_dir = os.path.join(os.getcwd(), "output", "modify_json")
                 json_files = [f for f in os.listdir(modify_dir) if f.startswith(emp_no.zfill(5)) and f.endswith('.json')]
                 return len(json_files) > 0
             else:
