@@ -1982,7 +1982,7 @@ class ResumeGeneratorGUI:
         """
         try:
             emp_list_path = os.path.join(base_dir, "config", "emp_list.json")
-            print(emp_list_path)
+            #print(emp_list_path)
             if not os.path.exists(emp_list_path):
                 self._log(f"员工信息文件不存在: {emp_list_path}")
                 # 如果是初始化时检查且不存在，显示提示
@@ -2507,6 +2507,7 @@ class ResumeGeneratorGUI:
                             
                             # 处理特殊字段信息
                             if has_special_info_module:
+                                self._log(f"===== 开始处理特殊字段 =====")
                                 try:
                                     if process_special_info(resume_path):
                                         special_info_processed += 1

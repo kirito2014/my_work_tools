@@ -77,7 +77,7 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
     
     # 如果提供了Word目录，先从Word文档生成/更新JSON
     if word_dir and os.path.exists(word_dir):
-        print(f"\n正在从Word文档更新简历JSON...")
+        print(f"\n  - [INFO] 正在从Word文档更新简历JSON...")
         # 遍历Word目录中的文件，找到匹配的工号文件
         for root, _, files in os.walk(word_dir):
             for file in files:
@@ -148,7 +148,7 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
                                         json.dump(template_data, f, ensure_ascii=False, indent=4)
                                     
                                     print(f"  - [OK] 成功从Word文档生成JSON: {json_filename}")
-                                    
+                                    """
                                     # 如果在Excel数据中找到该员工，更新AdditionInfo
                                     if file_emp_no.zfill(5) in emp_map:
                                         try:
@@ -173,14 +173,14 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
                                                         print(f"  - [ERROR] 特殊字段处理出错: {si_e}")
                                         except Exception as e:
                                             print(f"  - [ERROR] 更新AdditionInfo时出错: {e}")
-                                
+                                        """
                         except Exception as e:
                             print(f"  - [ERROR] 处理文件时出错: {e}")
                             import traceback
                             traceback.print_exc()
     
     # 查找并更新对应的简历JSON文件（使用Excel数据更新AdditionInfo）
-    print(f"\n正在更新简历JSON的AdditionInfo信息...")
+    print(f"\n  - [INFO] 正在更新简历JSON的AdditionInfo信息...")
     for emp_no in target_emp_numbers:
         if emp_no not in emp_map:
             print(f"警告: 工号 {emp_no} 在Excel数据中未找到")
@@ -201,7 +201,7 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
                         # 解析JSON字符串为Python字典
                         resume_data = json.loads(file_content)
                     except json.JSONDecodeError as e:
-                        print(f"[ERROR] 解析简历文件 {filename} 失败: {e}")
+                        print(f"  - [ERROR] 解析简历文件 {filename} 失败: {e}")
                         continue
                     
                     # 获取员工信息
@@ -216,26 +216,26 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
                                 # 将字典转换为JSON字符串并写回文件
                                 updated_content = json.dumps(resume_data, ensure_ascii=False, indent=2)
                                 write_file(file_path, updated_content)
-                                print(f"[OK] 已更新简历JSON: {filename}")
+                                print(f"  - [OK] 已更新简历JSON的AdditionInfo信息: {filename}")
                                 
                                 # 处理特殊字段信息
                                 if has_special_info_module and process_special_info:
                                     try:
                                         if process_special_info(file_path):
-                                            print(f"[OK] 特殊字段处理成功: {filename}")
+                                            print(f"  - [OK] 已更新简历JSON的特殊信息: {filename}")
                                         else:
-                                            print(f"[WARNING] 特殊字段处理失败: {filename}")
+                                            print(f"  - [WARNING] 特殊字段处理失败: {filename}")
                                     except Exception as si_e:
-                                        print(f"[ERROR] 特殊字段处理出错: {filename} - {si_e}")
+                                        print(f"  - [ERROR] 特殊字段处理出错: {filename} - {si_e}")
                                 
                                 updated_count += 1
                                 found = True
                                 break
                 except Exception as e:
-                    print(f"[ERROR] 更新简历文件 {filename} 时出错: {e}")
+                    print(f"  - [ERROR] 更新简历文件 {filename} 时出错: {e}")
         
         if not found:
-            print(f"[WARNING] 未找到工号 {emp_no} 对应的简历JSON文件")
+            print(f"  - [WARNING] 未找到工号 {emp_no} 对应的简历JSON文件")
     
     return updated_count
 
