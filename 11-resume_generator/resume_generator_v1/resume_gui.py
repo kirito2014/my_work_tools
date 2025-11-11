@@ -1669,10 +1669,10 @@ class ResumeGeneratorGUI:
             # 尝试直接导入bank_management模块
             bank_management = None
             try:
-                from package.utils import bank_management
+                import bank_management
             except ImportError:
                 # 如果直接导入失败，尝试使用importlib从base_dir加载
-                bank_management_path = os.path.join(base_dir, 'package', 'utils', 'bank_management.py')
+                bank_management_path = os.path.join(base_dir, 'bank_management.py')
                 if os.path.exists(bank_management_path):
                     import importlib.util
                     spec = importlib.util.spec_from_file_location("bank_management", bank_management_path)

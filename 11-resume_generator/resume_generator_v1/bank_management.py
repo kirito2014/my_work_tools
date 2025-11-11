@@ -20,8 +20,13 @@ except ImportError:
     print("警告: 未找到ttkthemes模块，请先安装: pip install ttkthemes")
     ThemedTk = tk.Tk
 
-# 获取当前脚本所在目录的父目录作为基础目录
-base_dir = os.getcwd()
+# 获取程序所在目录作为基础目录
+if getattr(sys, 'frozen', False):
+    # 如果是打包后的exe文件
+    base_dir = os.path.dirname(sys.executable)
+else:
+    # 如果是直接运行的Python脚本
+    base_dir = os.path.dirname(os.path.abspath(__file__))
 
 class BankManagementDialog:
     """银行管理对话框"""
@@ -175,7 +180,7 @@ class BankManagementDialog:
             self.bank_tree.delete(item)
         
         # 读取银行列表配置
-        bank_list_config = os.path.join(os.getcwd(), 'config', 'bank_list.config')
+        bank_list_config = os.path.join(base_dir, 'config', 'bank_list.config')
         try:
             if os.path.exists(bank_list_config):
                 with open(bank_list_config, 'r', encoding='utf-8') as f:
@@ -196,7 +201,7 @@ class BankManagementDialog:
             self.selected_bank = self.bank_tree.item(item, 'values')[0]
             self.bank_name.set(self.selected_bank)
             # 尝试加载对应的logo文件
-            ico_path = os.path.join(os.getcwd(), 'resources', 'bank_pics', f"{self.selected_bank}.ico")
+            ico_path = os.path.join(base_dir, 'resources', 'bank_pics', f"{self.selected_bank}.ico")
             if os.path.exists(ico_path):
                 # 由于我们不能直接设置ICO文件到PNG路径输入框，这里不设置路径
                 self.bank_png_path.set("")
@@ -235,7 +240,7 @@ class BankManagementDialog:
         def convert_icon():
             try:
                 # 设置输出路径
-                bank_pics_dir = os.path.join(os.getcwd(), 'resources', 'bank_pics')
+                bank_pics_dir = os.path.join(base_dir, 'resources', 'bank_pics')
                 os.makedirs(bank_pics_dir, exist_ok=True)
                 
                 # 输出ICO文件路径
@@ -246,7 +251,7 @@ class BankManagementDialog:
                 self.root.after(0, lambda: self.bank_log_text.insert(tk.END, f"输出路径: {ico_path}\n"))
                 
                 # 调用icon_converter.py进行转换
-                converter_path = os.path.join(os.getcwd(), 'package', 'utils', 'icon_converter.py')
+                converter_path = os.path.join(base_dir, 'package', 'utils', 'icon_converter.py')
                 cmd = [sys.executable, converter_path, png_path, ico_path, '--size', '32']
                 
                 self.root.after(0, lambda: self.bank_log_text.insert(tk.END, f"执行转换命令...\n"))
