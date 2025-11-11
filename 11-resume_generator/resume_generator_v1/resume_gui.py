@@ -1567,6 +1567,7 @@ class ResumeGeneratorGUI:
             self._log(f"选中的员工编号: {', '.join(self.selected_list)}")
         else:
             self._log("未选择任何人员")
+            messagebox.showinfo("提示", "请选择人员")
     
     def _select_list_file(self):
         """选择名单文件"""
@@ -2511,7 +2512,7 @@ class ResumeGeneratorGUI:
                                 try:
                                     if process_special_info(resume_path):
                                         special_info_processed += 1
-                                        self._log(f"  特殊字段处理: {resume_file} - 成功")
+                                        self._log(f"  特殊字段处理: {resume_file} - 成功添加特殊字段")
                                     else:
                                         special_info_failed += 1
                                         self._log(f"  特殊字段处理: {resume_file} - 失败")

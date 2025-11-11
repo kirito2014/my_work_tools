@@ -14,7 +14,7 @@ try:
     from package.utils.file_helper import read_file, write_file
     # 尝试导入特殊字段处理模块
     try:
-        from package.functions.add_special_info import process_special_info
+        from package.functions.add_special_info import process_directory
         has_special_info_module = True
     except ImportError:
         print("警告: 无法导入add_special_info模块，跳过特殊字段处理")
@@ -127,6 +127,7 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
                                 
                                 # 提取原始数据
                                 raw_resume_data = dj.extract_resume_universal(processed_doc_path)
+                                print(f"  - 提取成功")
                                 if not raw_resume_data:
                                     print(f"  - [ERROR] 文档信息提取失败")
                                     continue
@@ -163,7 +164,7 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
                                                 print(f"  - [OK] 已更新AdditionInfo信息")
                                                 
                                                 # 处理特殊字段信息
-                                                if has_special_info_module and process_special_info:
+                                                if has_special_info_module and process_directory:
                                                     try:
                                                         if process_special_info(json_file):
                                                             print(f"  - [OK] 特殊字段处理成功")
@@ -219,7 +220,7 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
                                 print(f"  - [OK] 已更新简历JSON的AdditionInfo信息: {filename}")
                                 
                                 # 处理特殊字段信息
-                                if has_special_info_module and process_special_info:
+                                if has_special_info_module and process_directory:
                                     try:
                                         if process_special_info(file_path):
                                             print(f"  - [OK] 已更新简历JSON的特殊信息: {filename}")
@@ -279,7 +280,7 @@ def main():
     parser.add_argument("--word", default="", help="简历文件夹路径")
     
     args = parser.parse_args()
-    
+    base_dir="output"
     # 验证Excel文件存在
     if not os.path.exists(args.excel):
         print(f"错误: Excel文件不存在: {args.excel}")
@@ -315,6 +316,11 @@ def main():
                     spec.loader.exec_module(batch_render_module)
                     # 调用批量更新函数
                     batch_render_module.batch_modify_json(args.word, args.excel)
+                    print(os.path.join(base_dir, "modify_json"))
+                    # 更新specialInfo字段
+                    if has_special_info_module and process_directory:
+                        process_directory(os.path.join(base_dir, "modify_json"))
+                        print("已更新specialInfo字段")
                     print("批量更新完成")
                     total_updated += 1  # 标记执行了批量更新
                 else:
