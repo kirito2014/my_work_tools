@@ -220,7 +220,8 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
                                 print(f"  - [OK] 已更新简历JSON的AdditionInfo信息: {filename}")
                                 
                                 # 处理特殊字段信息
-                                if has_special_info_module and process_directory:
+                                from add_special_info import process_special_info
+                                if has_special_info_module and process_special_info:
                                     try:
                                         if process_special_info(file_path):
                                             print(f"  - [OK] 已更新简历JSON的特殊信息: {filename}")

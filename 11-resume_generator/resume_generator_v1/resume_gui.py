@@ -1284,6 +1284,7 @@ class ResumeGeneratorGUI:
     def _start_parse(self):
         folder_path = self.resume_file_path.get()
         if not folder_path:
+            messagebox.showwarning("提示", "请先选择文件夹路径")
             self._log("请先选择文件夹路径")
             return
         
@@ -2533,7 +2534,7 @@ class ResumeGeneratorGUI:
                     skipped_count += 1
             
             # 添加验证步骤，检查AdditionInfo是否成功合并
-            self._log("===== 开始验证AdditionInfo合并结果 =====")
+            self._log("===== 开始验证合并结果 =====")
             validation_success = 0
             validation_failed = 0
             
@@ -2559,6 +2560,16 @@ class ResumeGeneratorGUI:
                         else:
                             validation_failed += 1
                             self._log(f"  验证失败: {resume_file} - 未找到AdditionInfo字段")
+                        
+                        # 新增：验证SpecialInfo字段
+                        if person_name in validated_data and "SpecialInfo" in validated_data[person_name]:
+                            special_info = validated_data[person_name]["SpecialInfo"]
+                            if special_info and isinstance(special_info, dict) and len(special_info) > 0:
+                                self._log(f"  验证成功: {resume_file} - SpecialInfo已正确合并")
+                            else:
+                                self._log(f"  验证失败: {resume_file} - SpecialInfo存在但为空或格式不正确")
+                        else:
+                            self._log(f"  验证失败: {resume_file} - 未找到SpecialInfo字段")
                     else:
                         validation_failed += 1
                         self._log(f"  验证失败: {resume_file} - 文件内容为空")
