@@ -1,17 +1,68 @@
 # check_resume_valid.py
+# 首先导入核心模块，确保sys始终可用
+import sys
+import os
 import pandas as pd
-import os,sys,re
+import re
 import json
 from datetime import datetime,timedelta
 import argparse
 from dateutil.relativedelta import relativedelta
 
+# 确保sys模块在整个模块中可用
+sys = sys  # 这行确保sys变量在函数内部也能正确访问
 
-#设置根目录为项目根目录
+# 设置项目根目录
+try:
+    # 确定是否在打包环境中运行
+    frozen = getattr(sys, 'frozen', False)
+    if frozen:
+        # 打包环境
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        # 开发环境
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    
+    sys.path.append(base_dir)
+    #print(f"check_resume_valid.py - 项目根目录: {base_dir}")
+except Exception as e:
+    print(f"设置项目根目录时出错: {e}")
+    # 提供默认值以确保程序继续运行
+    base_dir = os.getcwd()
+    if 'sys' in globals():
+        sys.path.append(base_dir)
 
-base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(base_dir)
-import excel_2_json as ej
+# 尝试多种方式导入excel_2_json模块
+try:
+    # 尝试直接导入
+    import excel_2_json as ej
+except ImportError:
+    try:
+        # 尝试从package.functions导入
+        from package.functions import excel_2_json as ej
+    except ImportError:
+        # 尝试动态导入
+        try:
+            excel_2_json_path = os.path.join(base_dir, 'package', 'functions', 'excel_2_json.py')
+            if os.path.exists(excel_2_json_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("excel_2_json", excel_2_json_path)
+                ej = importlib.util.module_from_spec(spec)
+                sys.modules["excel_2_json"] = ej
+                spec.loader.exec_module(ej)
+                print(f"成功动态导入excel_2_json模块: {excel_2_json_path}")
+            else:
+                print(f"警告: 未找到excel_2_json.py文件在路径: {excel_2_json_path}")
+                # 如果找不到，可以创建一个空的ej对象以避免完全失败
+                class EmptyExcel2Json:
+                    pass
+                ej = EmptyExcel2Json()
+        except Exception as e:
+            print(f"导入excel_2_json模块失败: {e}")
+            # 创建一个空的ej对象以避免完全失败
+            class EmptyExcel2Json:
+                pass
+            ej = EmptyExcel2Json()
 
 #print(base_dir)
 def parse_date(date_str, is_graduation=False):

@@ -26,9 +26,12 @@ except ImportError:
 # 处理PyInstaller打包后的路径问题
 if getattr(sys, 'frozen', False):
     # 打包后的环境
-    base_dir = sys._MEIPASS
+    # 获取exe实际运行的目录（而不是临时解压目录）
+    base_dir = os.path.dirname(sys.executable)
     # 确保工作目录设置为当前目录（exe所在目录）
     os.chdir(base_dir)
+    # 同时添加临时解压目录到sys.path以访问打包的资源
+    sys.path.append(sys._MEIPASS)
 else:
     # 开发环境
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -56,12 +59,29 @@ try:
     # 动态导入render_from_docx模块
     from package.functions import render_from_docx
     
-    # 动态导入check_resume_valid模块
+    # 动态导入check_resume_valid模块（使用三级导入机制）
     check_module = None
     try:
+        # 首先尝试从正确的包路径导入
         from package.functions import check_resume_valid as check_module
+        #print("成功从package.functions导入check_resume_valid模块")
     except ImportError:
-        pass
+        try:
+            # 尝试直接导入（兼容旧版本和打包环境）
+            import check_resume_valid as check_module
+            print("成功直接导入check_resume_valid模块")
+        except ImportError:
+            # 尝试动态导入
+            check_valid_path = os.path.join(base_dir, 'package', 'functions', 'check_resume_valid.py')
+            if os.path.exists(check_valid_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("check_resume_valid", check_valid_path)
+                check_module = importlib.util.module_from_spec(spec)
+                sys.modules["check_resume_valid"] = check_module
+                spec.loader.exec_module(check_module)
+                print(f"成功从路径动态导入check_resume_valid模块: {check_valid_path}")
+    except Exception as e:
+        print(f"导入check_resume_valid模块失败: {str(e)}")
     
     # 动态导入excel_reader模块
     from package.utils import excel_reader
@@ -69,19 +89,24 @@ try:
     # 动态导入batch_render_from_docx模块
     batch_render_module = None
     try:
-        import batch_render_from_docx as batch_render_module
+        # 首先尝试从正确的包路径导入
+        from package.functions import batch_render_from_docx as batch_render_module
     except ImportError:
-        # 使用base_dir构建完整路径以兼容打包环境
-        batch_render_path = os.path.join(base_dir, 'package', 'functions', 'batch_render_from_docx.py')
-        if os.path.exists(batch_render_path):
-            import importlib.util
-            spec = importlib.util.spec_from_file_location("batch_render_from_docx", batch_render_path)
-            batch_render_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(batch_render_module)
-        else:
-            error_msg = f"错误: 未找到 batch_render_from_docx.py 文件在路径: {batch_render_path}\n请确保打包时包含该文件，使用命令: pyinstaller --add-data 'batch_render_from_docx.py;.' resume_gui.py"
-            print(error_msg)
-            messagebox.showerror("文件缺失", error_msg)
+        try:
+            # 尝试直接导入（兼容旧版本和打包环境）
+            import batch_render_from_docx as batch_render_module
+        except ImportError:
+            # 使用base_dir构建完整路径以兼容各种环境
+            batch_render_path = os.path.join(base_dir, 'package', 'functions', 'batch_render_from_docx.py')
+            if os.path.exists(batch_render_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("batch_render_from_docx", batch_render_path)
+                batch_render_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(batch_render_module)
+            else:
+                error_msg = f"错误: 未找到 batch_render_from_docx.py 文件在路径: {batch_render_path}\n请确保打包时包含该文件，使用命令: pyinstaller --add-data 'package/functions/batch_render_from_docx.py;.' resume_gui.py"
+                print(error_msg)
+                messagebox.showerror("文件缺失", error_msg)
     
     # 动态导入doc_converter模块
     doc_converter = None
@@ -919,21 +944,26 @@ class ResumeGeneratorGUI:
             # 直接导入模块，获取并保存员工信息
             get_emp_module = None
             try:
-                # 尝试直接导入模块
+                # 尝试导入模块的三种方式
                 try:
-                    import get_emp_list as get_emp_module
+                    # 首先尝试从正确的包路径导入
+                    from package.functions import get_emp_list as get_emp_module
                 except ImportError:
-                    # 如果直接导入失败，尝试使用importlib加载
-                    self._log("尝试使用importlib加载get_emp_list模块...")
-                    import importlib.util
-                    get_emp_path = os.path.join(base_dir, 'package', 'functions', 'get_emp_list.py')
-                    if os.path.exists(get_emp_path):
-                        spec = importlib.util.spec_from_file_location("get_emp_list", get_emp_path)
-                        get_emp_module = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(get_emp_module)
-                    else:
-                        self._log(f"[ERROR] 未找到get_emp_list.py文件: {get_emp_path}")
-                        raise FileNotFoundError(f"get_emp_list.py not found at {get_emp_path}")
+                    try:
+                        # 其次尝试直接导入
+                        import get_emp_list as get_emp_module
+                    except ImportError:
+                        # 最后通过文件路径加载
+                        self._log("尝试使用importlib从文件路径加载get_emp_list模块...")
+                        import importlib.util
+                        get_emp_path = os.path.join(base_dir, 'package', 'functions', 'get_emp_list.py')
+                        if os.path.exists(get_emp_path):
+                            spec = importlib.util.spec_from_file_location("get_emp_list", get_emp_path)
+                            get_emp_module = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(get_emp_module)
+                        else:
+                            self._log(f"[ERROR] 未找到get_emp_list.py文件: {get_emp_path}")
+                            raise FileNotFoundError(f"get_emp_list.py not found at {get_emp_path}")
                 
                 # 确保模块成功导入并有必要的函数
                 if get_emp_module and hasattr(get_emp_module, 'get_employee_info') and hasattr(get_emp_module, 'save_employee_list'):
@@ -1517,20 +1547,25 @@ class ResumeGeneratorGUI:
             
             get_emp_module = None
             try:
-                # 尝试直接导入模块
+                # 尝试导入模块的三种方式
                 try:
-                    import get_emp_list as get_emp_module
+                    # 首先尝试从正确的包路径导入
+                    from package.functions import get_emp_list as get_emp_module
                 except ImportError:
-                    # 如果直接导入失败，尝试通过文件路径加载
-                    get_emp_path = os.path.join(base_dir, 'package', 'functions', "get_emp_list.py")
-                    if os.path.exists(get_emp_path):
-                        import importlib.util
-                        spec = importlib.util.spec_from_file_location("get_emp_list", get_emp_path)
-                        get_emp_module = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(get_emp_module)
-                    else:
-                        self._log(f"[ERROR] 未找到get_emp_list.py文件: {get_emp_path}")
-                        return
+                    try:
+                        # 其次尝试直接导入
+                        import get_emp_list as get_emp_module
+                    except ImportError:
+                        # 最后通过文件路径加载
+                        get_emp_path = os.path.join(base_dir, 'package', 'functions', "get_emp_list.py")
+                        if os.path.exists(get_emp_path):
+                            import importlib.util
+                            spec = importlib.util.spec_from_file_location("get_emp_list", get_emp_path)
+                            get_emp_module = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(get_emp_module)
+                        else:
+                            self._log(f"[ERROR] 未找到get_emp_list.py文件: {get_emp_path}")
+                            return
                 
                 # 检查模块是否有必要的函数
                 if get_emp_module and hasattr(get_emp_module, 'get_employee_info') and hasattr(get_emp_module, 'save_employee_list'):
@@ -1757,7 +1792,7 @@ class ResumeGeneratorGUI:
     # 银行管理相关方法已移至独立子程序 bank_management.py
     
     def _show_resume_validation(self):
-        """显示简历校验界面 - 直接创建窗口实例，作为模态窗口运行"""
+        """显示简历校验对话框 - 直接创建对话框实例，作为模态窗口运行"""
         try:
             # 尝试直接导入check_ui模块
             check_ui = None
@@ -1772,11 +1807,10 @@ class ResumeGeneratorGUI:
                     check_ui = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(check_ui)
                 else:
-                    messagebox.showerror("错误", f"未找到校验UI脚本: {check_ui_path}")
-                    self._log(f"错误: 未找到校验UI脚本: {check_ui_path}")
+                    messagebox.showerror("错误", f"未找到check_ui.py文件: {check_ui_path}")
                     return
             
-            # 如果成功导入模块，创建界面实例
+            # 如果成功导入模块，创建对话框实例
             self._log("启动简历校验工具...")
             
             # 保存原始stdout以便恢复
@@ -1796,20 +1830,14 @@ class ResumeGeneratorGUI:
             sys.stdout = LogCapture(self)
             
             try:
-                # 创建一个新窗口作为简历校验工具的父窗口
-                validation_window = tk.Toplevel(self.root)
-                validation_window.title("简历校验工具")
-                validation_window.geometry("800x600")
+                # 直接创建ResumeValidationDialog实例，传入主窗口作为父窗口
+                # 这样会创建一个模态窗口，不会自动切换回主界面
+                dialog = check_ui.ResumeValidationDialog(parent=self.root)
                 
-                # 设置为模态窗口，确保它不会自动切换回主界面
-                validation_window.transient(self.root)
-                validation_window.grab_set()
+                # 等待对话框关闭
+                self.root.wait_window(dialog.root)
                 
-                # 创建ResumeValidationUI实例
-                app = check_ui.ResumeValidationUI(validation_window)
-                
-                # 等待窗口关闭
-                self.root.wait_window(validation_window)
+                self._log("简历校验工具执行完成")
             except Exception as e:
                 self._log(f"[ERROR] 执行简历校验功能时出错: {str(e)}")
                 import traceback
@@ -1817,10 +1845,9 @@ class ResumeGeneratorGUI:
             finally:
                 # 恢复原始stdout
                 sys.stdout = old_stdout
-            
+                
         except Exception as e:
-            messagebox.showerror("错误", f"执行简历校验功能时出错: {str(e)}")
-            self._log(f"错误: 执行简历校验功能时出错: {str(e)}")
+            messagebox.showerror("错误", f"执行简历校验功能失败: {str(e)}")
             import traceback
             self._log(traceback.format_exc())
     

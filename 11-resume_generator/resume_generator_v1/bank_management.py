@@ -210,6 +210,7 @@ class BankManagementDialog:
     
     def _log(self, message):
         """在日志区域显示消息"""
+        print(f"[银行管理] {message}")  # 添加print日志用于调试
         self.bank_log_text.insert(tk.END, message + "\n")
         self.bank_log_text.see(tk.END)
     
@@ -239,56 +240,143 @@ class BankManagementDialog:
         # 定义转换函数
         def convert_icon():
             try:
+                print(f"[银行管理] 开始转换图标: {png_path} -> {bank_name}.ico")
+                
                 # 设置输出路径
                 bank_pics_dir = os.path.join(base_dir, 'resources', 'bank_pics')
                 os.makedirs(bank_pics_dir, exist_ok=True)
+                print(f"[银行管理] 创建目录: {bank_pics_dir}")
                 
                 # 输出ICO文件路径
                 ico_filename = f"{bank_name}.ico"
                 ico_path = os.path.join(bank_pics_dir, ico_filename)
+                print(f"[银行管理] 输出路径: {ico_path}")
                 
                 # 记录日志
                 self.root.after(0, lambda: self.bank_log_text.insert(tk.END, f"输出路径: {ico_path}\n"))
                 
-                # 调用icon_converter.py进行转换
+                # 根据程序运行模式选择不同的转换方式
+                print(f"[银行管理] 程序模式: {'打包为exe' if getattr(sys, 'frozen', False) else 'Python脚本'}")
+                
+                # 直接导入icon_converter模块而不是通过subprocess调用
+                converter_module = None
                 converter_path = os.path.join(base_dir, 'package', 'utils', 'icon_converter.py')
-                cmd = [sys.executable, converter_path, png_path, ico_path, '--size', '32']
+                print(f"[银行管理] converter_path: {converter_path}, 是否存在: {os.path.exists(converter_path)}")
                 
-                self.root.after(0, lambda: self.bank_log_text.insert(tk.END, f"执行转换命令...\n"))
+                # 尝试动态导入模块
+                try:
+                    # 如果是exe模式，尝试直接导入
+                    if getattr(sys, 'frozen', False):
+                        print("[银行管理] 尝试直接导入icon_converter模块")
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location("icon_converter", converter_path)
+                        if spec and spec.loader:
+                            converter_module = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(converter_module)
+                            print("[银行管理] 成功导入icon_converter模块")
+                        else:
+                            print("[银行管理] 无法加载icon_converter模块，使用备用方法")
+                    else:
+                        print("[银行管理] 脚本模式，使用subprocess调用")
+                except Exception as e:
+                    print(f"[银行管理] 导入icon_converter模块失败: {str(e)}")
                 
-                # 执行转换
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
+                # 根据是否成功导入模块和程序模式选择不同的执行方式
+                conversion_success = False
+                error_message = ""
                 
-                # 实时输出转换过程
-                stdout, stderr = process.communicate()
+                if getattr(sys, 'frozen', False):
+                    # exe模式 - 优先使用直接导入方式
+                    print("[银行管理] EXE模式 - 尝试使用直接导入转换")
+                    
+                    # 如果模块导入失败，尝试直接实现简单的转换逻辑
+                    if not converter_module or not hasattr(converter_module, 'convert_png_to_ico'):
+                        print("[银行管理] EXE模式 - 尝试直接实现转换逻辑")
+                        try:
+                            # 直接导入PIL库进行转换
+                            from PIL import Image, ImageDraw
+                            
+                            print(f"[银行管理] EXE模式 - 使用PIL直接转换: {png_path} -> {ico_path}")
+                            
+                            # 基本的PNG到ICO转换逻辑
+                            with Image.open(png_path) as img:
+                                # 调整图像大小
+                                img_resized = img.resize((32, 32), Image.LANCZOS)
+                                
+                                # 保存为ICO文件
+                                img_resized.save(ico_path, format='ICO', sizes=[(32, 32)])
+                            
+                            print(f"[银行管理] EXE模式 - 转换完成: {ico_path}")
+                            conversion_success = os.path.exists(ico_path)
+                        except Exception as e:
+                            error_message = f"EXE模式直接转换失败: {str(e)}"
+                            print(f"[银行管理] {error_message}")
+                            import traceback
+                            print(f"[银行管理] 异常栈: {traceback.format_exc()}")
+                    else:
+                        # 使用导入的模块直接调用函数
+                        print("[银行管理] EXE模式 - 使用导入的模块执行转换")
+                        try:
+                            result = converter_module.convert_png_to_ico(png_path, ico_path, size=32)
+                            print(f"[银行管理] EXE模式 - 转换结果: {result}")
+                            conversion_success = os.path.exists(ico_path)
+                        except Exception as e:
+                            error_message = f"EXE模式模块转换失败: {str(e)}"
+                            print(f"[银行管理] {error_message}")
+                else:
+                    # 脚本模式 - 使用subprocess调用
+                    print("[银行管理] 脚本模式 - 使用subprocess执行转换")
+                    # 调用icon_converter.py进行转换
+                    cmd = [sys.executable, converter_path, png_path, ico_path, '--size', '32']
+                    print(f"[银行管理] 执行命令: {' '.join(cmd)}")
+                    
+                    self.root.after(0, lambda: self.bank_log_text.insert(tk.END, f"执行转换命令...\n"))
+                    
+                    # 执行转换
+                    process = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                    )
+                    
+                    # 实时输出转换过程
+                    stdout, stderr = process.communicate()
+                    
+                    print(f"[银行管理] 转换输出: {stdout}")
+                    if stderr:
+                        print(f"[银行管理] 转换错误: {stderr}")
+                        error_message = stderr
+                    
+                    self.root.after(0, lambda: self.bank_log_text.insert(tk.END, stdout))
+                    if stderr:
+                        self.root.after(0, lambda: self.bank_log_text.insert(tk.END, f"错误: {stderr}\n"))
+                    
+                    # 检查转换是否成功
+                    conversion_success = (process.returncode == 0 and os.path.exists(ico_path))
                 
-                self.root.after(0, lambda: self.bank_log_text.insert(tk.END, stdout))
-                if stderr:
-                    self.root.after(0, lambda: self.bank_log_text.insert(tk.END, f"错误: {stderr}\n"))
-                
-                # 检查转换是否成功
-                if process.returncode == 0 and os.path.exists(ico_path):
+                if conversion_success:
+                    print("[银行管理] 转换成功，更新银行列表配置")
                     # 更新银行列表配置
                     bank_list_config = os.path.join(base_dir, 'config', 'bank_list.config')
                     os.makedirs(os.path.dirname(bank_list_config), exist_ok=True)
+                    print(f"[银行管理] 银行列表配置路径: {bank_list_config}")
                     
                     # 读取现有银行列表
                     bank_list = []
                     if os.path.exists(bank_list_config):
+                        print("[银行管理] 读取现有银行列表")
                         with open(bank_list_config, 'r', encoding='utf-8') as f:
                             bank_list = [line.strip() for line in f.readlines() if line.strip()]
                     
                     # 添加新银行（如果不存在）
                     if bank_name not in bank_list:
+                        print(f"[银行管理] 添加新银行: {bank_name}")
                         bank_list.append(bank_name)
                         # 保存银行列表
                         with open(bank_list_config, 'w', encoding='utf-8') as f:
                             f.write('\n'.join(bank_list))
+                        print(f"[银行管理] 银行列表已保存，共 {len(bank_list)} 个银行")
                         self.root.after(0, lambda: self.bank_log_text.insert(tk.END, f"\n银行列表已更新，当前包含 {len(bank_list)} 个银行\n"))
                     else:
                         self.root.after(0, lambda: self.bank_log_text.insert(tk.END, "\n银行名称已存在于配置中，已更新图标\n"))
@@ -302,6 +390,9 @@ class BankManagementDialog:
                     ])
                     self.root.after(500, lambda: messagebox.showinfo("成功", "银行添加/更新成功！"))
                 else:
+                    print(f"[银行管理] 转换失败，ICO文件不存在: {ico_path}")
+                    if error_message:
+                        print(f"[银行管理] 错误详情: {error_message}")
                     self.root.after(0, lambda: [
                         self.bank_log_text.insert(tk.END, "\n[ERR] 银行添加失败，请查看日志！"),
                         self.bank_log_text.see(tk.END)
@@ -309,7 +400,11 @@ class BankManagementDialog:
                     self.root.after(500, lambda: messagebox.showerror("失败", "银行添加失败，请查看日志"))
                     
             except Exception as e:
+                print(f"[银行管理] 处理异常: {str(e)}")
+                import traceback
+                print(f"[银行管理] 异常栈: {traceback.format_exc()}")
                 self.root.after(0, lambda: self.bank_log_text.insert(tk.END, f"\n[ERR] 处理出错: {str(e)}\n"))
+                self.root.after(0, lambda: self.bank_log_text.insert(tk.END, f"异常栈: {traceback.format_exc()}\n"))
                 self.root.after(500, lambda: messagebox.showerror("错误", f"处理出错: {str(e)}"))
         
         # 在新线程中执行转换
