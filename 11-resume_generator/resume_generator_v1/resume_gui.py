@@ -1397,6 +1397,8 @@ class ResumeGeneratorGUI:
                 messagebox.showinfo("提示", "请先上传技术人员信息并点击更新人员名单")
             
             self._person_list_visible = True
+            # 刷新银行下拉框，确保其正常工作
+            self._refresh_bank_list()
             # 隐藏名单选择框架
             if hasattr(self, 'list_select_frame'):
                 self.list_select_frame.pack_forget()
