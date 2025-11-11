@@ -28,9 +28,24 @@ try:
 except Exception as e:
     print(f"设置项目根目录时出错: {e}")
     # 提供默认值以确保程序继续运行
-    base_dir = os.getcwd()
-    if 'sys' in globals():
+    try:
+        # 即使出错也尝试获取更可靠的目录路径
+        if 'sys' in globals() and hasattr(sys, 'executable'):
+            base_dir = os.path.dirname(sys.executable)
+        elif 'sys' in globals() and hasattr(sys, '_getframe'):
+            # 尝试获取当前执行文件的目录
+            current_frame = sys._getframe()
+            filename = current_frame.f_code.co_filename
+            base_dir = os.path.dirname(os.path.abspath(filename))
+        else:
+            # 最后才使用当前工作目录
+            base_dir = os.getcwd()
         sys.path.append(base_dir)
+    except:
+        # 如果所有尝试都失败，使用当前工作目录
+        base_dir = os.getcwd()
+        if 'sys' in globals():
+            sys.path.append(base_dir)
 
 # 尝试多种方式导入excel_2_json模块
 try:

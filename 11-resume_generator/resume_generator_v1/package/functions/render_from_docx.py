@@ -312,7 +312,7 @@ if __name__ == "__main__":
     bankname = sys.argv[3]
     
     # 根据bankname设置输出目录，使用base_dir确保在打包环境中正确
-    output_dir = os.path.join(os.getcwd(), "output", bankname)
+    output_dir = os.path.join(base_dir, "output", bankname)
     
     # 从文件名提取工号和姓名，生成不带temp标识的JSON文件名
     base_name = os.path.splitext(os.path.basename(docx_file))[0]
@@ -327,7 +327,7 @@ if __name__ == "__main__":
         # 如果文件名格式不符合预期，则使用原文件名但移除temp标识
         json_filename = f"{base_name}.json"
     # 设置JSON文件路径为output/modify_json目录，使用base_dir确保在打包环境中正确
-    json_file = os.path.join(os.getcwd(), "output", "modify_json", json_filename)
+    json_file = os.path.join(base_dir, "output", "modify_json", json_filename)
 
     process_json_data(
         json_data=json_file,

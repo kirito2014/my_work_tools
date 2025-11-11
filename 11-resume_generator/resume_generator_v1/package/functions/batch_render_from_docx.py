@@ -480,6 +480,6 @@ if __name__ == "__main__":
     batch_process_resumes(input_folder, template_path, bankname)
     
     # 然后批量生成简历
-    modify_json_dir = os.path.join(os.getcwd(), 'output', 'modify_json')
+    modify_json_dir = os.path.join(base_dir, 'output', 'modify_json')
     print(f"\n开始批量生成简历...")
     batch_generate_resumes(modify_json_dir, template_path, bankname)

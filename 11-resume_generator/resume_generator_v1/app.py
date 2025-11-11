@@ -31,7 +31,7 @@ CORS(app)
 
 # 配置文件上传和输出目录
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
-OUTPUT_FOLDER = os.path.join(os.getcwd(), 'output')
+OUTPUT_FOLDER = os.path.join(os.path.dirname(__file__), 'output')
 for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER]:
     if not os.path.exists(folder):
         os.makedirs(folder)

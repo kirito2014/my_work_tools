@@ -136,11 +136,11 @@ class ResumeGeneratorGUI:
         
         # 设置文件路径变量 - 使用base_dir确保在打包环境中正确
         self.base_dir = base_dir
-        self.output_dir = os.path.join(os.getcwd(), "output")
-        self.template_dir = os.path.join(os.getcwd(), "template")
-        self.resources_dir = os.path.join(os.getcwd(), "resources")
-        self.config_dir = os.path.join(os.getcwd(), "config")
-        self.temp_dir = os.path.join(os.getcwd(), "temp")
+        self.output_dir = os.path.join(base_dir, "output")
+        self.template_dir = os.path.join(base_dir, "template")
+        self.resources_dir = os.path.join(base_dir, "resources")
+        self.config_dir = os.path.join(base_dir, "config")
+        self.temp_dir = os.path.join(base_dir, "temp")
         
         # 设置窗口图标 - 处理打包和非打包环境
         icon_path = os.path.join(self.resources_dir, "icons", "sunline.ico")
@@ -1373,8 +1373,29 @@ class ResumeGeneratorGUI:
             self.unfold_button.pack_forget()
             # 显示人员列表
             self.person_list_frame.pack(fill=tk.X, pady=5)
-            # 自动更新人员名单，确保有数据显示
-            self._update_person_list()
+            # 先尝试加载已有的员工信息
+            emp_list_path = os.path.join(base_dir, "config", "emp_list.json")
+            file_exists = os.path.exists(emp_list_path)
+            loaded = False
+            
+            if file_exists:
+                loaded = self._load_employee_info()
+                # 如果加载成功，更新人员树显示
+                if loaded:
+                    self._log(f"已加载现有员工信息：{emp_list_path}")
+                    # 使用新的_refresh_person_list方法来刷新人员树显示
+                    self._refresh_person_list()
+                else:
+                    # 文件存在但加载失败
+                    self._log(f"员工信息文件存在但加载失败：{emp_list_path}")
+            else:
+                # 文件不存在
+                self._log(f"员工信息文件不存在：{emp_list_path}")
+            
+            # 只有当文件不存在或加载失败时，才提示用户需要更新
+            if not file_exists or not loaded:
+                messagebox.showinfo("提示", "请先上传技术人员信息并点击更新人员名单")
+            
             self._person_list_visible = True
             # 隐藏名单选择框架
             if hasattr(self, 'list_select_frame'):
@@ -1422,8 +1443,105 @@ class ResumeGeneratorGUI:
             self.person_list_frame.pack(fill=tk.X, pady=5)
             self._person_list_visible = True
     
+    def _refresh_person_list(self):
+        """刷新人员列表 - 仅从emp_list.json加载数据并更新UI，不执行源文件更新"""
+        self._log("开始刷新人员列表...")
+        
+        # 在单独的线程中执行刷新操作
+        threading.Thread(target=self._refresh_person_list_thread).start()
+        
+    def _refresh_person_list_thread(self):
+        """在单独线程中刷新人员列表"""
+        try:
+            # 加载员工信息
+            self._update_progress(30)
+            if not self._load_employee_info():
+                self._log("[WARNING] 未找到员工信息，无法刷新人员列表")
+                return
+            
+            # 清空现有列表
+            def clear_tree():
+                for item in self.person_tree.get_children():
+                    self.person_tree.delete(item)
+            
+            if self.root.winfo_exists():
+                self.root.after(0, clear_tree)
+            
+            # 直接从config/emp_list.json加载人员信息
+            self._update_progress(60)
+            
+            # 存储所有人员信息
+            all_persons = []
+            
+            # 从员工信息中提取人员名单
+            if hasattr(self, 'employee_info') and self.employee_info:
+                for emp in self.employee_info:
+                    emp_no = emp.get('EmpNo', '')
+                    # 直接使用JobName作为姓名（从get_emp_list.py中可以看到，JobName实际上对应的是姓名列）
+                    person_name = emp.get('JobName', '')
+                    
+                    # 获取部门信息
+                    level1 = emp.get('Level1Dept', '')
+                    level2 = emp.get('Level2Dept', '')
+                    dept_info = f"{level1}-{level2}" if level1 and level2 else level1 or level2
+                    
+                    # 只有当工号和姓名都不为空时才添加
+                    if emp_no and person_name:
+                        all_persons.append((emp_no, person_name, dept_info))
+            
+            # 如果从emp_list.json没有获取到姓名，回退到从modify_json目录读取
+            if not all_persons and hasattr(self, 'employee_info') and self.employee_info:
+                self._log("从emp_list.json未获取到姓名信息，尝试从modify_json目录补充...")
+                modify_dir = os.path.join(os.getcwd(), "output", "modify_json")
+                if os.path.exists(modify_dir):
+                    # 创建工号到员工信息的映射
+                    emp_map = {emp.get('EmpNo'): emp for emp in self.employee_info}
+                    person_files = [f for f in os.listdir(modify_dir) if f.endswith('.json')]
+                    for json_file in person_files:
+                        file_path = os.path.join(modify_dir, json_file)
+                        try:
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                data = json.load(f)
+                                if data and isinstance(data, dict):
+                                    for person_name, person_data in data.items():
+                                        # 获取员工编号
+                                        emp_no = ""
+                                        if 'BasicInfo' in person_data and 'EmpNo' in person_data['BasicInfo']:
+                                            emp_no = person_data['BasicInfo']['EmpNo']
+                                        elif file_path and os.path.basename(file_path).split('_')[0].isdigit():
+                                            emp_no = os.path.basename(file_path).split('_')[0]
+                                        
+                                        # 如果在emp_map中找到该工号，使用emp_list.json中的部门信息
+                                        if emp_no in emp_map:
+                                            emp = emp_map[emp_no]
+                                            level1 = emp.get('Level1Dept', '')
+                                            level2 = emp.get('Level2Dept', '')
+                                            dept_info = f"{level1}-{level2}" if level1 and level2 else level1 or level2
+                                            all_persons.append((emp_no, person_name, dept_info))
+                        except Exception as e:
+                            self._log(f"处理文件{json_file}时出错: {str(e)}")
+                            continue
+            
+            # 按员工编号排序并插入树视图
+            all_persons.sort(key=lambda x: (x[0] if x[0].isdigit() else '99999', x[1]))
+            
+            def populate_tree():
+                for emp_no, person_name, dept_info in all_persons:
+                    # 添加空的复选框列
+                    self.person_tree.insert("", "end", values=("", emp_no, person_name, dept_info))
+                self._log(f"已刷新人员列表，共 {len(all_persons)} 人")
+            
+            if self.root.winfo_exists():
+                self.root.after(0, populate_tree)
+                self.root.after(0, lambda: self._update_progress(100))
+                
+        except Exception as e:
+            self._log(f"刷新人员列表时出错: {str(e)}")
+            import traceback
+            self._log(traceback.format_exc())
+    
     def _update_person_list(self):
-        """更新人员名单，包含执行get_emp_list脚本"""
+        """更新人员名单，包含执行get_emp_list脚本 - 仅用于手动点击更新时使用"""
         self._log("开始更新人员名单...")
         
         # 在单独的线程中执行更新操作
@@ -1577,6 +1695,9 @@ class ResumeGeneratorGUI:
                         file_path = self.tech_info_file_path.get()
                         if not file_path:
                             self._log("请先选择技术人员信息文件")
+                            # 显示弹窗提示用户
+                            if self.root.winfo_exists():
+                                self.root.after(0, lambda: messagebox.showinfo("提示", "请先选择技术人员信息文件！"))
                             return
                         
                         # 获取员工信息
@@ -1859,6 +1980,7 @@ class ResumeGeneratorGUI:
         """
         try:
             emp_list_path = os.path.join(base_dir, "config", "emp_list.json")
+            print(emp_list_path)
             if not os.path.exists(emp_list_path):
                 self._log(f"员工信息文件不存在: {emp_list_path}")
                 # 如果是初始化时检查且不存在，显示提示
@@ -2206,9 +2328,9 @@ class ResumeGeneratorGUI:
             
             self._log("===== 开始更新AdditionInfo信息 =====")
             
-            # 获取info_json和modify_json目录
-            info_dir = os.path.join(os.getcwd(), "output", "info_json")
-            modify_dir = os.path.join(os.getcwd(), "output", "modify_json")
+            # 获取info_json和modify_json目录（使用程序文件所在目录）
+            info_dir = os.path.join(base_dir, "output", "info_json")
+            modify_dir = os.path.join(base_dir, "output", "modify_json")
             
             # 创建目录（如果不存在）
             os.makedirs(info_dir, exist_ok=True)
