@@ -2443,9 +2443,19 @@ class ResumeGeneratorGUI:
             
             self._log(f"过滤后需要更新的文件数量: {len(files_to_update)}")
             
+            # 导入特殊字段处理模块
+            try:
+                from package.functions.add_special_info import process_special_info
+                has_special_info_module = True
+            except ImportError:
+                self._log("警告: 无法导入add_special_info模块，跳过特殊字段处理")
+                has_special_info_module = False
+            
             # 更新每个文件
             updated_count = 0
             skipped_count = 0
+            special_info_processed = 0
+            special_info_failed = 0
             for resume_file in files_to_update:
                 try:
                     file_emp_no = resume_file.split('_')[0]
@@ -2494,6 +2504,19 @@ class ResumeGeneratorGUI:
                             # 写回文件
                             with open(resume_path, 'w', encoding='utf-8') as f:
                                 json.dump(resume_data, f, ensure_ascii=False, indent=4)
+                            
+                            # 处理特殊字段信息
+                            if has_special_info_module:
+                                try:
+                                    if process_special_info(resume_path):
+                                        special_info_processed += 1
+                                        self._log(f"  特殊字段处理: {resume_file} - 成功")
+                                    else:
+                                        special_info_failed += 1
+                                        self._log(f"  特殊字段处理: {resume_file} - 失败")
+                                except Exception as si_e:
+                                    special_info_failed += 1
+                                    self._log(f"  特殊字段处理: {resume_file} - 出错: {si_e}")
                             
                             updated_count += 1
                             self._log(f"  已更新: {resume_file} - 成功添加AdditionInfo")
@@ -2545,6 +2568,10 @@ class ResumeGeneratorGUI:
             self._log(f"成功更新: {updated_count} 个文件")
             self._log(f"跳过: {skipped_count} 个文件")
             self._log(f"验证结果 - 成功: {validation_success}, 失败: {validation_failed}")
+            
+            # 记录特殊字段处理结果
+            if has_special_info_module:
+                self._log(f"特殊字段处理 - 成功: {special_info_processed}, 失败: {special_info_failed}")
             
             # 返回验证是否全部成功
             return updated_count > 0 and validation_success == updated_count

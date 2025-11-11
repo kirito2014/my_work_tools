@@ -12,6 +12,14 @@ try:
     # 导入现有的Excel转JSON功能
     from package.functions.excel_2_info_json import convert_excel_to_json, create_modify_json_format, save_json_files
     from package.utils.file_helper import read_file, write_file
+    # 尝试导入特殊字段处理模块
+    try:
+        from package.functions.add_special_info import process_special_info
+        has_special_info_module = True
+    except ImportError:
+        print("警告: 无法导入add_special_info模块，跳过特殊字段处理")
+        process_special_info = None
+        has_special_info_module = False
 except ImportError as e:
     print(f"导入模块失败: {e}")
     sys.exit(1)
@@ -153,6 +161,16 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
                                                 with open(json_file, 'w', encoding='utf-8') as f:
                                                     f.write(updated_content)
                                                 print(f"  - [OK] 已更新AdditionInfo信息")
+                                                
+                                                # 处理特殊字段信息
+                                                if has_special_info_module and process_special_info:
+                                                    try:
+                                                        if process_special_info(json_file):
+                                                            print(f"  - [OK] 特殊字段处理成功")
+                                                        else:
+                                                            print(f"  - [WARNING] 特殊字段处理失败")
+                                                    except Exception as si_e:
+                                                        print(f"  - [ERROR] 特殊字段处理出错: {si_e}")
                                         except Exception as e:
                                             print(f"  - [ERROR] 更新AdditionInfo时出错: {e}")
                                 
@@ -191,17 +209,28 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
                     
                     # 更新AdditionInfo
                     if resume_data:
-                        # 获取第一个键（通常是姓名）
-                        person_name = list(resume_data.keys())[0]
-                        if person_name in resume_data:
-                            resume_data[person_name]["AdditionInfo"] = emp_data
-                            # 将字典转换为JSON字符串并写回文件
-                            updated_content = json.dumps(resume_data, ensure_ascii=False, indent=2)
-                            write_file(file_path, updated_content)
-                            print(f"[OK] 已更新简历JSON: {filename}")
-                            updated_count += 1
-                            found = True
-                            break
+                            # 获取第一个键（通常是姓名）
+                            person_name = list(resume_data.keys())[0]
+                            if person_name in resume_data:
+                                resume_data[person_name]["AdditionInfo"] = emp_data
+                                # 将字典转换为JSON字符串并写回文件
+                                updated_content = json.dumps(resume_data, ensure_ascii=False, indent=2)
+                                write_file(file_path, updated_content)
+                                print(f"[OK] 已更新简历JSON: {filename}")
+                                
+                                # 处理特殊字段信息
+                                if has_special_info_module and process_special_info:
+                                    try:
+                                        if process_special_info(file_path):
+                                            print(f"[OK] 特殊字段处理成功: {filename}")
+                                        else:
+                                            print(f"[WARNING] 特殊字段处理失败: {filename}")
+                                    except Exception as si_e:
+                                        print(f"[ERROR] 特殊字段处理出错: {filename} - {si_e}")
+                                
+                                updated_count += 1
+                                found = True
+                                break
                 except Exception as e:
                     print(f"[ERROR] 更新简历文件 {filename} 时出错: {e}")
         

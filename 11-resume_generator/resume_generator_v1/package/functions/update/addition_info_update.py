@@ -179,6 +179,20 @@ def update_addition_info_for_files(json_dir: str, person_names: Optional[List[st
     返回:
         包含统计信息的字典
     """
+    # 尝试导入特殊字段处理模块
+    try:
+        # 使用相对导入
+        from ..add_special_info import process_special_info
+        has_special_info_module = True
+    except ImportError:
+        # 如果相对导入失败，尝试绝对导入
+        try:
+            from package.functions.add_special_info import process_special_info
+            has_special_info_module = True
+        except ImportError:
+            process_special_info = None
+            has_special_info_module = False
+    
     # 初始化统计信息
     stats = {
         "total_files": 0,
@@ -186,6 +200,8 @@ def update_addition_info_for_files(json_dir: str, person_names: Optional[List[st
         "skipped_count": 0,
         "validation_success": 0,
         "validation_failed": 0,
+        "special_info_processed": 0,
+        "special_info_failed": 0,
         "errors": []
     }
     
@@ -230,6 +246,19 @@ def update_addition_info_for_files(json_dir: str, person_names: Optional[List[st
                     json.dump(data, f, ensure_ascii=False, indent=2)
                 stats["updated_count"] += 1
                 log(f"  更新文件: {json_file}")
+                
+                # 处理特殊字段信息
+                if has_special_info_module and process_special_info:
+                    try:
+                        if process_special_info(json_path):
+                            stats["special_info_processed"] += 1
+                            log(f"  特殊字段处理: {json_file} - 成功")
+                        else:
+                            stats["special_info_failed"] += 1
+                            log(f"  特殊字段处理: {json_file} - 失败")
+                    except Exception as si_e:
+                        stats["special_info_failed"] += 1
+                        log(f"  特殊字段处理: {json_file} - 出错: {si_e}")
             else:
                 stats["skipped_count"] += 1
             
@@ -248,6 +277,10 @@ def update_addition_info_for_files(json_dir: str, person_names: Optional[List[st
     log(f"成功更新: {stats['updated_count']} 个文件")
     log(f"跳过: {stats['skipped_count']} 个文件")
     log(f"验证结果 - 成功: {stats['validation_success']}, 失败: {stats['validation_failed']}")
+    
+    # 记录特殊字段处理结果
+    if has_special_info_module and process_special_info:
+        log(f"特殊字段处理 - 成功: {stats['special_info_processed']}, 失败: {stats['special_info_failed']}")
     
     return stats
 
