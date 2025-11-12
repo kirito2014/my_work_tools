@@ -78,7 +78,7 @@
 
 ## 六、常用 Jinja2 语法示例
 
-### 1. 条件判断（学历 → 学位）
+### 1. 条件判断（学历 → 学位） 可直接使用SpecialInfo.Degree
 
 ```jinja2
 {% if BasicInfo.HighestEducation == "本科" %}
@@ -137,3 +137,6 @@
 ```jinja2
 {{ BasicInfo.PersonalProfile | replace(" ", "<br>") }}
 ```
+### 9.单表格中填写循环项目经历
+{% for exp in WorkExperience %}{{ exp.StartTime|default('') }}, {{ exp.EndTime|default('') }}, {{ exp.CompanyName|default('') }}{% if not loop.last %}; 
+{% endif %}{% endfor %}
