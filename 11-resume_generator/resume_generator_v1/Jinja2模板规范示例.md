@@ -13,7 +13,7 @@
 | HighestEducation | edu | 最高学历 | `{{ BasicInfo.HighestEducation }}` | `{{ bi.edu }}` | 本科 |
 | Department | dept | 部门 | `{{ BasicInfo.Department }}` | `{{ bi.dept }}` | 金融业务六部 |
 | Title | title | 职位 | `{{ BasicInfo.Title }}` | `{{ bi.title }}` | 主任工程师 |
-| PersonalProfile | profile | 个人简介 | `{{ BasicInfo.PersonalProfile }}` | `{{ bi.profile }}` | 支持多行文本 |
+| PersonalProfile | profile | 个人简介 | `{{ BasicInfo.PersonalProfile }}` | `{{ bi.profile }}` | 支持多行文本 | 
 
 ---
 
@@ -269,6 +269,9 @@
 - 示例一：根据空格替换为换行（短键）
 ```jinja2
 {{ bi.profile | replace(" ", "<br>") }}
+```
+
+
 ### 9.单表格中填写循环项目经历
 
 使用长键：
