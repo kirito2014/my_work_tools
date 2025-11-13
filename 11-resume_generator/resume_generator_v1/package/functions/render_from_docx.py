@@ -115,7 +115,8 @@ def generate_resume_from_json(person_data, template_path, output_folder, person_
         return output_path
 
     except Exception as e:
-        print(f"{person_name} 生成简历时出错: {e}")
+        # 使用更安全的方式打印错误信息，避免f-string格式化问题
+        print(f"{person_name} 生成简历时出错: {str(e)}")
         return None
 
 

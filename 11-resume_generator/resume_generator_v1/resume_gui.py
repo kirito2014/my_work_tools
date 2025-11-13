@@ -2711,6 +2711,7 @@ class ResumeGeneratorGUI:
                     self._log(f"【步骤5】调用批生成功能，JSON目录: {modify_dir}，模板: {os.path.basename(template_path)}")
                     
                     # 调用批生成函数
+                    # batch_generate_resumes函数内部已实现键值转换，会使用短键版数据进行渲染
                     success_count, failed_count = batch_render_module.batch_generate_resumes(
                         json_files_dir=modify_dir,
                         template_path=template_path,
