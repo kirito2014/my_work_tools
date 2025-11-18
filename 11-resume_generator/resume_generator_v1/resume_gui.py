@@ -2694,6 +2694,8 @@ class ResumeGeneratorGUI:
                 
                 # 设置模板文件路径 - 根据银行名称动态查找对应的模板
                 # 查找格式："银行名称_简历模板.docx"
+
+                # todo: 检测是否为xlsx格式，支持xlsx格式的生成
                 template_path = os.path.join(os.getcwd(), "template", f"{bankname}_简历模板.docx")
                 self._log(f"【步骤4】检查模板文件: {template_path}")
                 

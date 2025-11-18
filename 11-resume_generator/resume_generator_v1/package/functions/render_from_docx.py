@@ -66,6 +66,9 @@ def generate_resume_from_json(person_data, template_path, output_folder, person_
     :param bankname: 银行名称，用于文件名前缀。
     :return: 生成的简历文件路径。
     """
+
+
+    #todo:添加对xlsx文件的支持,并渲染到模板中，需要判断传入的文件格式
     try:
         # 修复可能的类型错误，确保数字类型才会被round操作处理
         # 递归检查并转换可能存在的数字字符串
