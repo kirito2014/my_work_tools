@@ -195,6 +195,7 @@ def extract_resume_universal(doc_path: str) -> Dict:
 
         # 提取项目经历列名
         header_cells = [cell.text.strip() for cell in table.rows[project_header_row].cells if cell.text.strip()]
+        print(header_cells)
         # 提取数据行
         for row_idx in range(project_header_row + 1, project_end_row + 1):
             row = table.rows[row_idx]
@@ -343,7 +344,7 @@ def convert_to_template_format(raw_data: Dict, emp_no: str = "") -> Dict:
             "EndTime": project.get("结束时间", project.get("截止时间", "")),
             "ProjectName": project.get("项目名称", project.get("项目", "")),
             "ProjectRole": project.get("项目角色", project.get("角色", project.get("职位", ""))),
-            "JobDescription": project.get("项目职责说明", project.get("项目描述", project.get("职责", "")))
+            "JobDescription": project.get("项目职责说明", project.get("项目描述", project.get("职责", project.get("项目职责", ""))))
         })
     
     # 处理None值
