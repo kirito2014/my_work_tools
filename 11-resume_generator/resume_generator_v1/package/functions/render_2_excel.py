@@ -14,11 +14,13 @@ from typing import Dict, Any, List, Optional, Tuple
 
 try:
     import openpyxl
-    from openpyxl import Workbook
+    from openpyxl import Workbook, load_workbook
     from openpyxl.utils import get_column_letter
-    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.utils.cell import coordinate_from_string
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from jinja2 import Environment, Template, TemplateError
 except ImportError:
-    print("错误: 未安装openpyxl库，请运行: pip install openpyxl")
+    print("错误: 未安装所需库，请运行: pip install openpyxl jinja2")
     sys.exit(1)
 
 
@@ -77,15 +79,15 @@ def copy_workbook(source_workbook):
         return Workbook()
 
 
-def find_placeholder_cells(worksheet) -> Dict[str, str]:
+def find_placeholder_cells(worksheet) -> Dict[str, List[str]]:
     """
-    查找工作表中的占位符单元格
+    查找工作表中的占位符单元格，支持多个相同占位符
     
     Args:
         worksheet: openpyxl工作表对象
         
     Returns:
-        Dict[str, str]: 占位符映射，键为占位符名称，值为单元格位置
+        Dict[str, List[str]]: 占位符映射，键为占位符名称，值为单元格位置列表
     """
     placeholders = {}
     
@@ -99,7 +101,13 @@ def find_placeholder_cells(worksheet) -> Dict[str, str]:
                     end = cell.value.find('}}')
                     if start > 1 and end > start:
                         placeholder_name = cell.value[start:end].strip()
-                        placeholders[placeholder_name] = cell.coordinate
+                        
+                        # 初始化列表（如果不存在）
+                        if placeholder_name not in placeholders:
+                            placeholders[placeholder_name] = []
+                        
+                        # 添加单元格位置到列表中
+                        placeholders[placeholder_name].append(cell.coordinate)
     
     return placeholders
 
@@ -119,6 +127,268 @@ def render_template_cell(cell, value):
         cell.value = json.dumps(value, ensure_ascii=False, indent=2)
     else:
         cell.value = str(value)
+
+
+def render_jinja2_template(template_str: str, context: dict) -> str:
+    """
+    使用Jinja2渲染模板字符串
+    
+    Args:
+        template_str: 包含Jinja2语法的模板字符串
+        context: 模板上下文数据
+        
+    Returns:
+        渲染后的字符串
+    """
+    try:
+        # 创建Jinja2环境
+        env = Environment()
+        template = env.from_string(template_str)
+        # 渲染模板
+        rendered = template.render(**context)
+        return rendered
+    except TemplateError as e:
+        print(f"Jinja2模板渲染错误: {e}")
+        return f"[模板错误: {str(e)}]"
+    except Exception as e:
+        print(f"渲染模板时出错: {e}")
+        return f"[渲染错误: {str(e)}]"
+
+
+def find_jinja2_cells(worksheet) -> List[Tuple[str, str]]:
+    """
+    查找工作表中的Jinja2模板单元格
+    
+    Args:
+        worksheet: openpyxl工作表对象
+        
+    Returns:
+        List[Tuple[str, str]]: 包含Jinja2语法的单元格列表，格式为[(coordinate, template_str), ...]
+    """
+    jinja2_cells = []
+    
+    for row in worksheet.iter_rows():
+        for cell in row:
+            if cell.value and isinstance(cell.value, str):
+                # 检查是否包含Jinja2语法
+                if ('{{' in cell.value and '}}' in cell.value) or ('{%' in cell.value and '%}' in cell.value):
+                    jinja2_cells.append((cell.coordinate, cell.value))
+    
+    return jinja2_cells
+
+
+def find_loop_blocks(worksheet) -> List[Dict]:
+    """
+    查找工作表中的Jinja2循环块
+    
+    Args:
+        worksheet: openpyxl工作表对象
+        
+    Returns:
+        List[Dict]: 循环块信息列表，每个元素包含start_row, end_row, template_info等
+    """
+    loop_blocks = []
+    
+    # 查找{% for %}和{% endfor %}标记
+    for row_idx, row in enumerate(worksheet.iter_rows(), 1):
+        for cell in row:
+            if cell.value and isinstance(cell.value, str):
+                if '{% for ' in cell.value and '%}' in cell.value:
+                    # 找到循环开始标记
+                    for_idx = cell.value.find('{% for ')
+                    endfor_pos = cell.value.find('%}', for_idx)
+                    if for_idx != -1 and endfor_pos != -1:
+                        loop_content = cell.value[for_idx:endfor_pos+2]
+                        # 提取循环变量和集合
+                        loop_var = loop_content.replace('{% for ', '').replace(' %}', '').strip()
+                        # 简单解析，格式如 "work in we"
+                        if ' in ' in loop_var:
+                            var_part, collection_part = loop_var.split(' in ', 1)
+                            var_name = var_part.strip()
+                            collection_name = collection_part.strip()
+                            
+                            # 查找对应的{% endfor %}
+                            endfor_row = find_matching_endfor(worksheet, row_idx)
+                            if endfor_row:
+                                loop_blocks.append({
+                                    'start_row': row_idx,
+                                    'end_row': endfor_row,
+                                    'var_name': var_name,
+                                    'collection_name': collection_name,
+                                    'template_cells': get_template_cells_in_loop(worksheet, row_idx, endfor_row)
+                                })
+    
+    return loop_blocks
+
+
+def find_matching_endfor(worksheet, start_row: int) -> Optional[int]:
+    """
+    查找匹配的{% endfor %}标记
+    
+    Args:
+        worksheet: openpyxl工作表对象
+        start_row: 循环开始的行号
+        
+    Returns:
+        Optional[int]: 匹配的endfor行号，未找到返回None
+    """
+    for row_idx in range(start_row + 1, worksheet.max_row + 1):
+        row = worksheet[row_idx]
+        for cell in row:
+            if cell.value and isinstance(cell.value, str):
+                if '{% endfor %}' in cell.value:
+                    return row_idx
+    return None
+
+
+def get_template_cells_in_loop(worksheet, start_row: int, end_row: int) -> List[Dict]:
+    """
+    获取循环块内的模板单元格信息
+    
+    Args:
+        worksheet: openpyxl工作表对象
+        start_row: 循环开始行号
+        end_row: 循环结束行号
+        
+    Returns:
+        List[Dict]: 模板单元格信息列表
+    """
+    template_cells = []
+    
+    for row_idx in range(start_row, end_row + 1):
+        row = worksheet[row_idx]
+        for cell in row:
+            if cell.value and isinstance(cell.value, str):
+                # 跳过循环标记本身
+                if '{% for ' in cell.value or '{% endfor %}' in cell.value:
+                    continue
+                # 查找包含变量的单元格
+                if '{{' in cell.value and '}}' in cell.value:
+                    template_cells.append({
+                        'coordinate': cell.coordinate,
+                        'row': row_idx,
+                        'column': cell.column,
+                        'template': cell.value,
+                        'style': cell._style if cell.has_style else None
+                    })
+    
+    return template_cells
+
+
+def expand_loop_blocks(worksheet, context: dict) -> Any:
+    """
+    展开工作表中的循环块
+    
+    Args:
+        worksheet: openpyxl工作表对象
+        context: 模板上下文数据
+        
+    Returns:
+        处理后的工作表对象
+    """
+    loop_blocks = find_loop_blocks(worksheet)
+    
+    if not loop_blocks:
+        return worksheet
+    
+    # 按行号倒序处理，避免插入行时影响后续循环块的行号
+    loop_blocks.sort(key=lambda x: x['start_row'], reverse=True)
+    
+    for loop_block in loop_blocks:
+        collection_name = loop_block['collection_name']
+        var_name = loop_block['var_name']
+        
+        # 获取集合数据
+        collection_data = get_nested_value(context, collection_name)
+        if not isinstance(collection_data, list) or not collection_data:
+            continue
+        
+        # 展开循环
+        expand_single_loop(worksheet, loop_block, collection_data, var_name)
+    
+    return worksheet
+
+
+def get_nested_value(data: dict, key_path: str):
+    """
+    获取嵌套字典中的值
+    
+    Args:
+        data: 数据字典
+        key_path: 键路径，如 "we" 或 "WorkExperience"
+        
+    Returns:
+        对应的值
+    """
+    keys = key_path.split('.')
+    value = data
+    
+    for key in keys:
+        if isinstance(value, dict) and key in value:
+            value = value[key]
+        else:
+            return None
+    
+    return value
+
+
+def expand_single_loop(worksheet, loop_block: Dict, collection_data: List[Dict], var_name: str):
+    """
+    展开单个循环块
+    
+    Args:
+        worksheet: openpyxl工作表对象
+        loop_block: 循环块信息
+        collection_data: 集合数据
+        var_name: 循环变量名
+    """
+    start_row = loop_block['start_row']
+    end_row = loop_block['end_row']
+    template_cells = loop_block['template_cells']
+    
+    if len(collection_data) <= 1:
+        # 如果只有一个元素或没有元素，直接渲染
+        for item_data in collection_data:
+            for template_cell in template_cells:
+                cell = worksheet[template_cell['coordinate']]
+                rendered = render_jinja2_template(template_cell['template'], {var_name: item_data})
+                cell.value = rendered
+        return
+    
+    # 删除原始循环块（除了第一行）
+    for _ in range(len(collection_data) - 1):
+        worksheet.delete_rows(start_row + 1)
+    
+    # 为每个数据项复制并渲染行
+    for i, item_data in enumerate(collection_data):
+        if i == 0:
+            # 第一行直接渲染
+            for template_cell in template_cells:
+                cell = worksheet[template_cell['coordinate']]
+                rendered = render_jinja2_template(template_cell['template'], {var_name: item_data})
+                cell.value = rendered
+        else:
+            # 复制行并渲染
+            new_row_idx = start_row + i
+            worksheet.insert_rows(new_row_idx)
+            
+            # 复制样式和格式
+            for template_cell in template_cells:
+                original_coord = template_cell['coordinate']
+                original_cell = worksheet[original_coord]
+                
+                # 计算新单元格坐标
+                new_row_num = new_row_idx
+                new_coord = f"{get_column_letter(template_cell['column'])}{new_row_num}"
+                new_cell = worksheet[new_coord]
+                
+                # 复制样式
+                if template_cell['style']:
+                    new_cell._style = template_cell['style']
+                
+                # 渲染模板
+                rendered = render_jinja2_template(template_cell['template'], {var_name: item_data})
+                new_cell.value = rendered
 
 
 def create_person_sheet(template_worksheet, person_name: str, person_data: Dict[str, Any]) -> Any:
@@ -168,13 +438,16 @@ def create_person_sheet(template_worksheet, person_name: str, person_data: Dict[
                     # 如果样式复制失败，至少复制值
                     pass
     
+    # 处理循环块（在处理普通占位符之前）
+    new_sheet = expand_loop_blocks(new_sheet, person_data)
+    
     # 查找占位符并替换
     placeholders = find_placeholder_cells(new_sheet)
+    jinja2_cells = find_jinja2_cells(new_sheet)
     sanitized_data = sanitize_data(person_data)
     
-    for placeholder, cell_coord in placeholders.items():
-        cell = new_sheet[cell_coord]
-        
+    # 处理普通占位符
+    for placeholder, cell_coords in placeholders.items():
         # 支持嵌套键值，如 "personal_info.name"
         keys = placeholder.split('.')
         value = sanitized_data
@@ -194,10 +467,29 @@ def create_person_sheet(template_worksheet, person_name: str, person_data: Dict[
                     value = None
                     break
             
-            render_template_cell(cell, value)
+            # 处理该占位符的所有单元格位置
+            for cell_coord in cell_coords:
+                cell = new_sheet[cell_coord]
+                render_template_cell(cell, value)
+                
         except Exception as e:
             print(f"渲染占位符 {placeholder} 时出错: {str(e)}")
-            render_template_cell(cell, f"[错误: {placeholder}]")
+            # 为所有相同占位符的单元格设置错误信息
+            for cell_coord in cell_coords:
+                cell = new_sheet[cell_coord]
+                render_template_cell(cell, f"[错误: {placeholder}]")
+    
+    # 处理Jinja2模板
+    for cell_coord, template_str in jinja2_cells:
+        try:
+            cell = new_sheet[cell_coord]
+            # 使用Jinja2渲染模板
+            rendered_value = render_jinja2_template(template_str, sanitized_data)
+            cell.value = rendered_value
+        except Exception as e:
+            print(f"渲染Jinja2模板 {cell_coord} 时出错: {str(e)}")
+            cell = new_sheet[cell_coord]
+            cell.value = f"[Jinja2错误: {str(e)}]"
     
     return new_sheet, new_workbook
 
@@ -360,9 +652,7 @@ def create_person_sheet_with_formatting(template_worksheet, person_name: str, pe
     placeholders = find_placeholder_cells(new_sheet)
     sanitized_data = sanitize_data(person_data)
     
-    for placeholder, cell_coord in placeholders.items():
-        cell = new_sheet[cell_coord]
-        
+    for placeholder, cell_coords in placeholders.items():
         # 支持嵌套键值，如 "personal_info.name"
         keys = placeholder.split('.')
         value = sanitized_data
@@ -382,10 +672,17 @@ def create_person_sheet_with_formatting(template_worksheet, person_name: str, pe
                     value = None
                     break
             
-            render_template_cell(cell, value)
+            # 处理该占位符的所有单元格位置
+            for cell_coord in cell_coords:
+                cell = new_sheet[cell_coord]
+                render_template_cell(cell, value)
+                
         except Exception as e:
             print(f"渲染占位符 {placeholder} 时出错: {str(e)}")
-            render_template_cell(cell, f"[错误: {placeholder}]")
+            # 为所有相同占位符的单元格设置错误信息
+            for cell_coord in cell_coords:
+                cell = new_sheet[cell_coord]
+                render_template_cell(cell, f"[错误: {placeholder}]")
     
     return new_sheet
 
