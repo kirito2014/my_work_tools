@@ -70,6 +70,61 @@ def generate_resume_from_json(person_data, template_path, output_folder, person_
 
     #todo:添加对xlsx文件的支持,并渲染到模板中，需要判断传入的文件格式
     try:
+        # 检查模板文件格式
+        if template_path.lower().endswith('.xlsx'):
+            # 使用Excel模板批量处理功能（合并到同一文件）
+            try:
+                from . import render_2_excel as r2e
+            except ImportError:
+                try:
+                    import render_2_excel as r2e
+                except ImportError:
+                    print("错误: 未找到 render_2_excel.py 文件")
+                    return None
+            
+            # 创建临时目录存放单个JSON文件
+            import tempfile
+            temp_dir = tempfile.mkdtemp()
+            temp_json_file = os.path.join(temp_dir, f"{person_name}_temp.json")
+            
+            # 将person_data保存为JSON文件
+            try:
+                with open(temp_json_file, 'w', encoding='utf-8') as f:
+                    json.dump({person_name: person_data}, f, ensure_ascii=False, indent=4)
+            except Exception as e:
+                print(f"创建临时JSON文件失败: {str(e)}")
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return None
+            
+            # 使用批量生成功能，合并到同一文件
+            try:
+                success_count, failed_count = r2e.batch_generate_resumes_excel(
+                    temp_dir, template_path, bankname, 
+                    person_names=[person_name], 
+                    merge_to_single_file=True
+                )
+                
+                # 清理临时目录
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                
+                if success_count > 0:
+                    # 返回输出目录路径（实际文件由batch_generate_resumes_excel生成）
+                    output_folder = os.path.join(os.getcwd(), "output", bankname)
+                    print(f"{person_name} 简历已批量生成 (Excel格式)，保存到: {output_folder}")
+                    return output_folder
+                else:
+                    print(f"{person_name} 简历生成失败")
+                    return None
+                    
+            except Exception as e:
+                # 清理临时目录
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                print(f"{person_name} 批量生成Excel简历时出错: {str(e)}")
+                return None
+        
         # 修复可能的类型错误，确保数字类型才会被round操作处理
         # 递归检查并转换可能存在的数字字符串
         def sanitize_data(data):
@@ -159,7 +214,13 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
         # ========== 前置检查阶段 ========== 
         # 验证模板文件存在性
         if not os.path.isfile(template_path):
-            print(f"[ERROR] 关键错误：Word模板文件不存在 {os.path.abspath(template_path)}")
+            print(f"[ERROR] 关键错误：模板文件不存在 {os.path.abspath(template_path)}")
+            return
+        
+        # 检查模板文件格式
+        template_ext = os.path.splitext(template_path)[1].lower()
+        if template_ext not in ['.docx', '.xlsx']:
+            print(f"[ERROR] 不支持的模板格式: {template_ext}。仅支持.docx和.xlsx格式。")
             return
             
         # 验证Doc/Docx文件存在性（仅在input_file不为None时检查）
@@ -169,7 +230,7 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
 
         # 验证模板文件存在性
         if not os.path.isfile(template_path):
-            print(f"[ERROR] 关键错误：Word模板文件不存在 {os.path.abspath(template_path)}")
+            print(f"[ERROR] 关键错误：模板文件不存在 {os.path.abspath(template_path)}")
             return
 
         # ========== 数据准备阶段 ========== 

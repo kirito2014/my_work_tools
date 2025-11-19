@@ -2792,15 +2792,22 @@ class ResumeGeneratorGUI:
                     return
                 
                 # 设置模板文件路径 - 根据银行名称动态查找对应的模板
-                # 查找格式："银行名称_简历模板.docx"
-
-                # todo: 检测是否为xlsx格式，支持xlsx格式的生成
-                template_path = os.path.join(os.getcwd(), "template", f"{bankname}_简历模板.docx")
-                self._log(f"【步骤4】检查模板文件: {template_path}")
+                # 优先查找xlsx格式，如果不存在则查找docx格式
+                template_dir = os.path.join(os.getcwd(), "template")
                 
-                # 如果找不到银行特定模板，直接弹窗提示
-                if not os.path.exists(template_path):
-                    self._log(f"错误: 未找到银行特定模板: {bankname}_简历模板.docx")
+                # todo: 检测是否为xlsx格式，支持xlsx格式的生成
+                xlsx_template = os.path.join(template_dir, f"{bankname}_简历模板.xlsx")
+                docx_template = os.path.join(template_dir, f"{bankname}_简历模板.docx")
+                
+                # 优先使用xlsx模板
+                if os.path.exists(xlsx_template):
+                    template_path = xlsx_template
+                    self._log(f"【步骤4】找到Excel模板: {template_path}")
+                elif os.path.exists(docx_template):
+                    template_path = docx_template
+                    self._log(f"【步骤4】找到Word模板: {template_path}")
+                else:
+                    self._log(f"错误: 未找到银行特定模板，尝试查找: {bankname}_简历模板.xlsx 或 {bankname}_简历模板.docx")
                     # 使用主线程显示弹窗
                     self.root.after(0, lambda: messagebox.showinfo("提示", f"没有对应{bankname}的模板，请先配置银行简历模板"))
                     return
