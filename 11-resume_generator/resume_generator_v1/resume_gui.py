@@ -3065,10 +3065,14 @@ class ResumeGeneratorGUI:
     
     def _show_example_resume(self):
         """显示填写示例窗口"""
+        # 读取配置文件
+        config_path = os.path.join('config', 'case_sample.config')
+        sample_data = self._load_sample_config(config_path)
+        
         # 创建新窗口
         example_window = tk.Toplevel(self.root)
         example_window.title("填写示例")
-        example_window.geometry("800x600")
+        example_window.geometry("900x700")
         example_window.resizable(True, True)
         
         # 设置字体
@@ -3079,174 +3083,50 @@ class ResumeGeneratorGUI:
         main_frame = ttk.Frame(example_window, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # 标题
-        title_label = ttk.Label(main_frame, text="简历填写示例", font=("Microsoft YaHei", 16, "bold"))
-        title_label.pack(pady=(0, 20))
+        # 标题框架
+        title_frame = ttk.Frame(main_frame)
+        title_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        title_label = ttk.Label(title_frame, text="简历填写示例", font=("Microsoft YaHei", 16, "bold"))
+        title_label.pack(side=tk.LEFT)
+        
+        # 编辑模式切换
+        edit_mode = tk.BooleanVar(value=False)
+        edit_checkbox = ttk.Checkbutton(title_frame, text="编辑模式", variable=edit_mode, 
+                                      command=lambda: self._toggle_edit_mode(edit_mode.get(), text_widgets))
+        edit_checkbox.pack(side=tk.RIGHT, padx=(10, 0))
         
         # 创建Notebook用于分页显示不同类型的示例
         notebook = ttk.Notebook(main_frame)
         notebook.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
         
-        # 个人信息示例页面
-        personal_frame = ttk.Frame(notebook)
-        notebook.add(personal_frame, text="个人信息")
+        # 存储所有文本控件的字典
+        text_widgets = {}
         
-        personal_text = scrolledtext.ScrolledText(personal_frame, wrap=tk.WORD, font=text_font, height=15)
-        personal_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        personal_content = """个人信息填写示例：
-
-姓名：XXX
-性别：XXX
-出生年月：XXX
-民族：XXX
-政治面貌：XXX
-学历：XXX
-毕业院校：XXX
-专业：XXX
-联系电话：XXX
-电子邮箱：XXX
-现居住地：XXX
-
-填写说明：
-1. 姓名请填写真实姓名
-2. 联系电话请确保畅通
-3. 电子邮箱请使用常用邮箱
-4. 居住地请填写详细地址"""
-        personal_text.insert(tk.END, personal_content)
-        personal_text.config(state=tk.DISABLED)
+        # 创建各个标签页
+        tabs = [
+            ('personal_info', '个人信息'),
+            ('education', '教育经历'),
+            ('work_experience', '工作经历'),
+            ('project_experience', '项目经验'),
+            ('skills', '技能特长'),
+            ('update_log', '更新日志')
+        ]
         
-        # 教育经历示例页面
-        education_frame = ttk.Frame(notebook)
-        notebook.add(education_frame, text="教育经历")
-        
-        education_text = scrolledtext.ScrolledText(education_frame, wrap=tk.WORD, font=text_font, height=15)
-        education_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        education_content = """教育经历填写示例：
-
-2008.09-2012.07 XXX大学 计算机科学与技术 本科
-主修课程：数据结构、算法分析、数据库原理、软件工程等
-获得荣誉：优秀学生干部、奖学金等
-
-2012.09-2015.06 XXX大学 计算机应用技术 硕士研究生
-研究方向：人工智能、机器学习
-发表论文：XXX期刊论文X篇
-
-填写说明：
-1. 按时间倒序填写（最近的在前）
-2. 包含起止时间、学校名称、专业、学历
-3. 可添加主修课程、获得荣誉、研究成果等"""
-        education_text.insert(tk.END, education_content)
-        education_text.config(state=tk.DISABLED)
-        
-        # 工作经历示例页面
-        work_frame = ttk.Frame(notebook)
-        notebook.add(work_frame, text="工作经历")
-        
-        work_text = scrolledtext.ScrolledText(work_frame, wrap=tk.WORD, font=text_font, height=15)
-        work_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        work_content = """工作经历填写示例：
-
-2015.07-2018.03 XXX科技有限公司 软件工程师
-主要职责：
-- 负责公司核心产品的设计与开发
-- 参与需求分析和技术方案制定
-- 指导初级开发人员，进行代码审查
-主要业绩：
-- 主导完成XXX项目，提升系统性能30%
-- 获得公司年度优秀员工称号
-
-2018.04-至今 XXX信息技术有限公司 高级软件工程师
-主要职责：
-- 负责架构设计和技术选型
-- 带领开发团队完成重点项目
-- 制定开发规范和最佳实践
-主要业绩：
-- 成功交付多个大型项目，客户满意度95%以上
-
-填写说明：
-1. 按时间倒序填写
-2. 包含公司名称、职位、工作时间
-3. 详细描述工作职责和取得的成绩"""
-        work_text.insert(tk.END, work_content)
-        work_text.config(state=tk.DISABLED)
-        
-        # 项目经验示例页面
-        project_frame = ttk.Frame(notebook)
-        notebook.add(project_frame, text="项目经验")
-        
-        project_text = scrolledtext.ScrolledText(project_frame, wrap=tk.WORD, font=text_font, height=15)
-        project_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        project_content = """项目经验填写示例：
-
-项目名称：XXX银行核心系统升级改造
-项目时间：2020.01-2020.12
-担任角色：技术负责人
-项目描述：该项目旨在对银行核心业务系统进行全面升级，提升系统性能和用户体验
-技术栈：Java、Spring Boot、MySQL、Redis、Docker
-主要职责：
-- 负责项目整体架构设计和技术选型
-- 协调5人开发团队，制定开发计划
-- 解决关键技术难题，确保项目按时交付
-项目成果：
-- 系统响应时间提升50%
-- 支持10万+并发用户
-- 获得客户高度认可
-
-项目名称：XXX移动支付平台开发
-项目时间：2019.03-2019.10
-担任角色：核心开发工程师
-项目描述：开发新一代移动支付平台，支持多种支付方式
-技术栈：React Native、Node.js、MongoDB、微服务架构
-主要职责：
-- 负责支付核心模块开发
-- 参与系统设计和接口定义
-- 编写技术文档和测试用例
-项目成果：
-- 平台日交易量突破100万笔
-- 支付成功率达到99.9%
-
-填写说明：
-1. 选择有代表性的项目
-2. 突出个人贡献和技术能力
-3. 量化项目成果和影响"""
-        project_text.insert(tk.END, project_content)
-        project_text.config(state=tk.DISABLED)
-        
-        # 技能特长示例页面
-        skills_frame = ttk.Frame(notebook)
-        notebook.add(skills_frame, text="技能特长")
-        
-        skills_text = scrolledtext.ScrolledText(skills_frame, wrap=tk.WORD, font=text_font, height=15)
-        skills_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        skills_content = """技能特长填写示例：
-
-专业技能：
-- 编程语言：Java、Python、JavaScript、SQL
-- 框架技术：Spring Boot、Spring Cloud、React、Vue.js
-- 数据库：MySQL、Oracle、MongoDB、Redis
-- 开发工具：Git、Maven、Docker、Jenkins
-- 其他：微服务架构、分布式系统、云计算
-
-语言能力：
-- 英语：CET-6，能够熟练阅读英文技术文档
-- 普通话：标准流利
-
-证书资质：
-- Oracle认证Java程序员
-- AWS认证解决方案架构师
-- PMP项目管理认证
-
-兴趣爱好：
-- 技术博客写作（个人博客访问量10万+）
-- 开源项目贡献（GitHub项目XXX星标）
-- 技术分享和培训
-
-填写说明：
-1. 突出与应聘岗位相关的技能
-2. 证书和资质要真实有效
-3. 兴趣爱好可以体现个人特色"""
-        skills_text.insert(tk.END, skills_content)
-        skills_text.config(state=tk.DISABLED)
+        for key, title in tabs:
+            frame = ttk.Frame(notebook)
+            notebook.add(frame, text=title)
+            
+            text_widget = scrolledtext.ScrolledText(frame, wrap=tk.WORD, font=text_font, height=15)
+            text_widget.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            
+            # 从配置文件加载内容
+            if key in sample_data:
+                content = sample_data[key].get('content', '')
+                text_widget.insert(tk.END, content)
+            
+            text_widget.config(state=tk.DISABLED)
+            text_widgets[key] = text_widget
         
         # 按钮框架
         button_frame = ttk.Frame(main_frame)
@@ -3257,9 +3137,9 @@ class ResumeGeneratorGUI:
             current_tab = notebook.select()
             if current_tab:
                 tab_index = notebook.index(current_tab)
-                text_widgets = [personal_text, education_text, work_text, project_text, skills_text]
-                if tab_index < len(text_widgets):
-                    content = text_widgets[tab_index].get(1.0, tk.END)
+                if tab_index < len(tabs):
+                    key = tabs[tab_index][0]
+                    content = text_widgets[key].get(1.0, tk.END)
                     example_window.clipboard_clear()
                     example_window.clipboard_append(content.strip())
                     messagebox.showinfo("复制成功", "当前页面内容已复制到剪贴板")
@@ -3269,38 +3149,111 @@ class ResumeGeneratorGUI:
             all_content = "简历填写完整示例\n"
             all_content += "=" * 50 + "\n\n"
             
-            # 个人信息
-            all_content += "【个人信息】\n"
-            all_content += personal_text.get(1.0, tk.END).strip() + "\n\n"
-            
-            # 教育经历
-            all_content += "【教育经历】\n"
-            all_content += education_text.get(1.0, tk.END).strip() + "\n\n"
-            
-            # 工作经历
-            all_content += "【工作经历】\n"
-            all_content += work_text.get(1.0, tk.END).strip() + "\n\n"
-            
-            # 项目经验
-            all_content += "【项目经验】\n"
-            all_content += project_text.get(1.0, tk.END).strip() + "\n\n"
-            
-            # 技能特长
-            all_content += "【技能特长】\n"
-            all_content += skills_text.get(1.0, tk.END).strip()
+            for key, title in tabs:
+                if key in text_widgets:
+                    all_content += f"【{title}】\n"
+                    all_content += text_widgets[key].get(1.0, tk.END).strip() + "\n\n"
             
             example_window.clipboard_clear()
-            example_window.clipboard_append(all_content)
+            example_window.clipboard_append(all_content.strip())
             messagebox.showinfo("复制成功", "所有示例内容已复制到剪贴板")
         
-        # 复制按钮
-        ttk.Button(button_frame, text="复制当前页", command=copy_current_content).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(button_frame, text="复制全部内容", command=copy_all_content).pack(side=tk.LEFT, padx=(0, 10))
+        def save_content():
+            """保存修改后的内容到配置文件"""
+            try:
+                updated_data = {}
+                for key, title in tabs:
+                    if key in text_widgets:
+                        content = text_widgets[key].get(1.0, tk.END).strip()
+                        updated_data[key] = {
+                            'title': title,
+                            'content': content
+                        }
+                
+                # 保存到配置文件
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    json.dump(updated_data, f, ensure_ascii=False, indent=2)
+                
+                messagebox.showinfo("保存成功", "示例内容已保存到配置文件")
+                self._log(f"示例内容已更新并保存到 {config_path}")
+                
+            except Exception as e:
+                messagebox.showerror("保存失败", f"保存配置文件时出错：{str(e)}")
+                self._log(f"保存示例内容失败：{str(e)}")
+        
+        def reset_content():
+            """重置内容为配置文件中的原始内容"""
+            if messagebox.askyesno("确认重置", "确定要重置所有内容为配置文件中的原始内容吗？未保存的修改将丢失。"):
+                sample_data = self._load_sample_config(config_path)
+                for key, title in tabs:
+                    if key in text_widgets and key in sample_data:
+                        text_widgets[key].config(state=tk.NORMAL)
+                        text_widgets[key].delete(1.0, tk.END)
+                        text_widgets[key].insert(tk.END, sample_data[key].get('content', ''))
+                        text_widgets[key].config(state=tk.DISABLED)
+                messagebox.showinfo("重置完成", "内容已重置为配置文件中的原始内容")
+        
+        # 按钮布局
+        ttk.Button(button_frame, text="复制当前页", command=copy_current_content).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(button_frame, text="复制全部内容", command=copy_all_content).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(button_frame, text="保存内容", command=save_content).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(button_frame, text="重置内容", command=reset_content).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(button_frame, text="关闭", command=example_window.destroy).pack(side=tk.RIGHT)
         
         # 居中显示窗口
         example_window.transient(self.root)
         example_window.grab_set()
+    
+    def _load_sample_config(self, config_path):
+        """加载示例配置文件"""
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                # 如果配置文件不存在，返回默认内容
+                return self._get_default_sample_data()
+        except Exception as e:
+            self._log(f"加载示例配置文件失败：{str(e)}")
+            messagebox.showwarning("配置文件错误", f"无法加载配置文件：{str(e)}\n将使用默认示例内容")
+            return self._get_default_sample_data()
+    
+    def _get_default_sample_data(self):
+        """获取默认示例数据"""
+        return {
+            "personal_info": {
+                "title": "个人信息",
+                "content": "姓名：XXX\n性别：XXX\n出生年月：XXX\n民族：XXX\n政治面貌：XXX\n学历：XXX\n学位：XXX\n毕业院校：XXX\n专业：XXX\n联系电话：XXX\n电子邮箱：XXX\n现居住地：XXX\n籍贯：XXX\n身份证号：XXX\n婚姻状况：XXX\n身高体重：XXX"
+            },
+            "education": {
+                "title": "教育经历",
+                "content": "起止时间：XXXX年XX月 - XXXX年XX月\n学校名称：XXX大学\n专业名称：XXX专业\n学历学位：本科/硕士/博士\n主要课程：XXX、XXX、XXX等\n学习成绩：GPA XXX，专业排名前X%\n获得证书：XXX证书、XXX证书\n\n起止时间：XXXX年XX月 - XXXX年XX月\n学校名称：XXX中学\n学历：高中"
+            },
+            "work_experience": {
+                "title": "工作经历",
+                "content": "起止时间：XXXX年XX月 - 至今\n工作单位：XXX公司\n部门职位：XXX部门 - XXX职位\n工作职责：\n1. 负责XXX系统的设计与开发\n2. 参与XXX项目的需求分析和架构设计\n3. 维护和优化现有XXX系统\n4. 撰写技术文档和用户手册\n工作业绩：\n1. 成功完成XXX项目，获得客户好评\n2. 优化XXX流程，提高工作效率XX%\n3. 获得公司年度优秀员工称号"
+            },
+            "project_experience": {
+                "title": "项目经验",
+                "content": "项目时间：XXXX年XX月 - XXXX年XX月\n项目名称：XXX管理系统\n项目描述：该项目是一个XXX管理系统，主要解决XXX问题\n担任角色：项目负责人/核心开发人员\n技术栈：Java、Spring Boot、MySQL、Redis等\n主要职责：\n1. 负责项目整体架构设计\n2. 参与核心模块的编码实现\n3. 协调团队成员工作进度\n4. 与客户沟通需求，控制项目风险\n项目成果：\n1. 系统成功上线，稳定运行XX个月\n2. 处理用户量达到XXX万\n3. 获得客户满意度评分XX分"
+            },
+            "skills": {
+                "title": "技能特长",
+                "content": "编程语言：\n- Java：熟练掌握，有X年开发经验\n- Python：熟练掌握，熟悉常用框架\n- JavaScript：掌握，能进行前端开发\n- SQL：熟练掌握，能进行复杂查询优化\n\n框架技术：\n- Spring Boot：熟练掌握，有多个项目经验\n- Django：掌握，能独立开发Web应用\n- Vue.js：掌握，能进行前端页面开发\n- React：了解，能参与项目开发\n\n数据库：\n- MySQL：熟练掌握，能进行性能优化\n- PostgreSQL：掌握，了解高级特性\n- Redis：熟练掌握，有缓存设计经验\n- MongoDB：了解，能进行基本操作"
+            },
+            "update_log": {
+                "title": "更新日志",
+                "content": "2024-12-20：\n- 初始版本发布\n- 实现基本的简历模板功能\n- 支持个人信息、教育经历、工作经历、项目经验、技能特长等模块\n\n2024-12-21：\n- 优化用户界面设计\n- 添加数据验证功能\n- 修复已知问题\n\n2024-12-22：\n- 新增模板导出功能\n- 支持多种格式导出（Word、PDF等）\n- 优化性能，提升用户体验"
+            }
+        }
+    
+    def _toggle_edit_mode(self, is_edit_mode, text_widgets):
+        """切换编辑模式"""
+        for text_widget in text_widgets.values():
+            if is_edit_mode:
+                text_widget.config(state=tk.NORMAL)
+            else:
+                text_widget.config(state=tk.DISABLED)
 
     def _log(self, message):
         """在日志区域显示消息"""
