@@ -160,67 +160,152 @@ def batch_generate_resumes(json_files_dir, template_path, bankname, person_names
     success_count = 0
     failed_count = 0
     
-    # 处理每个JSON文件
-    for index, json_file in enumerate(json_files, 1):
-        json_path = os.path.join(json_files_dir, json_file)
-        print(f"\n[{index}/{total_files}] 正在处理JSON文件: {json_file}")
+    # 检查是否为Excel模板，如果是则使用批量合并功能（无论文件数量多少）
+    if template_path.lower().endswith(('.xlsx', '.xls')):
+        print(f"[INFO] 检测到Excel模板，使用批量合并功能（共{total_files}个JSON文件）")
         
         try:
-            # 读取JSON文件内容
-            with open(json_path, 'r', encoding='utf-8') as f:
-                resume_data = json.load(f)
+            # 创建临时目录存放所有JSON文件
+            import tempfile
+            temp_dir = tempfile.mkdtemp()
             
-            # 如果成功导入了key_map_convert模块，则进行键值转换
-            if key_map_convert and hasattr(key_map_convert, 'convert_resume_data'):
-                print(f"  - 正在将长键转换为短键...")
-                # 转换简历数据的键值
-                converted_data = key_map_convert.convert_resume_data(resume_data)
-                
-                # 创建临时目录用于存储转换后的JSON文件
-                temp_dir = os.path.join(os.path.dirname(json_path), "temp_converted")
-                os.makedirs(temp_dir, exist_ok=True)
-                
-                # 生成临时JSON文件路径
-                temp_json_filename = os.path.basename(json_path).replace('.json', '_converted.json')
-                temp_json_path = os.path.join(temp_dir, temp_json_filename)
-                
-                # 保存转换后的数据到临时JSON文件
-                with open(temp_json_path, 'w', encoding='utf-8') as f:
-                    json.dump(converted_data, f, ensure_ascii=False, indent=2)
-                
-                # 使用临时文件路径
-                data_to_process_path = temp_json_path
-                print(f"  - 转换后的临时文件已保存: {temp_json_filename}")
-            else:
-                # 未导入key_map_convert模块，使用原始文件路径
-                data_to_process_path = json_path
+            # 收集所有人员数据
+            all_person_names = []
             
-            # 调用render_from_docx模块处理文件
-            # 由于我们已经根据工号过滤了JSON文件，处理文件时应该处理其中的所有人员
-            render_module.process_json_data(
-                json_data=data_to_process_path,  # 传递文件路径（原始或转换后的临时文件）
-                template_path=template_path,
-                input_file=None,  # 批量生成时不需要input_file
-                output_folder=output_dir,
-                person_names="all",  # 处理文件中的所有人员
-                bankname=bankname
-            )
-            success_count += 1
-            print(f"  - 处理完成")
-            
-            # 清理临时文件
-            if 'temp_json_path' in locals() and os.path.exists(temp_json_path):
+            # 处理每个JSON文件，转换并保存到临时目录
+            for json_file in json_files:
+                json_path = os.path.join(json_files_dir, json_file)
+                print(f"  - 处理文件: {json_file}")
+                
                 try:
-                    os.remove(temp_json_path)
-                    print(f"  - 已清理临时文件: {temp_json_filename}")
-                except Exception as e:
-                    print(f"  - 清理临时文件失败: {e}")
+                    # 读取JSON文件内容
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        resume_data = json.load(f)
                     
+                    # 如果成功导入了key_map_convert模块，则进行键值转换
+                    if key_map_convert and hasattr(key_map_convert, 'convert_resume_data'):
+                        # 转换简历数据的键值
+                        converted_data = key_map_convert.convert_resume_data(resume_data)
+                        data_to_use = converted_data
+                    else:
+                        data_to_use = resume_data
+                    
+                    # 为每个人员创建单独的JSON文件
+                    for person_name in data_to_use.keys():
+                        all_person_names.append(person_name)
+                        person_data = {person_name: data_to_use[person_name]}
+                        temp_json_file = os.path.join(temp_dir, f"{person_name}.json")
+                        
+                        with open(temp_json_file, 'w', encoding='utf-8') as f:
+                            json.dump(person_data, f, ensure_ascii=False, indent=4)
+                
+                except Exception as e:
+                    print(f"  - 处理文件 {json_file} 失败: {e}")
+                    failed_count += 1
+            
+            # 使用render_2_excel的批量生成功能
+            try:
+                from . import render_2_excel as r2e
+            except ImportError:
+                try:
+                    import render_2_excel as r2e
+                except ImportError:
+                    print("错误: 未找到 render_2_excel.py 文件")
+                    failed_count = total_files
+                    return success_count, failed_count
+            
+            # 调用批量生成函数
+            batch_success, batch_failed = r2e.batch_generate_resumes_excel(
+                temp_dir, template_path, bankname, 
+                person_names=all_person_names, 
+                merge_to_single_file=True
+            )
+            
+            success_count = batch_success
+            failed_count = batch_failed
+            
+            # 清理临时目录
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            
+            print(f"[INFO] Excel批量合并完成：成功 {success_count}，失败 {failed_count}")
+            
         except Exception as e:
-            print(f"  - 处理失败: {e}")
-            failed_count += 1
+            print(f"[ERROR] Excel批量处理时出错: {str(e)}")
             import traceback
             traceback.print_exc()
+            failed_count = total_files
+            
+            # 清理临时目录
+            import shutil
+            temp_dir_to_clean = 'temp_dir' in locals()
+            if temp_dir_to_clean:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+    else:
+        # 非Excel模板，使用原有逻辑
+        print(f"[INFO] 使用标准处理模式（非Excel模板）")
+        
+        # 处理每个JSON文件
+        for index, json_file in enumerate(json_files, 1):
+            json_path = os.path.join(json_files_dir, json_file)
+            print(f"\n[{index}/{total_files}] 正在处理JSON文件: {json_file}")
+            
+            try:
+                # 读取JSON文件内容
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    resume_data = json.load(f)
+                
+                # 如果成功导入了key_map_convert模块，则进行键值转换
+                if key_map_convert and hasattr(key_map_convert, 'convert_resume_data'):
+                    print(f"  - 正在将长键转换为短键...")
+                    # 转换简历数据的键值
+                    converted_data = key_map_convert.convert_resume_data(resume_data)
+                    
+                    # 创建临时目录用于存储转换后的JSON文件
+                    temp_dir = os.path.join(os.path.dirname(json_path), "temp_converted")
+                    os.makedirs(temp_dir, exist_ok=True)
+                    
+                    # 生成临时JSON文件路径
+                    temp_json_filename = os.path.basename(json_path).replace('.json', '_converted.json')
+                    temp_json_path = os.path.join(temp_dir, temp_json_filename)
+                    
+                    # 保存转换后的数据到临时JSON文件
+                    with open(temp_json_path, 'w', encoding='utf-8') as f:
+                        json.dump(converted_data, f, ensure_ascii=False, indent=2)
+                    
+                    # 使用临时文件路径
+                    data_to_process_path = temp_json_path
+                    print(f"  - 转换后的临时文件已保存: {temp_json_filename}")
+                else:
+                    # 未导入key_map_convert模块，使用原始文件路径
+                    data_to_process_path = json_path
+                
+                # 调用render_from_docx模块处理文件
+                # 由于我们已经根据工号过滤了JSON文件，处理文件时应该处理其中的所有人员
+                render_module.process_json_data(
+                    json_data=data_to_process_path,  # 传递文件路径（原始或转换后的临时文件）
+                    template_path=template_path,
+                    input_file=None,  # 批量生成时不需要input_file
+                    output_folder=output_dir,
+                    person_names="all",  # 处理文件中的所有人员
+                    bankname=bankname
+                )
+                success_count += 1
+                print(f"  - 处理完成")
+                
+                # 清理临时文件
+                if 'temp_json_path' in locals() and os.path.exists(temp_json_path):
+                    try:
+                        os.remove(temp_json_path)
+                        print(f"  - 已清理临时文件: {temp_json_filename}")
+                    except Exception as e:
+                        print(f"  - 清理临时文件失败: {e}")
+                        
+            except Exception as e:
+                print(f"  - 处理失败: {e}")
+                failed_count += 1
+                import traceback
+                traceback.print_exc()
     
     # 输出统计信息
     print("\n" + "=" * 50)

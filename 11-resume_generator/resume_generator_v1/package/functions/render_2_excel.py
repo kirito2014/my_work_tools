@@ -47,6 +47,35 @@ def sanitize_data(data):
     return data
 
 
+def copy_workbook(source_workbook):
+    """
+    完整复制工作簿，包括所有工作表、格式和样式
+    
+    Args:
+        source_workbook: 源工作簿对象
+        
+    Returns:
+        复制后的新工作簿对象
+    """
+    try:
+        # 创建新工作簿
+        new_workbook = Workbook()
+        # 删除默认创建的工作表
+        new_workbook.remove(new_workbook.active)
+        
+        # 复制所有工作表
+        for sheet_name in source_workbook.sheetnames:
+            source_sheet = source_workbook[sheet_name]
+            new_sheet = new_workbook.create_sheet(title=sheet_name)
+            copy_worksheet_with_formatting(source_sheet, new_sheet, new_workbook)
+        
+        return new_workbook
+    except Exception as e:
+        print(f"复制工作簿时出错: {str(e)}")
+        # 如果复制失败，返回空工作簿
+        return Workbook()
+
+
 def find_placeholder_cells(worksheet) -> Dict[str, str]:
     """
     查找工作表中的占位符单元格
@@ -399,17 +428,8 @@ def generate_multiple_resumes_in_one_file(person_data_list: List[Dict[str, Any]]
                 print("错误: Excel文件中没有工作表")
                 return None
         
-        # 创建新工作簿（基于模板）
-        new_workbook = Workbook()
-        # 删除默认创建的工作表
-        new_workbook.remove(new_workbook.active)
-        
-        # 首先复制模板中的所有非简历工作表（如果有）
-        for sheet_name in template_workbook.sheetnames:
-            if not sheet_name.endswith('XX简历'):
-                template_sheet_to_copy = template_workbook[sheet_name]
-                new_sheet = new_workbook.create_sheet(title=sheet_name)
-                copy_worksheet_with_formatting(template_sheet_to_copy, new_sheet, new_workbook)
+        # 创建新工作簿（完整复制模板）
+        new_workbook = copy_workbook(template_workbook)
         
         # 为每个人员创建工作表
         for person_name, person_data in person_data_list:
@@ -603,9 +623,9 @@ def batch_generate_resumes_excel(json_files_dir: str, template_path: str,
                     print(f"处理JSON文件 {json_file} 时出错: {str(e)}")
                     failed_count += 1
             
-            # 生成输出文件名
-            template_name = os.path.splitext(os.path.basename(template_path))[0]
-            output_filename = f"{bankname}_批量简历_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            # 生成输出文件名 - 修改为要求的格式
+            current_date = datetime.now().strftime("%Y%m%d")
+            output_filename = f"{bankname}_合并简历_{current_date}.xlsx"
             output_path = os.path.join(output_folder, output_filename)
             
             # 生成合并的Excel文件

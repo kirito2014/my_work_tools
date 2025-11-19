@@ -55,7 +55,7 @@ if dj is None:
     sys.exit(1)
 
 
-def generate_resume_from_json(person_data, template_path, output_folder, person_name, bankname=None):
+def generate_resume_from_json(person_data, template_path, output_folder, person_name, bankname=None, merge_to_single_file=False):
     """
     根据JSON数据和Word模板生成简历文档。
 
@@ -64,6 +64,7 @@ def generate_resume_from_json(person_data, template_path, output_folder, person_
     :param output_folder: 输出文件夹路径。
     :param person_name: 人员姓名。
     :param bankname: 银行名称，用于文件名前缀。
+    :param merge_to_single_file: 是否合并到单个Excel文件（仅对Excel模板有效）。
     :return: 生成的简历文件路径。
     """
 
@@ -102,7 +103,7 @@ def generate_resume_from_json(person_data, template_path, output_folder, person_
                 success_count, failed_count = r2e.batch_generate_resumes_excel(
                     temp_dir, template_path, bankname, 
                     person_names=[person_name], 
-                    merge_to_single_file=True
+                    merge_to_single_file=merge_to_single_file
                 )
                 
                 # 清理临时目录
@@ -340,16 +341,65 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
 
             # 批量生成文档
             success_count = 0
-            for person_name in valid_names:
-                output_path = generate_resume_from_json(
-                    data[person_name],
-                    template_path,
-                    output_folder,
-                    person_name,
-                    bankname,
-                )
-                if output_path: 
-                    success_count += 1
+            
+            # 检查模板文件格式，如果是Excel则使用批量合并功能
+            if template_path.lower().endswith('.xlsx') and len(valid_names) > 1:
+                print(f"[INFO] 检测到Excel模板和多个人员，使用批量合并功能")
+                
+                # 创建临时目录存放JSON文件
+                import tempfile
+                temp_dir = tempfile.mkdtemp()
+                
+                try:
+                    # 为每个人员创建单独的JSON文件
+                    for person_name in valid_names:
+                        person_data = {person_name: data[person_name]}
+                        temp_json_file = os.path.join(temp_dir, f"{person_name}.json")
+                        
+                        with open(temp_json_file, 'w', encoding='utf-8') as f:
+                            json.dump(person_data, f, ensure_ascii=False, indent=4)
+                    
+                    # 使用批量生成功能
+                    try:
+                        from . import render_2_excel as r2e
+                    except ImportError:
+                        try:
+                            import render_2_excel as r2e
+                        except ImportError:
+                            print("错误: 未找到 render_2_excel.py 文件")
+                            success_count = 0
+                    
+                    # 调用批量生成函数
+                    batch_success, batch_failed = r2e.batch_generate_resumes_excel(
+                        temp_dir, template_path, bankname, 
+                        person_names=valid_names, 
+                        merge_to_single_file=True
+                    )
+                    
+                    success_count = batch_success
+                    
+                    # 清理临时目录
+                    import shutil
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    
+                except Exception as e:
+                    print(f"[ERROR] 批量生成Excel简历时出错: {str(e)}")
+                    # 清理临时目录
+                    import shutil
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    success_count = 0
+            else:
+                # Word模板或单个人员，使用原有逻辑
+                for person_name in valid_names:
+                    output_path = generate_resume_from_json(
+                        data[person_name],
+                        template_path,
+                        output_folder,
+                        person_name,
+                        bankname,
+                    )
+                    if output_path: 
+                        success_count += 1
 
             # 生成统计报告
             print("\n" + "="*40)
