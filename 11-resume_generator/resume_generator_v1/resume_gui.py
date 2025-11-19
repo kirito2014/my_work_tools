@@ -86,6 +86,9 @@ try:
     # 动态导入excel_reader模块
     from package.utils import excel_reader
     
+    # 动态导入excel_helper模块
+    from package.utils import excel_helper
+    
     # 动态导入batch_render_from_docx模块
     batch_render_module = None
     try:
@@ -1590,16 +1593,18 @@ class ResumeGeneratorGUI:
             return
         
         try:
-            # 读取文件内容
-            with open(file_path, 'r', encoding='utf-8') as file:
-                content = file.read().strip()
+            # 根据文件扩展名选择读取方式
+            file_ext = os.path.splitext(file_path)[1].lower()
             
-            # 解析工号，支持逗号、空格、换行等分隔符
-            emp_numbers = []
-            # 替换所有非数字字符为逗号，然后分割
-            import re
-            cleaned_content = re.sub(r'[^0-9]', ',', content)
-            emp_numbers = [num.strip() for num in cleaned_content.split(',') if num.strip()]
+            if file_ext in ['.xlsx', '.xls']:
+                # 使用excel_helper读取Excel文件
+                emp_numbers = self._read_excel_file(file_path)
+            elif file_ext in ['.txt', '.csv']:
+                # 使用原有方式读取文本文件
+                emp_numbers = self._read_text_file(file_path)
+            else:
+                messagebox.showerror("错误", f"不支持的文件格式: {file_ext}\n支持的格式: .xlsx, .xls, .txt, .csv")
+                return
             
             if emp_numbers:
                 # 更新selected_list
@@ -1622,6 +1627,92 @@ class ResumeGeneratorGUI:
             messagebox.showerror("错误", f"读取名单文件时出错: {str(e)}")
             self.selected_count_var.set("读取文件出错，请重新选择")
             self._log(f"读取名单文件时出错: {str(e)}")
+    
+    def _read_excel_file(self, file_path):
+        """读取Excel文件的首列数据，跳过标题行"""
+        try:
+            # 使用excel_helper读取Excel文件
+            excel_rw = excel_helper.ExcelRW(file_path)
+            
+            # 获取工作簿数据
+            workbook_data = excel_rw.get_data()
+            
+            if not workbook_data:
+                self._log("警告: Excel文件为空或无法读取")
+                return []
+            
+            # 获取第一个工作表的数据
+            first_sheet_name = list(workbook_data.keys())[0]
+            sheet_data = workbook_data[first_sheet_name]
+            
+            if not sheet_data:
+                self._log("警告: Excel工作表为空")
+                return []
+            
+            # 提取首列数据（每行的第一个元素）
+            first_column_data = [row[0] if row else None for row in sheet_data]
+            
+            # 跳过标题行（第一行），从第二行开始处理
+            emp_numbers = []
+            for i, cell_value in enumerate(first_column_data):
+                if i == 0:
+                    # 跳过标题行
+                    continue
+                
+                # 处理单元格值，确保为字符串
+                if cell_value is not None:
+                    # 转换为字符串并去除空白字符
+                    emp_no = str(cell_value).strip()
+                    
+                    # 过滤空值和只包含非数字字符的值
+                    if emp_no and any(char.isdigit() for char in emp_no):
+                        # 提取数字部分作为员工编号
+                        import re
+                        digits_only = re.findall(r'\d+', emp_no)
+                        if digits_only:
+                            emp_numbers.append(digits_only[0])
+            
+            self._log(f"从Excel文件首列读取到 {len(emp_numbers)} 个有效员工编号")
+            return emp_numbers
+            
+        except Exception as e:
+            self._log(f"读取Excel文件时出错: {str(e)}")
+            raise Exception(f"Excel文件读取失败: {str(e)}")
+    
+    def _read_text_file(self, file_path):
+        """读取文本文件内容并解析员工编号"""
+        try:
+            # 读取文件内容
+            with open(file_path, 'r', encoding='utf-8') as file:
+                content = file.read().strip()
+            
+            # 解析工号，支持逗号、空格、换行等分隔符
+            emp_numbers = []
+            # 替换所有非数字字符为逗号，然后分割
+            import re
+            cleaned_content = re.sub(r'[^0-9]', ',', content)
+            emp_numbers = [num.strip() for num in cleaned_content.split(',') if num.strip()]
+            
+            self._log(f"从文本文件解析出 {len(emp_numbers)} 个员工编号")
+            return emp_numbers
+            
+        except UnicodeDecodeError:
+            # 尝试使用其他编码
+            try:
+                with open(file_path, 'r', encoding='gbk') as file:
+                    content = file.read().strip()
+                
+                import re
+                cleaned_content = re.sub(r'[^0-9]', ',', content)
+                emp_numbers = [num.strip() for num in cleaned_content.split(',') if num.strip()]
+                
+                self._log(f"使用GBK编码从文本文件解析出 {len(emp_numbers)} 个员工编号")
+                return emp_numbers
+            except Exception as e:
+                raise Exception(f"文本文件编码错误: {str(e)}")
+        except Exception as e:
+            raise Exception(f"文本文件读取失败: {str(e)}")
+    
     
     def _update_person_list_selection(self):
         """根据selected_list更新人员列表选择状态"""
