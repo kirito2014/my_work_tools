@@ -8,8 +8,9 @@ Excel模板渲染模块
 import os
 import sys
 import json
+import copy
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 try:
     import openpyxl
@@ -389,7 +390,200 @@ def create_person_sheet_with_formatting(template_worksheet, person_name: str, pe
     return new_sheet
 
 
-def generate_multiple_resumes_in_one_file(person_data_list: List[Dict[str, Any]], 
+def extract_person_summary_info(person_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    从人员数据中提取首页需要显示的基本信息
+    
+    Args:
+        person_data: 人员数据字典
+        
+    Returns:
+        包含首页信息的字典
+    """
+    summary_info = {}
+    
+    try:
+        # 提取基本信息
+        ai_info = person_data.get('ai', {})
+        bi_info = person_data.get('bi', {})
+        if isinstance(ai_info, dict):
+            summary_info['姓名'] = ai_info.get('name', '')
+            summary_info['最高学历'] = ai_info.get('edu', '')
+            summary_info['毕业院校'] = ai_info.get('school', '')
+
+
+        if isinstance(bi_info, dict):
+            summary_info['工作年限'] = bi_info.get('work', '')
+
+        # 提取项目经验中的项目名称
+        pe = person_data.get('pe', [])
+        if isinstance(pe, list):
+            project_names = []
+            for project in pe:
+                if isinstance(project, dict):
+                    project_name = project.get('proj', '')
+                    if project_name:
+                        project_names.append(project_name)
+            summary_info['项目名称'] = ', '.join(project_names)
+        elif isinstance(pe, dict):
+            # 如果是字典格式，尝试获取项目名称
+            project_name = pe.get('proj', '')
+            summary_info['项目名称'] = project_name if project_name else ''
+        
+    except Exception as e:
+        print(f"提取人员摘要信息时出错: {str(e)}")
+        # 返回空信息，避免程序中断
+        summary_info = {
+            '姓名': '',
+            '工作年限': '',
+            '最高学历': '',
+            '学历证明材料': '',
+            '毕业院校': '',
+            '项目名称': ''
+        }
+    print(summary_info)
+    return summary_info
+
+
+def fill_summary_sheet(workbook, summary_data_list: List[Dict[str, Any]], start_row: int = 3):
+    """
+    在首页工作表填写多人基本信息
+    
+    Args:
+        workbook: Excel工作簿对象
+        summary_data_list: 多人摘要信息列表
+        start_row: 开始填写的行号（默认第1行）
+    """
+    try:
+        # 查找首页工作表（非"简历"结尾的工作表）
+        summary_sheet = None
+        for sheet_name in workbook.sheetnames:
+            if not sheet_name.endswith('简历'):
+                summary_sheet = workbook[sheet_name]
+                break
+        
+        if summary_sheet is None:
+            print("警告: 未找到首页工作表，跳过首页信息填写")
+            return
+        
+        # 定义占位符到列的映射关系
+        placeholder_mapping = {
+            '{{姓名}}': '姓名',
+            '{{工作年限}}': '工作年限', 
+            '{{最高学历}}': '最高学历',
+            '{{学历证明材料}}': '学历证明材料',
+            '{{毕业院校}}': '毕业院校',
+            '{{项目名称}}': '项目名称'
+        }
+        
+        # 查找占位符位置，以姓名占位符为基准
+        placeholder_positions = {}
+        name_placeholder_cell = None
+        
+        for row in summary_sheet.iter_rows():
+            for cell in row:
+                if cell.value and isinstance(cell.value, str):
+                    for placeholder in placeholder_mapping.keys():
+                        if placeholder in cell.value:
+                            placeholder_positions[placeholder] = cell
+                            if '{{姓名}}' in placeholder:
+                                name_placeholder_cell = cell
+                            break
+        
+        print(f"找到的占位符位置: {placeholder_positions}")
+        
+        # 如果找到姓名占位符，以其位置为基准，自动查找其他字段对应的列
+        if name_placeholder_cell:
+            print(f"以姓名占位符 {name_placeholder_cell.coordinate} 为基准，自动查找其他字段列位置")
+            base_row = name_placeholder_cell.row
+            
+            # 在同一行查找所有包含占位符的单元格，自动确定列位置
+            for col in range(1, summary_sheet.max_column + 1):
+                cell = summary_sheet.cell(row=base_row, column=col)
+                if cell.value and isinstance(cell.value, str):
+                    cell_value = str(cell.value).strip()
+                    # 检查是否包含任何占位符
+                    for placeholder in placeholder_mapping.keys():
+                        if placeholder in cell_value:
+                            placeholder_positions[placeholder] = cell
+                            print(f"找到占位符 {placeholder} 在位置: {cell.coordinate}")
+                            break
+        
+        # 如果没有找到占位符，尝试按列标题查找
+        if not placeholder_positions:
+            # 尝试查找表头行
+            header_row = None
+            for row_idx, row in enumerate(summary_sheet.iter_rows(), 1):
+                for cell in row:
+                    if cell.value and isinstance(cell.value, str):
+                        cell_value = str(cell.value).strip()
+                        if any(keyword in cell_value for keyword in ['姓名', '工作年限', '最高学历', '毕业院校', '项目经验']):
+                            header_row = row_idx
+                            break
+                if header_row:
+                    break
+            
+            # 如果找到表头行，建立列映射
+            if header_row:
+                header_cells = list(summary_sheet.iter_rows(min_row=header_row, max_row=header_row))[0]
+                for cell in header_cells:
+                    if cell.value and isinstance(cell.value, str):
+                        cell_value = str(cell.value).strip()
+                        for field_name, field_key in placeholder_mapping.items():
+                            field_key_clean = field_key.replace('{{', '').replace('}}', '')
+                            if field_key_clean in cell_value:
+                                placeholder_positions[field_name] = cell
+                                break
+        
+        # 填写多人信息，使用实际找到的占位符位置
+        start_row = name_placeholder_cell.row if name_placeholder_cell else start_row
+        
+        print(f"以第 {start_row} 行作为起始行填写 {len(summary_data_list)} 人的信息")
+        
+        for i, person_summary in enumerate(summary_data_list):
+            # 计算当前人员的行位置
+            current_row = start_row + i
+            
+            for placeholder, field_name in placeholder_mapping.items():
+                if placeholder in placeholder_positions:
+                    # 获取占位符所在的单元格位置
+                    placeholder_cell = placeholder_positions[placeholder]
+                    target_col = placeholder_cell.column  # 使用占位符实际的列位置
+                    
+                    target_cell = summary_sheet.cell(row=current_row, column=target_col)
+                    
+                    # 检查是否为合并单元格，如果是则跳过
+                    try:
+                        # 填写数据
+                        field_value = person_summary.get(field_name, '')
+                        if field_value:
+                            target_cell.value = field_value
+                            print(f"填写 {field_name} 到 {target_cell.coordinate}: {field_value}")
+                            # 简化格式复制，避免递归错误
+                            try:
+                                if hasattr(placeholder_cell, 'font') and placeholder_cell.font:
+                                    target_cell.font = placeholder_cell.font
+                                if hasattr(placeholder_cell, 'alignment') and placeholder_cell.alignment:
+                                    target_cell.alignment = placeholder_cell.alignment
+                            except:
+                                # 如果格式复制失败，至少保证数据填写成功
+                                pass
+                    except AttributeError as e:
+                        if 'MergedCell' in str(e):
+                            print(f"警告: 跳过合并单元格 {target_cell.coordinate} 的填写")
+                            continue
+                        else:
+                            raise e
+        
+        print(f"已在首页填写 {len(summary_data_list)} 人的基本信息")
+        
+    except Exception as e:
+        print(f"填写首页信息时出错: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
+def generate_multiple_resumes_in_one_file(person_data_list: List[Tuple[str, Dict[str, Any]]], 
                                        template_path: str, output_path: str) -> Optional[str]:
     """
     从Excel模板生成多个人员的简历（所有人员在同一个文件的不同sheet页中）
@@ -435,6 +629,16 @@ def generate_multiple_resumes_in_one_file(person_data_list: List[Dict[str, Any]]
         for person_name, person_data in person_data_list:
             print(f"正在为 {person_name} 创建工作表...")
             create_person_sheet_with_formatting(template_sheet, person_name, person_data, new_workbook)
+        
+        # 收集所有人员的摘要信息用于首页填写
+        summary_data_list = []
+        for person_name, person_data in person_data_list:
+            summary_info = extract_person_summary_info(person_data)
+            summary_data_list.append(summary_info)
+        
+        # 在首页填写基本信息
+        if summary_data_list:
+            fill_summary_sheet(new_workbook, summary_data_list)
         
         # 确保输出目录存在
         output_dir = os.path.dirname(output_path)
