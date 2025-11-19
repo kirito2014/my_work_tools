@@ -473,11 +473,12 @@ def fill_summary_sheet(workbook, summary_data_list: List[Dict[str, Any]], start_
             '{{最高学历}}': '最高学历',
             '{{学历证明材料}}': '学历证明材料',
             '{{毕业院校}}': '毕业院校',
-            '{{项目名称}}': '项目名称'
+            '{{项目名称}}': '项目名称',
+            '{{总人数}}': '总人数'
         }
         
-        # 查找占位符位置，以姓名占位符为基准
-        placeholder_positions = {}
+        # 查找占位符位置，支持多个相同占位符
+        placeholder_positions = {}  # 改为字典，值为列表，存储所有相同占位符的位置
         name_placeholder_cell = None
         
         for row in summary_sheet.iter_rows():
@@ -485,12 +486,20 @@ def fill_summary_sheet(workbook, summary_data_list: List[Dict[str, Any]], start_
                 if cell.value and isinstance(cell.value, str):
                     for placeholder in placeholder_mapping.keys():
                         if placeholder in cell.value:
-                            placeholder_positions[placeholder] = cell
+                            # 初始化列表（如果不存在）
+                            if placeholder not in placeholder_positions:
+                                placeholder_positions[placeholder] = []
+                            placeholder_positions[placeholder].append(cell)
+                            
                             if '{{姓名}}' in placeholder:
                                 name_placeholder_cell = cell
                             break
         
-        print(f"找到的占位符位置: {placeholder_positions}")
+        # 打印找到的占位符位置信息
+        print("找到的占位符位置:")
+        for placeholder, cells in placeholder_positions.items():
+            positions = [cell.coordinate for cell in cells]
+            print(f"  {placeholder}: {positions}")
         
         # 如果找到姓名占位符，以其位置为基准，自动查找其他字段对应的列
         if name_placeholder_cell:
@@ -505,7 +514,10 @@ def fill_summary_sheet(workbook, summary_data_list: List[Dict[str, Any]], start_
                     # 检查是否包含任何占位符
                     for placeholder in placeholder_mapping.keys():
                         if placeholder in cell_value:
-                            placeholder_positions[placeholder] = cell
+                            # 初始化列表（如果不存在）
+                            if placeholder not in placeholder_positions:
+                                placeholder_positions[placeholder] = []
+                            placeholder_positions[placeholder].append(cell)
                             print(f"找到占位符 {placeholder} 在位置: {cell.coordinate}")
                             break
         
@@ -532,7 +544,10 @@ def fill_summary_sheet(workbook, summary_data_list: List[Dict[str, Any]], start_
                         for field_name, field_key in placeholder_mapping.items():
                             field_key_clean = field_key.replace('{{', '').replace('}}', '')
                             if field_key_clean in cell_value:
-                                placeholder_positions[field_name] = cell
+                                # 初始化列表（如果不存在）
+                                if field_name not in placeholder_positions:
+                                    placeholder_positions[field_name] = []
+                                placeholder_positions[field_name].append(cell)
                                 break
         
         # 填写多人信息，使用实际找到的占位符位置
@@ -540,42 +555,69 @@ def fill_summary_sheet(workbook, summary_data_list: List[Dict[str, Any]], start_
         
         print(f"以第 {start_row} 行作为起始行填写 {len(summary_data_list)} 人的信息")
         
+        # 首先处理总人数（只需要填写一次）
+        if '{{总人数}}' in placeholder_positions:
+            total_count_cells = placeholder_positions['{{总人数}}']
+            for total_count_cell in total_count_cells:
+                try:
+                    total_count_cell.value = f"人员简历汇总表（共{len(summary_data_list)}人）"
+                    print(f"填写总人数到 {total_count_cell.coordinate}: 共{len(summary_data_list)}人")
+                    # 复制格式
+                    try:
+                        if hasattr(total_count_cell, 'font') and total_count_cell.font:
+                            total_count_cell.font = total_count_cell.font
+                        if hasattr(total_count_cell, 'alignment') and total_count_cell.alignment:
+                            total_count_cell.alignment = total_count_cell.alignment
+                    except:
+                        pass
+                except AttributeError as e:
+                    if 'MergedCell' in str(e):
+                        print(f"警告: 跳过合并单元格 {total_count_cell.coordinate} 的填写")
+                    else:
+                        raise e
+        
+        # 然后处理每个人的信息
         for i, person_summary in enumerate(summary_data_list):
             # 计算当前人员的行位置
             current_row = start_row + i
             
             for placeholder, field_name in placeholder_mapping.items():
+                # 跳过总人数，已经处理过了
+                if placeholder == '{{总人数}}':
+                    continue
+                    
                 if placeholder in placeholder_positions:
-                    # 获取占位符所在的单元格位置
-                    placeholder_cell = placeholder_positions[placeholder]
-                    target_col = placeholder_cell.column  # 使用占位符实际的列位置
+                    # 获取所有相同占位符的单元格位置
+                    placeholder_cells = placeholder_positions[placeholder]
                     
-                    target_cell = summary_sheet.cell(row=current_row, column=target_col)
-                    
-                    # 检查是否为合并单元格，如果是则跳过
-                    try:
-                        # 填写数据
-                        field_value = person_summary.get(field_name, '')
-                        if field_value:
-                            target_cell.value = field_value
-                            print(f"填写 {field_name} 到 {target_cell.coordinate}: {field_value}")
-                            # 简化格式复制，避免递归错误
-                            try:
-                                if hasattr(placeholder_cell, 'font') and placeholder_cell.font:
-                                    target_cell.font = placeholder_cell.font
-                                if hasattr(placeholder_cell, 'alignment') and placeholder_cell.alignment:
-                                    target_cell.alignment = placeholder_cell.alignment
-                            except:
-                                # 如果格式复制失败，至少保证数据填写成功
-                                pass
-                    except AttributeError as e:
-                        if 'MergedCell' in str(e):
-                            print(f"警告: 跳过合并单元格 {target_cell.coordinate} 的填写")
-                            continue
-                        else:
-                            raise e
+                    for placeholder_cell in placeholder_cells:
+                        target_col = placeholder_cell.column  # 使用占位符实际的列位置
+                        target_cell = summary_sheet.cell(row=current_row, column=target_col)
+                        
+                        # 检查是否为合并单元格，如果是则跳过
+                        try:
+                            # 填写数据
+                            field_value = person_summary.get(field_name, '')
+                            if field_value:
+                                target_cell.value = field_value
+                                print(f"填写 {field_name} 到 {target_cell.coordinate}: {field_value}")
+                                # 简化格式复制，避免递归错误
+                                try:
+                                    if hasattr(placeholder_cell, 'font') and placeholder_cell.font:
+                                        target_cell.font = placeholder_cell.font
+                                    if hasattr(placeholder_cell, 'alignment') and placeholder_cell.alignment:
+                                        target_cell.alignment = placeholder_cell.alignment
+                                except:
+                                    # 如果格式复制失败，至少保证数据填写成功
+                                    pass
+                        except AttributeError as e:
+                            if 'MergedCell' in str(e):
+                                print(f"警告: 跳过合并单元格 {target_cell.coordinate} 的填写")
+                                continue
+                            else:
+                                raise e
         
-        print(f"已在首页填写 {len(summary_data_list)} 人的基本信息")
+        print(f"已在首页填写 {len(summary_data_list)} 人的基本信息，总人数: 共{len(summary_data_list)}人")
         
     except Exception as e:
         print(f"填写首页信息时出错: {str(e)}")
