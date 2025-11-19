@@ -209,6 +209,14 @@ class ResumeGeneratorGUI:
         # 将简历校验菜单添加到菜单栏
         menubar.add_cascade(label="简历校验", menu=validate_menu)
         
+        # 创建填写示例菜单
+        example_menu = tk.Menu(menubar, tearoff=0, font=self.font_config['button'])
+        example_menu.add_command(label="填写示例", command=self._show_example_resume)
+        
+        # 将填写示例菜单添加到菜单栏
+        menubar.add_cascade(label="填写示例", menu=example_menu)    
+
+
         # 设置菜单栏
         self.root.config(menu=menubar)
         
@@ -3055,6 +3063,245 @@ class ResumeGeneratorGUI:
             self._log(f"更新员工 {emp_no} 的JSON文件时出错: {str(e)}")
             return False
     
+    def _show_example_resume(self):
+        """显示填写示例窗口"""
+        # 创建新窗口
+        example_window = tk.Toplevel(self.root)
+        example_window.title("填写示例")
+        example_window.geometry("800x600")
+        example_window.resizable(True, True)
+        
+        # 设置字体
+        dialog_font = self.font_config['label']
+        text_font = self.font_config['text']
+        
+        # 创建主框架
+        main_frame = ttk.Frame(example_window, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        title_label = ttk.Label(main_frame, text="简历填写示例", font=("Microsoft YaHei", 16, "bold"))
+        title_label.pack(pady=(0, 20))
+        
+        # 创建Notebook用于分页显示不同类型的示例
+        notebook = ttk.Notebook(main_frame)
+        notebook.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
+        
+        # 个人信息示例页面
+        personal_frame = ttk.Frame(notebook)
+        notebook.add(personal_frame, text="个人信息")
+        
+        personal_text = scrolledtext.ScrolledText(personal_frame, wrap=tk.WORD, font=text_font, height=15)
+        personal_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        personal_content = """个人信息填写示例：
+
+姓名：XXX
+性别：XXX
+出生年月：XXX
+民族：XXX
+政治面貌：XXX
+学历：XXX
+毕业院校：XXX
+专业：XXX
+联系电话：XXX
+电子邮箱：XXX
+现居住地：XXX
+
+填写说明：
+1. 姓名请填写真实姓名
+2. 联系电话请确保畅通
+3. 电子邮箱请使用常用邮箱
+4. 居住地请填写详细地址"""
+        personal_text.insert(tk.END, personal_content)
+        personal_text.config(state=tk.DISABLED)
+        
+        # 教育经历示例页面
+        education_frame = ttk.Frame(notebook)
+        notebook.add(education_frame, text="教育经历")
+        
+        education_text = scrolledtext.ScrolledText(education_frame, wrap=tk.WORD, font=text_font, height=15)
+        education_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        education_content = """教育经历填写示例：
+
+2008.09-2012.07 XXX大学 计算机科学与技术 本科
+主修课程：数据结构、算法分析、数据库原理、软件工程等
+获得荣誉：优秀学生干部、奖学金等
+
+2012.09-2015.06 XXX大学 计算机应用技术 硕士研究生
+研究方向：人工智能、机器学习
+发表论文：XXX期刊论文X篇
+
+填写说明：
+1. 按时间倒序填写（最近的在前）
+2. 包含起止时间、学校名称、专业、学历
+3. 可添加主修课程、获得荣誉、研究成果等"""
+        education_text.insert(tk.END, education_content)
+        education_text.config(state=tk.DISABLED)
+        
+        # 工作经历示例页面
+        work_frame = ttk.Frame(notebook)
+        notebook.add(work_frame, text="工作经历")
+        
+        work_text = scrolledtext.ScrolledText(work_frame, wrap=tk.WORD, font=text_font, height=15)
+        work_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        work_content = """工作经历填写示例：
+
+2015.07-2018.03 XXX科技有限公司 软件工程师
+主要职责：
+- 负责公司核心产品的设计与开发
+- 参与需求分析和技术方案制定
+- 指导初级开发人员，进行代码审查
+主要业绩：
+- 主导完成XXX项目，提升系统性能30%
+- 获得公司年度优秀员工称号
+
+2018.04-至今 XXX信息技术有限公司 高级软件工程师
+主要职责：
+- 负责架构设计和技术选型
+- 带领开发团队完成重点项目
+- 制定开发规范和最佳实践
+主要业绩：
+- 成功交付多个大型项目，客户满意度95%以上
+
+填写说明：
+1. 按时间倒序填写
+2. 包含公司名称、职位、工作时间
+3. 详细描述工作职责和取得的成绩"""
+        work_text.insert(tk.END, work_content)
+        work_text.config(state=tk.DISABLED)
+        
+        # 项目经验示例页面
+        project_frame = ttk.Frame(notebook)
+        notebook.add(project_frame, text="项目经验")
+        
+        project_text = scrolledtext.ScrolledText(project_frame, wrap=tk.WORD, font=text_font, height=15)
+        project_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        project_content = """项目经验填写示例：
+
+项目名称：XXX银行核心系统升级改造
+项目时间：2020.01-2020.12
+担任角色：技术负责人
+项目描述：该项目旨在对银行核心业务系统进行全面升级，提升系统性能和用户体验
+技术栈：Java、Spring Boot、MySQL、Redis、Docker
+主要职责：
+- 负责项目整体架构设计和技术选型
+- 协调5人开发团队，制定开发计划
+- 解决关键技术难题，确保项目按时交付
+项目成果：
+- 系统响应时间提升50%
+- 支持10万+并发用户
+- 获得客户高度认可
+
+项目名称：XXX移动支付平台开发
+项目时间：2019.03-2019.10
+担任角色：核心开发工程师
+项目描述：开发新一代移动支付平台，支持多种支付方式
+技术栈：React Native、Node.js、MongoDB、微服务架构
+主要职责：
+- 负责支付核心模块开发
+- 参与系统设计和接口定义
+- 编写技术文档和测试用例
+项目成果：
+- 平台日交易量突破100万笔
+- 支付成功率达到99.9%
+
+填写说明：
+1. 选择有代表性的项目
+2. 突出个人贡献和技术能力
+3. 量化项目成果和影响"""
+        project_text.insert(tk.END, project_content)
+        project_text.config(state=tk.DISABLED)
+        
+        # 技能特长示例页面
+        skills_frame = ttk.Frame(notebook)
+        notebook.add(skills_frame, text="技能特长")
+        
+        skills_text = scrolledtext.ScrolledText(skills_frame, wrap=tk.WORD, font=text_font, height=15)
+        skills_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        skills_content = """技能特长填写示例：
+
+专业技能：
+- 编程语言：Java、Python、JavaScript、SQL
+- 框架技术：Spring Boot、Spring Cloud、React、Vue.js
+- 数据库：MySQL、Oracle、MongoDB、Redis
+- 开发工具：Git、Maven、Docker、Jenkins
+- 其他：微服务架构、分布式系统、云计算
+
+语言能力：
+- 英语：CET-6，能够熟练阅读英文技术文档
+- 普通话：标准流利
+
+证书资质：
+- Oracle认证Java程序员
+- AWS认证解决方案架构师
+- PMP项目管理认证
+
+兴趣爱好：
+- 技术博客写作（个人博客访问量10万+）
+- 开源项目贡献（GitHub项目XXX星标）
+- 技术分享和培训
+
+填写说明：
+1. 突出与应聘岗位相关的技能
+2. 证书和资质要真实有效
+3. 兴趣爱好可以体现个人特色"""
+        skills_text.insert(tk.END, skills_content)
+        skills_text.config(state=tk.DISABLED)
+        
+        # 按钮框架
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X)
+        
+        def copy_current_content():
+            """复制当前选中的标签页内容"""
+            current_tab = notebook.select()
+            if current_tab:
+                tab_index = notebook.index(current_tab)
+                text_widgets = [personal_text, education_text, work_text, project_text, skills_text]
+                if tab_index < len(text_widgets):
+                    content = text_widgets[tab_index].get(1.0, tk.END)
+                    example_window.clipboard_clear()
+                    example_window.clipboard_append(content.strip())
+                    messagebox.showinfo("复制成功", "当前页面内容已复制到剪贴板")
+        
+        def copy_all_content():
+            """复制所有示例内容"""
+            all_content = "简历填写完整示例\n"
+            all_content += "=" * 50 + "\n\n"
+            
+            # 个人信息
+            all_content += "【个人信息】\n"
+            all_content += personal_text.get(1.0, tk.END).strip() + "\n\n"
+            
+            # 教育经历
+            all_content += "【教育经历】\n"
+            all_content += education_text.get(1.0, tk.END).strip() + "\n\n"
+            
+            # 工作经历
+            all_content += "【工作经历】\n"
+            all_content += work_text.get(1.0, tk.END).strip() + "\n\n"
+            
+            # 项目经验
+            all_content += "【项目经验】\n"
+            all_content += project_text.get(1.0, tk.END).strip() + "\n\n"
+            
+            # 技能特长
+            all_content += "【技能特长】\n"
+            all_content += skills_text.get(1.0, tk.END).strip()
+            
+            example_window.clipboard_clear()
+            example_window.clipboard_append(all_content)
+            messagebox.showinfo("复制成功", "所有示例内容已复制到剪贴板")
+        
+        # 复制按钮
+        ttk.Button(button_frame, text="复制当前页", command=copy_current_content).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(button_frame, text="复制全部内容", command=copy_all_content).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(button_frame, text="关闭", command=example_window.destroy).pack(side=tk.RIGHT)
+        
+        # 居中显示窗口
+        example_window.transient(self.root)
+        example_window.grab_set()
+
     def _log(self, message):
         """在日志区域显示消息"""
         self.log_text.config(state=tk.NORMAL)
