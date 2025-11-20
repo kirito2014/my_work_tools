@@ -11,6 +11,7 @@ import json
 import copy
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
+import weakref
 
 try:
     import openpyxl
@@ -48,35 +49,6 @@ def sanitize_data(data):
         except ValueError:
             return data
     return data
-
-
-def copy_workbook(source_workbook):
-    """
-    完整复制工作簿，包括所有工作表、格式和样式
-    
-    Args:
-        source_workbook: 源工作簿对象
-        
-    Returns:
-        复制后的新工作簿对象
-    """
-    try:
-        # 创建新工作簿
-        new_workbook = Workbook()
-        # 删除默认创建的工作表
-        new_workbook.remove(new_workbook.active)
-        
-        # 复制所有工作表
-        for sheet_name in source_workbook.sheetnames:
-            source_sheet = source_workbook[sheet_name]
-            new_sheet = new_workbook.create_sheet(title=sheet_name)
-            copy_worksheet_with_formatting(source_sheet, new_sheet, new_workbook)
-        
-        return new_workbook
-    except Exception as e:
-        print(f"复制工作簿时出错: {str(e)}")
-        # 如果复制失败，返回空工作簿
-        return Workbook()
 
 
 def find_placeholder_cells(worksheet) -> Dict[str, List[str]]:
@@ -157,7 +129,7 @@ def render_jinja2_template(template_str: str, context: dict) -> str:
 
 def find_jinja2_cells(worksheet) -> List[Tuple[str, str]]:
     """
-    查找工作表中的Jinja2模板单元格
+    查找工作表中的Jinja2模板单元格（排除工作经历和项目经历相关占位符）
     
     Args:
         worksheet: openpyxl工作表对象
@@ -167,411 +139,410 @@ def find_jinja2_cells(worksheet) -> List[Tuple[str, str]]:
     """
     jinja2_cells = []
     
+    # 需要排除的工作经历和项目经历相关占位符
+    excluded_placeholders = {
+        '开始时间', '结束时间', '起始时间', '公司名称', '公司职位', '工作描述',
+        '项目开始时间', '项目结束时间', '项目时间', '项目名称', '项目角色', '项目描述'
+    }
+    
     for row in worksheet.iter_rows():
         for cell in row:
             if cell.value and isinstance(cell.value, str):
                 # 检查是否包含Jinja2语法
-                if ('{{' in cell.value and '}}' in cell.value) or ('{%' in cell.value and '%}' in cell.value):
-                    jinja2_cells.append((cell.coordinate, cell.value))
+                if ('{{' in cell.value and '}}' in cell.value):
+                    # 检查是否包含需要排除的占位符
+                    cell_content = cell.value
+                    should_exclude = False
+                    
+                    for placeholder in excluded_placeholders:
+                        if f'{{{{{placeholder}}}}}' in cell_content:
+                            should_exclude = True
+                            break
+                    
+                    # 如果不包含排除的占位符，则加入处理列表
+                    if not should_exclude:
+                        jinja2_cells.append((cell.coordinate, cell.value))
     
     return jinja2_cells
 
 
-def find_loop_blocks(worksheet) -> List[Dict]:
+def prepare_work_experience_data(person_data: Dict[str, Any]) -> Dict[str, List]:
     """
-    查找工作表中的Jinja2循环块
-    
-    Args:
-        worksheet: openpyxl工作表对象
-        
-    Returns:
-        List[Dict]: 循环块信息列表，每个元素包含start_row, end_row, template_info等
-    """
-    loop_blocks = []
-    
-    # 查找{% for %}和{% endfor %}标记
-    for row_idx, row in enumerate(worksheet.iter_rows(), 1):
-        for cell in row:
-            if cell.value and isinstance(cell.value, str):
-                if '{% for ' in cell.value and '%}' in cell.value:
-                    # 找到循环开始标记
-                    for_idx = cell.value.find('{% for ')
-                    endfor_pos = cell.value.find('%}', for_idx)
-                    if for_idx != -1 and endfor_pos != -1:
-                        loop_content = cell.value[for_idx:endfor_pos+2]
-                        # 提取循环变量和集合
-                        loop_var = loop_content.replace('{% for ', '').replace(' %}', '').strip()
-                        # 简单解析，格式如 "work in we"
-                        if ' in ' in loop_var:
-                            var_part, collection_part = loop_var.split(' in ', 1)
-                            var_name = var_part.strip()
-                            collection_name = collection_part.strip()
-                            
-                            # 查找对应的{% endfor %}
-                            endfor_row = find_matching_endfor(worksheet, row_idx)
-                            if endfor_row:
-                                loop_blocks.append({
-                                    'start_row': row_idx,
-                                    'end_row': endfor_row,
-                                    'var_name': var_name,
-                                    'collection_name': collection_name,
-                                    'template_cells': get_template_cells_in_loop(worksheet, row_idx, endfor_row)
-                                })
-    
-    return loop_blocks
-
-
-def find_matching_endfor(worksheet, start_row: int) -> Optional[int]:
-    """
-    查找匹配的{% endfor %}标记
-    
-    Args:
-        worksheet: openpyxl工作表对象
-        start_row: 循环开始的行号
-        
-    Returns:
-        Optional[int]: 匹配的endfor行号，未找到返回None
-    """
-    for row_idx in range(start_row + 1, worksheet.max_row + 1):
-        row = worksheet[row_idx]
-        for cell in row:
-            if cell.value and isinstance(cell.value, str):
-                if '{% endfor %}' in cell.value:
-                    return row_idx
-    return None
-
-
-def get_template_cells_in_loop(worksheet, start_row: int, end_row: int) -> List[Dict]:
-    """
-    获取循环块内的模板单元格信息
-    
-    Args:
-        worksheet: openpyxl工作表对象
-        start_row: 循环开始行号
-        end_row: 循环结束行号
-        
-    Returns:
-        List[Dict]: 模板单元格信息列表
-    """
-    template_cells = []
-    
-    for row_idx in range(start_row, end_row + 1):
-        row = worksheet[row_idx]
-        for cell in row:
-            if cell.value and isinstance(cell.value, str):
-                # 跳过循环标记本身
-                if '{% for ' in cell.value or '{% endfor %}' in cell.value:
-                    continue
-                # 查找包含变量的单元格
-                if '{{' in cell.value and '}}' in cell.value:
-                    template_cells.append({
-                        'coordinate': cell.coordinate,
-                        'row': row_idx,
-                        'column': cell.column,
-                        'template': cell.value,
-                        'style': cell._style if cell.has_style else None
-                    })
-    
-    return template_cells
-
-
-def expand_loop_blocks(worksheet, context: dict) -> Any:
-    """
-    展开工作表中的循环块
-    
-    Args:
-        worksheet: openpyxl工作表对象
-        context: 模板上下文数据
-        
-    Returns:
-        处理后的工作表对象
-    """
-    loop_blocks = find_loop_blocks(worksheet)
-    
-    if not loop_blocks:
-        return worksheet
-    
-    # 按行号倒序处理，避免插入行时影响后续循环块的行号
-    loop_blocks.sort(key=lambda x: x['start_row'], reverse=True)
-    
-    for loop_block in loop_blocks:
-        collection_name = loop_block['collection_name']
-        var_name = loop_block['var_name']
-        
-        # 获取集合数据
-        collection_data = get_nested_value(context, collection_name)
-        if not isinstance(collection_data, list) or not collection_data:
-            continue
-        
-        # 展开循环
-        expand_single_loop(worksheet, loop_block, collection_data, var_name)
-    
-    return worksheet
-
-
-def get_nested_value(data: dict, key_path: str):
-    """
-    获取嵌套字典中的值
-    
-    Args:
-        data: 数据字典
-        key_path: 键路径，如 "we" 或 "WorkExperience"
-        
-    Returns:
-        对应的值
-    """
-    keys = key_path.split('.')
-    value = data
-    
-    for key in keys:
-        if isinstance(value, dict) and key in value:
-            value = value[key]
-        else:
-            return None
-    
-    return value
-
-
-def expand_single_loop(worksheet, loop_block: Dict, collection_data: List[Dict], var_name: str):
-    """
-    展开单个循环块
-    
-    Args:
-        worksheet: openpyxl工作表对象
-        loop_block: 循环块信息
-        collection_data: 集合数据
-        var_name: 循环变量名
-    """
-    start_row = loop_block['start_row']
-    end_row = loop_block['end_row']
-    template_cells = loop_block['template_cells']
-    
-    if len(collection_data) <= 1:
-        # 如果只有一个元素或没有元素，直接渲染
-        for item_data in collection_data:
-            for template_cell in template_cells:
-                cell = worksheet[template_cell['coordinate']]
-                rendered = render_jinja2_template(template_cell['template'], {var_name: item_data})
-                cell.value = rendered
-        return
-    
-    # 删除原始循环块（除了第一行）
-    for _ in range(len(collection_data) - 1):
-        worksheet.delete_rows(start_row + 1)
-    
-    # 为每个数据项复制并渲染行
-    for i, item_data in enumerate(collection_data):
-        if i == 0:
-            # 第一行直接渲染
-            for template_cell in template_cells:
-                cell = worksheet[template_cell['coordinate']]
-                rendered = render_jinja2_template(template_cell['template'], {var_name: item_data})
-                cell.value = rendered
-        else:
-            # 复制行并渲染
-            new_row_idx = start_row + i
-            worksheet.insert_rows(new_row_idx)
-            
-            # 复制样式和格式
-            for template_cell in template_cells:
-                original_coord = template_cell['coordinate']
-                original_cell = worksheet[original_coord]
-                
-                # 计算新单元格坐标
-                new_row_num = new_row_idx
-                new_coord = f"{get_column_letter(template_cell['column'])}{new_row_num}"
-                new_cell = worksheet[new_coord]
-                
-                # 复制样式
-                if template_cell['style']:
-                    new_cell._style = template_cell['style']
-                
-                # 渲染模板
-                rendered = render_jinja2_template(template_cell['template'], {var_name: item_data})
-                new_cell.value = rendered
-
-
-def create_person_sheet(template_worksheet, person_name: str, person_data: Dict[str, Any]) -> Any:
-    """
-    为指定人员创建新的工作表
-    
-    Args:
-        template_worksheet: 模板工作表
-        person_name: 人员姓名
-        person_data: 人员数据
-        
-    Returns:
-        新创建的工作表对象
-    """
-    # 创建新工作簿
-    new_workbook = Workbook()
-    # 删除默认创建的工作表
-    new_workbook.remove(new_workbook.active)
-    
-    # 创建新工作表，命名为"人员名称_简历"
-    new_sheet = new_workbook.create_sheet(title=f"{person_name}_简历")
-    
-    # 复制模板工作表的内容和格式
-    for row in template_worksheet.iter_rows():
-        for cell in row:
-            new_cell = new_sheet.cell(row=cell.row, column=cell.column)
-            
-            # 复制值
-            new_cell.value = cell.value
-            
-            # 复制样式（简化版本）
-            if cell.has_style:
-                try:
-                    if cell.font:
-                        new_cell.font = cell.font.copy()
-                    if cell.border:
-                        new_cell.border = cell.border.copy()
-                    if cell.fill:
-                        new_cell.fill = cell.fill.copy()
-                    new_cell.number_format = cell.number_format
-                    if cell.protection:
-                        new_cell.protection = cell.protection.copy()
-                    if cell.alignment:
-                        new_cell.alignment = cell.alignment.copy()
-                except Exception as e:
-                    print(f"复制样式时出错: {e}")
-                    # 如果样式复制失败，至少复制值
-                    pass
-    
-    # 处理循环块（在处理普通占位符之前）
-    new_sheet = expand_loop_blocks(new_sheet, person_data)
-    
-    # 查找占位符并替换
-    placeholders = find_placeholder_cells(new_sheet)
-    jinja2_cells = find_jinja2_cells(new_sheet)
-    sanitized_data = sanitize_data(person_data)
-    
-    # 处理普通占位符
-    for placeholder, cell_coords in placeholders.items():
-        # 支持嵌套键值，如 "personal_info.name"
-        keys = placeholder.split('.')
-        value = sanitized_data
-        
-        try:
-            for key in keys:
-                if isinstance(value, dict) and key in value:
-                    value = value[key]
-                elif isinstance(value, list) and key.isdigit():
-                    idx = int(key)
-                    if 0 <= idx < len(value):
-                        value = value[idx]
-                    else:
-                        value = None
-                        break
-                else:
-                    value = None
-                    break
-            
-            # 处理该占位符的所有单元格位置
-            for cell_coord in cell_coords:
-                cell = new_sheet[cell_coord]
-                render_template_cell(cell, value)
-                
-        except Exception as e:
-            print(f"渲染占位符 {placeholder} 时出错: {str(e)}")
-            # 为所有相同占位符的单元格设置错误信息
-            for cell_coord in cell_coords:
-                cell = new_sheet[cell_coord]
-                render_template_cell(cell, f"[错误: {placeholder}]")
-    
-    # 处理Jinja2模板
-    for cell_coord, template_str in jinja2_cells:
-        try:
-            cell = new_sheet[cell_coord]
-            # 使用Jinja2渲染模板
-            rendered_value = render_jinja2_template(template_str, sanitized_data)
-            cell.value = rendered_value
-        except Exception as e:
-            print(f"渲染Jinja2模板 {cell_coord} 时出错: {str(e)}")
-            cell = new_sheet[cell_coord]
-            cell.value = f"[Jinja2错误: {str(e)}]"
-    
-    return new_sheet, new_workbook
-
-
-def generate_resume_from_excel(person_data: Dict[str, Any], template_path: str, 
-                              output_path: str) -> Optional[str]:
-    """
-    从Excel模板生成单个简历（简化版本，用于测试）
+    将工作经历数据转换为列表格式，用于表格填充
     
     Args:
         person_data: 人员数据字典
-        template_path: Excel模板文件路径
-        output_path: 输出文件路径
         
     Returns:
-        生成的文件路径，失败时返回None
+        包含工作经历列表数据的字典
     """
-    try:
-        # 检查模板文件是否存在
-        if not os.path.exists(template_path):
-            print(f"错误: Excel模板文件不存在: {template_path}")
-            return None
+
+    #print(person_data)
+    work_experience_data = {
+        '开始时间': [],
+        '结束时间': [],
+        '起始时间': [],  # 开始结束时间段
+        '公司名称': [],
+        '公司职位': [],
+        '工作描述': []
+    }
+    
+    # 获取工作经历数据
+    we = person_data.get('we', [])
+    if not isinstance(we, list):
+        we = []
+    
+    for exp in we:
+        if not isinstance(exp, dict):
+            continue
         
-        # 加载Excel模板
-        print(f"正在加载Excel模板: {template_path}")
-        template_workbook = openpyxl.load_workbook(template_path)
+        # 提取各字段数据
+        start_date = exp.get('start', '')
+        end_date = exp.get('end', '')
+        company = exp.get('comp', '')
+        position = exp.get('pos', '')
+        description = exp.get('desc', '')
         
-        # 查找模板工作表（假设名为"XX_简历"）
-        template_sheet = None
-        for sheet_name in template_workbook.sheetnames:
-            if sheet_name.endswith('XX简历'):
-                template_sheet = template_workbook[sheet_name]
-                break
+        # 构建时间段
+        time_period = f"{start_date}-{end_date}" if start_date and end_date else (start_date or end_date or '')
         
-        if template_sheet is None:
-            # 如果没有找到"_简历"结尾的工作表，使用第一个工作表
-            if template_workbook.sheetnames:
-                template_sheet = template_workbook.active
-                print(f"警告: 未找到'XX简历'结尾的工作表，使用第一个工作表: {template_sheet.title}")
-            else:
-                print("错误: Excel文件中没有工作表")
-                return None
+        # 添加到对应的列表
+        work_experience_data['开始时间'].append(start_date)
+        work_experience_data['结束时间'].append(end_date)
+        work_experience_data['起始时间'].append(time_period)
+        work_experience_data['公司名称'].append(company)
+        work_experience_data['公司职位'].append(position)
+        work_experience_data['工作描述'].append(description)
+    
+    return work_experience_data
+
+
+def prepare_project_experience_data(person_data: Dict[str, Any]) -> Dict[str, List]:
+    """
+    将项目经历数据转换为列表格式，用于表格填充
+    
+    Args:
+        person_data: 人员数据字典
         
-        # 获取人员姓名
-        person_name = "未知人员"
-        if isinstance(person_data, dict):
-            # 尝试多种可能的姓名字段
-            name_info = person_data.get('personal_info', {})
-            if not isinstance(name_info, dict):
-                name_info = person_data.get('AdditionInfo', {})
-            if not isinstance(name_info, dict):
-                name_info = person_data
+    Returns:
+        包含项目经历列表数据的字典
+    """
+    project_experience_data = {
+        '项目开始时间': [],
+        '项目结束时间': [],
+        '项目时间': [],  # 项目时间段
+        '项目名称': [],
+        '项目角色': [],
+        '项目描述': []
+    }
+    
+    # 获取项目经历数据
+    pe = person_data.get('pe', [])
+    if not isinstance(pe, list):
+        pe = []
+    
+    for proj in pe:
+        if not isinstance(proj, dict):
+            continue
+        
+        # 提取各字段数据
+        start_date = proj.get('start', '')
+        end_date = proj.get('end', '')
+        name = proj.get('proj', '')
+        role = proj.get('role', '')
+        description = proj.get('desc', '')
+        
+        # 构建时间段
+        time_period = f"{start_date}-{end_date}" if start_date and end_date else (start_date or end_date or '')
+        
+        # 添加到对应的列表
+        project_experience_data['项目开始时间'].append(start_date)
+        project_experience_data['项目结束时间'].append(end_date)
+        project_experience_data['项目时间'].append(time_period)
+        project_experience_data['项目名称'].append(name)
+        project_experience_data['项目角色'].append(role)
+        project_experience_data['项目描述'].append(description)
+    #print(project_experience_data)    
+    return project_experience_data
+
+
+def find_section_row(worksheet, section_name):
+    """查找指定章节的行号"""
+    # 如果section_name是字符串，转换为列表以便统一处理
+    if isinstance(section_name, str):
+        section_names = [section_name]
+    else:
+        section_names = section_name
+    
+    for row in worksheet.iter_rows():
+        for cell in row:
+            if cell.value and isinstance(cell.value, str):
+                # 检查所有可能的章节名称
+                for name in section_names:
+                    if name in str(cell.value):
+                        print(f"找到章节 '{name}' 在第{cell.row}行，列{cell.column}，内容: '{cell.value}'")
+                        return cell.row
+    return None
+
+
+def find_placeholder_columns(sheet: openpyxl.worksheet.worksheet.Worksheet, section_row: int, 
+                           placeholders: List[str]) -> Dict[str, int]:
+    """
+    在指定行中查找占位符所在的列号
+    
+    Args:
+        sheet: Excel工作表对象
+        section_row: 章节所在行号
+        placeholders: 占位符列表，如["{{开始时间}}", "{{结束时间}}"]
+        
+    Returns:
+        占位符列号映射字典
+    """
+    placeholder_columns = {}
+    
+    # 搜索章节行及其下方几行，重点关注section_row+1和section_row+2行
+    search_rows = range(section_row, min(section_row + 5, sheet.max_row + 1))
+    
+    print(f"搜索占位符，从行 {section_row} 到 {min(section_row + 5, sheet.max_row)}")
+    
+    for row_num in search_rows:
+        for cell in sheet[row_num]:
+            if cell.value and isinstance(cell.value, str):
+                cell_value = str(cell.value).strip()
+                for placeholder in placeholders:
+                    if placeholder in cell_value:
+                        placeholder_columns[placeholder] = cell.column
+                        print(f"找到占位符 '{placeholder}' 在列 {cell.column} (行 {cell.row})")
+    
+    # 如果没找到，尝试在section_row+1和section_row+2行进行更精确的搜索
+    if not placeholder_columns:
+        print("未在常规范围内找到占位符，尝试精确搜索section_row+1和section_row+2行")
+        precise_search_rows = [section_row + 1, section_row + 2]
+        
+        for row_num in precise_search_rows:
+            if row_num <= sheet.max_row:
+                print(f"精确搜索行 {row_num} 的内容:")
+                for cell in sheet[row_num]:
+                    if cell.value:
+                        cell_value = str(cell.value).strip()
+                        print(f"  列 {cell.column}: '{cell_value}'")
+                        
+                        for placeholder in placeholders:
+                            if placeholder in cell_value:
+                                placeholder_columns[placeholder] = cell.column
+                                print(f"找到占位符 '{placeholder}' 在列 {cell.column} (行 {cell.row})")
+    
+    return placeholder_columns
+
+
+def add_experience_rows(sheet: openpyxl.worksheet.worksheet.Worksheet, section_row: int, 
+                       num_rows: int, placeholder_columns: Dict[str, int] = None) -> None:
+    """
+    在指定章节的占位符行下方添加指定数量的行
+    
+    Args:
+        sheet: Excel工作表对象
+        section_row: 章节所在行号
+        num_rows: 要添加的行数
+        placeholder_columns: 占位符列位置字典，用于找到占位符行
+    """
+    if num_rows <= 0:
+        return
+    
+    # 如果提供了占位符位置，找到占位符所在的行，在该行下方插入
+    if placeholder_columns:
+        # 找到占位符所在的最大行号（通常占位符都在同一行）
+        max_placeholder_row = section_row
+        for col in placeholder_columns.values():
+            # 找到该列中包含占位符的单元格
+            for row in range(section_row + 1, min(section_row + 6, sheet.max_row + 1)):
+                cell = sheet.cell(row=row, column=col)
+                if cell.value and isinstance(cell.value, str):
+                    # 检查是否包含占位符标记
+                    if any(placeholder in str(cell.value) for placeholder in ['{{', '}}', '{%', '%}']):
+                        max_placeholder_row = max(max_placeholder_row, row)
+                        break
+        
+        # 在占位符行下方插入新行
+        insert_row = max_placeholder_row + 1
+        sheet.insert_rows(insert_row, num_rows)
+        print(f"在占位符行（行 {max_placeholder_row}）下方插入 {num_rows} 行，插入位置：行 {insert_row}")
+    else:
+        # 如果没有提供占位符位置，使用原来的逻辑（在章节行下方插入）
+        insert_row = section_row + 1
+        sheet.insert_rows(insert_row, num_rows)
+        print(f"在章节行（行 {section_row}）下方插入 {num_rows} 行，插入位置：行 {insert_row}")
+
+
+def fill_work_experience(sheet: openpyxl.worksheet.worksheet.Worksheet, work_data: Dict[str, List], prefound_placeholders: Dict[str, int] = None) -> None:
+    """
+    填充工作经历数据到表格
+    
+    Args:
+        sheet: Excel工作表对象
+        work_data: 工作经历数据字典
+        prefound_placeholders: 预先找到的占位符位置字典
+    """
+    if not work_data or not any(work_data.values()):
+        print("没有工作经历数据需要填充")
+        return
+    
+    # 查找工作经历章节行
+    section_row = find_section_row(sheet, ["工作经历", "工作经验"])
+    if not section_row:
+        print("未找到工作经历章节")
+        return
+    
+    # 获取数据行数
+    data_length = len(work_data.get('开始时间', []))
+    if data_length == 0:
+        print("工作经历数据为空")
+        return
+    
+    # 使用预先保存的占位符位置，如果没有则重新查找
+    if prefound_placeholders:
+        placeholder_columns = prefound_placeholders
+        print(f"使用预先保存的工作经历占位符位置: {placeholder_columns}")
+    else:
+        placeholders = ['{{起始时间}}', '{{结束时间}}', '{{公司名称}}', '{{公司职位}}', '{{工作描述}}']
+        placeholder_columns = find_placeholder_columns(sheet, section_row, placeholders)
+        print(f"重新查找的工作经历占位符位置: {placeholder_columns}")
+    
+    if not placeholder_columns:
+        print("未找到工作经历占位符列")
+        return
+    
+    # 添加新行
+    add_experience_rows(sheet, section_row, data_length, placeholder_columns)
+    
+    # 找到占位符所在的最大行号，数据填充起始行应该是占位符行下方
+    max_placeholder_row = section_row
+    if placeholder_columns:
+        for col in placeholder_columns.values():
+            for row in range(section_row + 1, min(section_row + 6, sheet.max_row + 1)):
+                cell = sheet.cell(row=row, column=col)
+                if cell.value and isinstance(cell.value, str):
+                    if any(placeholder in str(cell.value) for placeholder in ['{{', '}}', '{%', '%}']):
+                        max_placeholder_row = max(max_placeholder_row, row)
+                        break
+    
+    # 填充数据从占位符行下方开始
+    start_row = max_placeholder_row + 1
+    for i in range(data_length):
+        current_row = start_row + i
+        
+        # 填充各个字段
+        if '{{起始时间}}' in placeholder_columns and i < len(work_data.get('起始时间', [])):
+            col = placeholder_columns['{{起始时间}}']
+            sheet.cell(row=current_row, column=col, value=work_data['起始时间'][i])
             
-            if isinstance(name_info, dict):
-                person_name = name_info.get('name', name_info.get('Name', '未知人员'))
-        
-        # 创建人员专用工作表
-        new_sheet, new_workbook = create_person_sheet(template_sheet, person_name, person_data)
-        
-        # 确保输出目录存在
-        output_dir = os.path.dirname(output_path)
-        if output_dir:
-            os.makedirs(output_dir, exist_ok=True)
-        
-        # 如果文件已存在，则删除
-        if os.path.exists(output_path):
-            os.remove(output_path)
-        
-        # 保存生成的Excel文件
-        new_workbook.save(output_path)
-        print(f"{person_name} 简历已生成 (Excel格式)，保存到: {os.path.abspath(output_path)}")
-        
-        return output_path
-        
-    except Exception as e:
-        print(f"生成Excel简历时出错: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return None
+        if '{{结束时间}}' in placeholder_columns and i < len(work_data.get('结束时间', [])):
+            col = placeholder_columns['{{结束时间}}']
+            sheet.cell(row=current_row, column=col, value=work_data['结束时间'][i])
+            
+        if '{{公司名称}}' in placeholder_columns and i < len(work_data.get('公司名称', [])):
+            col = placeholder_columns['{{公司名称}}']
+            sheet.cell(row=current_row, column=col, value=work_data['公司名称'][i])
+            
+        if '{{公司职位}}' in placeholder_columns and i < len(work_data.get('公司职位', [])):
+            col = placeholder_columns['{{公司职位}}']
+            sheet.cell(row=current_row, column=col, value=work_data['公司职位'][i])
+            
+        if '{{工作描述}}' in placeholder_columns and i < len(work_data.get('工作描述', [])):
+            col = placeholder_columns['{{工作描述}}']
+            sheet.cell(row=current_row, column=col, value=work_data['工作描述'][i])
+    
+    print(f"已填充 {data_length} 行工作经历数据")
 
 
-def copy_worksheet_with_formatting(source_worksheet, target_worksheet, target_workbook):
+def fill_project_experience(sheet: openpyxl.worksheet.worksheet.Worksheet, project_data: Dict[str, List], prefound_placeholders: Dict[str, int] = None) -> None:
+    """
+    填充项目经历数据到表格
+    
+    Args:
+        sheet: Excel工作表对象
+        project_data: 项目经历数据字典
+        prefound_placeholders: 预先找到的占位符位置字典
+    """
+    if not project_data or not any(project_data.values()):
+        print("没有项目经历数据需要填充")
+        return
+    
+    # 查找项目经历章节行
+    section_row = find_section_row(sheet, ["项目经历", "项目经验"])
+    if not section_row:
+        print("未找到项目经历章节")
+        return
+    
+    # 获取数据行数
+    data_length = len(project_data.get('项目名称', []))
+    if data_length == 0:
+        print("项目经历数据为空")
+        return
+    
+    # 使用预先保存的占位符位置，如果没有则重新查找
+    if prefound_placeholders:
+        placeholder_columns = prefound_placeholders
+        print(f"使用预先保存的项目经历占位符位置: {placeholder_columns}")
+    else:
+        placeholders = ['{{项目名称}}', '{{项目描述}}', '{{项目时间}}', '{{项目角色}}']
+        placeholder_columns = find_placeholder_columns(sheet, section_row, placeholders)
+        print(f"重新查找的项目经历占位符位置: {placeholder_columns}")
+    
+    if not placeholder_columns:
+        print("未找到项目经历占位符列")
+        return
+    
+    # 添加新行
+    add_experience_rows(sheet, section_row, data_length, placeholder_columns)
+    
+    # 找到占位符所在的最大行号，数据填充起始行应该是占位符行下方
+    max_placeholder_row = section_row
+    if placeholder_columns:
+        for col in placeholder_columns.values():
+            for row in range(section_row + 1, min(section_row + 6, sheet.max_row + 1)):
+                cell = sheet.cell(row=row, column=col)
+                if cell.value and isinstance(cell.value, str):
+                    if any(placeholder in str(cell.value) for placeholder in ['{{', '}}', '{%', '%}']):
+                        max_placeholder_row = max(max_placeholder_row, row)
+                        break
+    
+    # 填充数据从占位符行下方开始
+    start_row = max_placeholder_row + 1
+    for i in range(data_length):
+        current_row = start_row + i
+        
+        # 填充各个字段
+        if '{{项目开始时间}}' in placeholder_columns and i < len(project_data['项目开始时间']):
+            col = placeholder_columns['{{项目开始时间}}']
+            sheet.cell(row=current_row, column=col, value=project_data['项目开始时间'][i])
+            
+        if '{{项目结束时间}}' in placeholder_columns and i < len(project_data['项目结束时间']):
+            col = placeholder_columns['{{项目结束时间}}']
+            sheet.cell(row=current_row, column=col, value=project_data['项目结束时间'][i])
+            
+        if '{{项目时间}}' in placeholder_columns and i < len(project_data['项目时间']):
+            col = placeholder_columns['{{项目时间}}']
+            sheet.cell(row=current_row, column=col, value=project_data['项目时间'][i])
+            
+        if '{{项目名称}}' in placeholder_columns and i < len(project_data['项目名称']):
+            col = placeholder_columns['{{项目名称}}']
+            sheet.cell(row=current_row, column=col, value=project_data['项目名称'][i])
+            
+        if '{{项目角色}}' in placeholder_columns and i < len(project_data['项目角色']):
+            col = placeholder_columns['{{项目角色}}']
+            sheet.cell(row=current_row, column=col, value=project_data['项目角色'][i])
+            
+        if '{{项目描述}}' in placeholder_columns and i < len(project_data['项目描述']):
+            col = placeholder_columns['{{项目描述}}']
+            sheet.cell(row=current_row, column=col, value=project_data['项目描述'][i])
+    
+    print(f"已填充 {data_length} 行项目经历数据")
+
+
+def copy_worksheet_with_formatting(source_worksheet: openpyxl.worksheet.worksheet.Worksheet,
+                                  target_worksheet: openpyxl.worksheet.worksheet.Worksheet, 
+                                  target_workbook: openpyxl.Workbook):
     """
     完整复制工作表，包括所有格式、合并单元格等
     
@@ -629,9 +600,39 @@ def copy_worksheet_with_formatting(source_worksheet, target_worksheet, target_wo
         target_worksheet.protection = source_worksheet.protection
 
 
-def create_person_sheet_with_formatting(template_worksheet, person_name: str, person_data: Dict[str, Any], target_workbook) -> Any:
+def copy_workbook(source_workbook: openpyxl.Workbook) -> openpyxl.Workbook:
     """
-    为指定人员创建新的工作表（完整格式保留版本）
+    完整复制工作簿，包括所有工作表和格式
+    
+    Args:
+        source_workbook: 源工作簿
+        
+    Returns:
+        复制的新工作簿
+    """
+    new_workbook = openpyxl.Workbook()
+    
+    # 删除默认创建的工作表
+    if new_workbook.sheetnames:
+        new_workbook.remove(new_workbook.active)
+    
+    # 复制所有工作表
+    for sheet_name in source_workbook.sheetnames:
+        source_sheet = source_workbook[sheet_name]
+        new_sheet = new_workbook.create_sheet(title=sheet_name)
+        
+        # 复制工作表内容和格式
+        copy_worksheet_with_formatting(source_sheet, new_sheet, new_workbook)
+    
+    return new_workbook
+
+
+def create_person_sheet_with_formatting(template_worksheet: openpyxl.worksheet.worksheet.Worksheet, 
+                                       person_name: str, 
+                                       person_data: Dict[str, Any], 
+                                       target_workbook: openpyxl.Workbook) -> openpyxl.worksheet.worksheet.Worksheet:
+    """
+    为指定人员创建工作表，完整复制模板格式并处理数据填充
     
     Args:
         template_worksheet: 模板工作表
@@ -640,19 +641,75 @@ def create_person_sheet_with_formatting(template_worksheet, person_name: str, pe
         target_workbook: 目标工作簿
         
     Returns:
-        新创建的工作表对象
+        创建的新工作表
     """
-    # 创建新工作表，命名为"人员名称_简历"
+    # 创建新工作表
     new_sheet = target_workbook.create_sheet(title=f"{person_name}_简历")
     
     # 完整复制模板工作表的内容和格式
     copy_worksheet_with_formatting(template_worksheet, new_sheet, target_workbook)
     
-    # 查找占位符并替换
+    # 预先查找并保存工作经历和项目经历的占位符位置（在Jinja2渲染之前）
+    work_experience_placeholders = None
+    project_experience_placeholders = None
+    
+    try:
+        # 预先查找工作经历占位符位置
+        print("预先查找工作经历占位符位置...")
+        work_section_row = find_section_row(new_sheet, "工作经验")
+        if not work_section_row:
+            work_section_row = find_section_row(new_sheet, "工作经历")
+        
+        if work_section_row:
+            work_placeholders = ['{{起始时间}}', '{{结束时间}}', '{{公司名称}}', '{{公司职位}}', '{{工作描述}}']
+            work_placeholder_columns = find_placeholder_columns(new_sheet, work_section_row, work_placeholders)
+            print(f"找到工作经历占位符位置: {work_placeholder_columns}")
+        else:
+            work_placeholder_columns = {}
+            print("未找到工作经历章节")
+        
+        # 预先查找项目经历占位符位置
+        print("预先查找项目经历占位符位置...")
+        project_section_row = find_section_row(new_sheet, "项目经验")
+        if not project_section_row:
+            project_section_row = find_section_row(new_sheet, "项目经历")
+        
+        if project_section_row:
+            project_placeholders = ['{{项目名称}}', '{{项目描述}}', '{{项目时间}}', '{{项目角色}}']
+            project_placeholder_columns = find_placeholder_columns(new_sheet, project_section_row, project_placeholders)
+            print(f"找到项目经历占位符位置: {project_placeholder_columns}")
+        else:
+            project_placeholder_columns = {}
+            print("未找到项目经历章节")
+            
+    except Exception as e:
+        print(f"预先查找占位符位置时出错: {str(e)}")
+    
+    # 查找占位符并替换（除了工作经历和项目经历的占位符）
     placeholders = find_placeholder_cells(new_sheet)
+    jinja2_cells = find_jinja2_cells(new_sheet)
     sanitized_data = sanitize_data(person_data)
     
+    # 定义需要保留给后续处理的占位符集合
+    reserved_placeholders = {'起始时间', '结束时间', '公司名称', '公司职位', '工作描述', '项目名称', '项目时间', '项目角色', '项目描述'}
+    
+    # 处理Jinja2模板单元格
+    for cell_coord, template_str in jinja2_cells:
+        cell = new_sheet[cell_coord]
+        try:
+            rendered = render_jinja2_template(template_str, sanitized_data)
+            cell.value = rendered
+        except Exception as e:
+            print(f"渲染Jinja2模板 {cell_coord} 时出错: {str(e)}]")
+            cell.value = f"[模板错误: {str(e)}]"
+    
+    # 处理普通占位符（排除保留的占位符）
     for placeholder, cell_coords in placeholders.items():
+        # 跳过保留的占位符
+        if placeholder in reserved_placeholders:
+            print(f"跳过保留占位符: {placeholder}")
+            continue
+            
         # 支持嵌套键值，如 "personal_info.name"
         keys = placeholder.split('.')
         value = sanitized_data
@@ -683,6 +740,31 @@ def create_person_sheet_with_formatting(template_worksheet, person_name: str, pe
             for cell_coord in cell_coords:
                 cell = new_sheet[cell_coord]
                 render_template_cell(cell, f"[错误: {placeholder}]")
+    
+    # 处理工作经历和项目经历的表格数据
+    try:
+        # 准备工作经历数据并填充
+        work_experience_data = prepare_work_experience_data(person_data)
+        print(f"工作经历数据: {work_experience_data}")
+        if work_experience_data and any(work_experience_data.values()):
+            print(f"开始处理工作经历数据: {len(work_experience_data.get('开始时间', []))} 条记录")
+            # 使用预先保存的占位符位置，如果没有则重新查找
+            fill_work_experience(new_sheet, work_experience_data, work_placeholder_columns)
+        
+        # 准备项目经历数据并填充
+        project_experience_data = prepare_project_experience_data(person_data)
+        print(f"项目经历数据: {project_experience_data}")
+        if project_experience_data and any(project_experience_data.values()):
+            print(f"开始处理项目经历数据: {len(project_experience_data.get('开始时间', []))} 条记录")
+        if project_experience_data and any(project_experience_data.values()):
+            print(f"开始处理项目经历数据: {len(project_experience_data.get('项目名称', []))} 条记录")
+            # 使用预先保存的占位符位置，如果没有则重新查找
+            fill_project_experience(new_sheet, project_experience_data, project_placeholder_columns)
+            
+    except Exception as e:
+        print(f"处理工作经历和项目经历时出错: {str(e)}")
+        import traceback
+        traceback.print_exc()
     
     return new_sheet
 
@@ -1067,7 +1149,7 @@ def generate_resume_from_excel_original(person_data: Dict[str, Any], template_pa
                 return None
         
         # 创建人员专用工作表
-        new_sheet, new_workbook = create_person_sheet(template_sheet, person_name, person_data)
+        new_sheet, new_workbook = create_person_sheet_with_formatting(template_sheet, person_name, person_data)
         
         # 生成文件名
         current_date = datetime.now().strftime("%Y%m%d")
