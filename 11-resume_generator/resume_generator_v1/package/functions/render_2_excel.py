@@ -335,43 +335,103 @@ def find_placeholder_columns(sheet: openpyxl.worksheet.worksheet.Worksheet, sect
     return placeholder_columns
 
 
-def add_experience_rows(sheet: openpyxl.worksheet.worksheet.Worksheet, section_row: int, 
-                       num_rows: int, placeholder_columns: Dict[str, int] = None) -> None:
+def add_experience_rows(sheet: openpyxl.worksheet.worksheet.Worksheet, section_row: int, data_length: int, placeholder_columns: Dict[str, int] = None) -> None:
     """
-    在指定章节的占位符行下方添加指定数量的行
+    在章节下方添加新行以容纳经历数据
     
     Args:
         sheet: Excel工作表对象
         section_row: 章节所在行号
-        num_rows: 要添加的行数
-        placeholder_columns: 占位符列位置字典，用于找到占位符行
+        data_length: 需要添加的数据行数
+        placeholder_columns: 占位符列位置字典
     """
-    if num_rows <= 0:
-        return
+    if data_length <= 1:
+        return  # 如果只有1行数据，不需要添加新行（占位符行本身就是第一行）
     
-    # 如果提供了占位符位置，找到占位符所在的行，在该行下方插入
+    # 找到占位符行位置
+    placeholder_row = None
     if placeholder_columns:
-        # 找到占位符所在的最大行号（通常占位符都在同一行）
-        max_placeholder_row = section_row
         for col in placeholder_columns.values():
-            # 找到该列中包含占位符的单元格
-            for row in range(section_row + 1, min(section_row + 6, sheet.max_row + 1)):
+            for row in range(section_row + 1, min(section_row + 10, sheet.max_row + 1)):
                 cell = sheet.cell(row=row, column=col)
                 if cell.value and isinstance(cell.value, str):
-                    # 检查是否包含占位符标记
                     if any(placeholder in str(cell.value) for placeholder in ['{{', '}}', '{%', '%}']):
-                        max_placeholder_row = max(max_placeholder_row, row)
+                        placeholder_row = row
                         break
+            if placeholder_row:
+                break
+    
+    if not placeholder_row:
+        # 如果没找到占位符行，使用默认位置（章节行+2）
+        placeholder_row = section_row + 2
+    
+    # 在占位符行下方插入新行（数据行数-1）
+    rows_to_add = data_length - 1
+    for i in range(rows_to_add):
+        sheet.insert_rows(placeholder_row + 1 + i)
+    
+    # 复制子标题行（章节行+1）的格式到从占位符行到占位符行+数据行数-1的所有行
+    subtitle_row = section_row + 1  # 子标题行
+    end_row = placeholder_row + data_length - 1  # 结束行（占位符行+新增行数）
+    
+    for row in range(placeholder_row, end_row + 1):
+        copy_row_format(sheet, subtitle_row, row)
+    
+    print(f"已添加 {rows_to_add} 行，并复制了子标题行格式到第 {placeholder_row}-{end_row} 行")
+
+
+def copy_row_format(sheet: openpyxl.worksheet.worksheet.Worksheet, source_row: int, target_row: int) -> None:
+    """
+    复制源行的格式到目标行
+    
+    Args:
+        sheet: Excel工作表对象
+        source_row: 源行号
+        target_row: 目标行号
+    """
+    # 复制每个单元格的格式
+    for col in range(1, sheet.max_column + 1):
+        source_cell = sheet.cell(row=source_row, column=col)
+        target_cell = sheet.cell(row=target_row, column=col)
         
-        # 在占位符行下方插入新行
-        insert_row = max_placeholder_row + 1
-        sheet.insert_rows(insert_row, num_rows)
-        print(f"在占位符行（行 {max_placeholder_row}）下方插入 {num_rows} 行，插入位置：行 {insert_row}")
-    else:
-        # 如果没有提供占位符位置，使用原来的逻辑（在章节行下方插入）
-        insert_row = section_row + 1
-        sheet.insert_rows(insert_row, num_rows)
-        print(f"在章节行（行 {section_row}）下方插入 {num_rows} 行，插入位置：行 {insert_row}")
+        # 复制字体
+        if source_cell.font:
+            target_cell.font = openpyxl.styles.Font(
+                name=source_cell.font.name,
+                size=source_cell.font.size,
+                bold=source_cell.font.bold,
+                italic=source_cell.font.italic,
+                color=source_cell.font.color
+            )
+        
+        # 复制填充
+        if source_cell.fill:
+            target_cell.fill = openpyxl.styles.PatternFill(
+                fill_type=source_cell.fill.fill_type,
+                start_color=source_cell.fill.start_color,
+                end_color=source_cell.fill.end_color
+            )
+        
+        # 复制边框
+        if source_cell.border:
+            target_cell.border = openpyxl.styles.Border(
+                left=source_cell.border.left,
+                right=source_cell.border.right,
+                top=source_cell.border.top,
+                bottom=source_cell.border.bottom
+            )
+        
+        # 复制对齐方式
+        if source_cell.alignment:
+            target_cell.alignment = openpyxl.styles.Alignment(
+                horizontal=source_cell.alignment.horizontal,
+                vertical=source_cell.alignment.vertical,
+                wrap_text=source_cell.alignment.wrap_text
+            )
+        
+        # 复制数字格式
+        if source_cell.number_format:
+            target_cell.number_format = source_cell.number_format
 
 
 def fill_work_experience(sheet: openpyxl.worksheet.worksheet.Worksheet, work_data: Dict[str, List], prefound_placeholders: Dict[str, int] = None) -> None:
@@ -404,7 +464,7 @@ def fill_work_experience(sheet: openpyxl.worksheet.worksheet.Worksheet, work_dat
         placeholder_columns = prefound_placeholders
         print(f"使用预先保存的工作经历占位符位置: {placeholder_columns}")
     else:
-        placeholders = ['{{起始时间}}', '{{结束时间}}', '{{公司名称}}', '{{公司职位}}', '{{工作描述}}']
+        placeholders = ['{{work.start}}', '{{work.end}}', '{{work.comp}}', '{{work.pos}}', '{{work.desc}}']
         placeholder_columns = find_placeholder_columns(sheet, section_row, placeholders)
         print(f"重新查找的工作经历占位符位置: {placeholder_columns}")
     
@@ -412,43 +472,73 @@ def fill_work_experience(sheet: openpyxl.worksheet.worksheet.Worksheet, work_dat
         print("未找到工作经历占位符列")
         return
     
-    # 添加新行
+    # 添加新行（数据行数-1，因为占位符行本身算作一行）
     add_experience_rows(sheet, section_row, data_length, placeholder_columns)
     
-    # 找到占位符所在的最大行号，数据填充起始行应该是占位符行下方
+    # 找到占位符所在的最大行号，数据填充起始行应该是占位符行
     max_placeholder_row = section_row
     if placeholder_columns:
         for col in placeholder_columns.values():
             for row in range(section_row + 1, min(section_row + 6, sheet.max_row + 1)):
                 cell = sheet.cell(row=row, column=col)
                 if cell.value and isinstance(cell.value, str):
-                    if any(placeholder in str(cell.value) for placeholder in ['{{', '}}', '{%', '%}']):
-                        max_placeholder_row = max(max_placeholder_row, row)
-                        break
+                    if cell.value and isinstance(cell.value, str):
+                        if any(placeholder in str(cell.value) for placeholder in ['{{', '}}', '{%', '%}']):
+                            max_placeholder_row = max(max_placeholder_row, row)
+                            break
     
-    # 填充数据从占位符行下方开始
-    start_row = max_placeholder_row + 1
+    # 填充数据从占位符行开始（占位符行本身作为第一行数据）
+    start_row = max_placeholder_row
     for i in range(data_length):
         current_row = start_row + i
         
-        # 填充各个字段
-        if '{{起始时间}}' in placeholder_columns and i < len(work_data.get('起始时间', [])):
-            col = placeholder_columns['{{起始时间}}']
-            sheet.cell(row=current_row, column=col, value=work_data['起始时间'][i])
-            
-        if '{{结束时间}}' in placeholder_columns and i < len(work_data.get('结束时间', [])):
+        # 填充各个字段 - 支持两种占位符名称格式
+        # 开始时间/起始时间（统一处理）
+        if '{{work.start}}' in placeholder_columns:
+            time_data = work_data.get('开始时间') or work_data.get('起始时间', [])
+            if i < len(time_data):
+                col = placeholder_columns['{{work.start}}']
+                sheet.cell(row=current_row, column=col, value=time_data[i])
+        elif '{{开始时间}}' in placeholder_columns:
+            time_data = work_data.get('开始时间', [])
+            if i < len(time_data):
+                col = placeholder_columns['{{开始时间}}']
+                sheet.cell(row=current_row, column=col, value=time_data[i])
+        elif '{{起始时间}}' in placeholder_columns:
+            time_data = work_data.get('起始时间', [])
+            if i < len(time_data):
+                col = placeholder_columns['{{起始时间}}']
+                sheet.cell(row=current_row, column=col, value=time_data[i])
+
+        # 结束时间
+        if '{{work.end}}' in placeholder_columns and i < len(work_data.get('结束时间', [])):
+            col = placeholder_columns['{{work.end}}']
+            sheet.cell(row=current_row, column=col, value=work_data['结束时间'][i])
+        elif '{{结束时间}}' in placeholder_columns and i < len(work_data.get('结束时间', [])):
             col = placeholder_columns['{{结束时间}}']
             sheet.cell(row=current_row, column=col, value=work_data['结束时间'][i])
             
-        if '{{公司名称}}' in placeholder_columns and i < len(work_data.get('公司名称', [])):
+        # 公司名称
+        if '{{work.comp}}' in placeholder_columns and i < len(work_data.get('公司名称', [])):
+            col = placeholder_columns['{{work.comp}}']
+            sheet.cell(row=current_row, column=col, value=work_data['公司名称'][i])
+        elif '{{公司名称}}' in placeholder_columns and i < len(work_data.get('公司名称', [])):
             col = placeholder_columns['{{公司名称}}']
             sheet.cell(row=current_row, column=col, value=work_data['公司名称'][i])
             
-        if '{{公司职位}}' in placeholder_columns and i < len(work_data.get('公司职位', [])):
+        # 公司职位
+        if '{{work.pos}}' in placeholder_columns and i < len(work_data.get('公司职位', [])):
+            col = placeholder_columns['{{work.pos}}']
+            sheet.cell(row=current_row, column=col, value=work_data['公司职位'][i])
+        elif '{{公司职位}}' in placeholder_columns and i < len(work_data.get('公司职位', [])):
             col = placeholder_columns['{{公司职位}}']
             sheet.cell(row=current_row, column=col, value=work_data['公司职位'][i])
             
-        if '{{工作描述}}' in placeholder_columns and i < len(work_data.get('工作描述', [])):
+        # 工作描述
+        if '{{work.desc}}' in placeholder_columns and i < len(work_data.get('工作描述', [])):
+            col = placeholder_columns['{{work.desc}}']
+            sheet.cell(row=current_row, column=col, value=work_data['工作描述'][i])
+        elif '{{工作描述}}' in placeholder_columns and i < len(work_data.get('工作描述', [])):
             col = placeholder_columns['{{工作描述}}']
             sheet.cell(row=current_row, column=col, value=work_data['工作描述'][i])
     
@@ -485,7 +575,7 @@ def fill_project_experience(sheet: openpyxl.worksheet.worksheet.Worksheet, proje
         placeholder_columns = prefound_placeholders
         print(f"使用预先保存的项目经历占位符位置: {placeholder_columns}")
     else:
-        placeholders = ['{{项目名称}}', '{{项目描述}}', '{{项目时间}}', '{{项目角色}}']
+        placeholders = ['{{prj.proj}}', '{{prj.desc}}', '{{prj.start}} 至 {{prj.end}}', '{{prj.role}}']
         placeholder_columns = find_placeholder_columns(sheet, section_row, placeholders)
         print(f"重新查找的项目经历占位符位置: {placeholder_columns}")
     
@@ -493,10 +583,10 @@ def fill_project_experience(sheet: openpyxl.worksheet.worksheet.Worksheet, proje
         print("未找到项目经历占位符列")
         return
     
-    # 添加新行
+    # 添加新行（数据行数-1，因为占位符行本身算作一行）
     add_experience_rows(sheet, section_row, data_length, placeholder_columns)
     
-    # 找到占位符所在的最大行号，数据填充起始行应该是占位符行下方
+    # 找到占位符所在的最大行号，数据填充起始行应该是占位符行
     max_placeholder_row = section_row
     if placeholder_columns:
         for col in placeholder_columns.values():
@@ -507,35 +597,43 @@ def fill_project_experience(sheet: openpyxl.worksheet.worksheet.Worksheet, proje
                         max_placeholder_row = max(max_placeholder_row, row)
                         break
     
-    # 填充数据从占位符行下方开始
-    start_row = max_placeholder_row + 1
+    # 填充数据从占位符行开始（占位符行本身作为第一行数据）
+    start_row = max_placeholder_row
     for i in range(data_length):
         current_row = start_row + i
         
-        # 填充各个字段
-        if '{{项目开始时间}}' in placeholder_columns and i < len(project_data['项目开始时间']):
-            col = placeholder_columns['{{项目开始时间}}']
-            sheet.cell(row=current_row, column=col, value=project_data['项目开始时间'][i])
-            
-        if '{{项目结束时间}}' in placeholder_columns and i < len(project_data['项目结束时间']):
-            col = placeholder_columns['{{项目结束时间}}']
-            sheet.cell(row=current_row, column=col, value=project_data['项目结束时间'][i])
-            
-        if '{{项目时间}}' in placeholder_columns and i < len(project_data['项目时间']):
-            col = placeholder_columns['{{项目时间}}']
-            sheet.cell(row=current_row, column=col, value=project_data['项目时间'][i])
-            
-        if '{{项目名称}}' in placeholder_columns and i < len(project_data['项目名称']):
+        # 填充各个字段 - 支持两种占位符名称格式
+        # 项目名称
+        if '{{prj.proj}}' in placeholder_columns and i < len(project_data.get('项目名称', [])):
+            col = placeholder_columns['{{prj.proj}}']
+            sheet.cell(row=current_row, column=col, value=project_data['项目名称'][i])
+        elif '{{项目名称}}' in placeholder_columns and i < len(project_data.get('项目名称', [])):
             col = placeholder_columns['{{项目名称}}']
             sheet.cell(row=current_row, column=col, value=project_data['项目名称'][i])
             
-        if '{{项目角色}}' in placeholder_columns and i < len(project_data['项目角色']):
-            col = placeholder_columns['{{项目角色}}']
-            sheet.cell(row=current_row, column=col, value=project_data['项目角色'][i])
-            
-        if '{{项目描述}}' in placeholder_columns and i < len(project_data['项目描述']):
+        # 项目描述
+        if '{{prj.desc}}' in placeholder_columns and i < len(project_data.get('项目描述', [])):
+            col = placeholder_columns['{{prj.desc}}']
+            sheet.cell(row=current_row, column=col, value=project_data['项目描述'][i])
+        elif '{{项目描述}}' in placeholder_columns and i < len(project_data.get('项目描述', [])):
             col = placeholder_columns['{{项目描述}}']
             sheet.cell(row=current_row, column=col, value=project_data['项目描述'][i])
+            
+        # 项目时间
+        if '{{prj.start}} 至 {{prj.end}}' in placeholder_columns and i < len(project_data.get('项目时间', [])):
+            col = placeholder_columns['{{prj.start}} 至 {{prj.end}}']
+            sheet.cell(row=current_row, column=col, value=project_data['项目时间'][i])
+        elif '{{项目时间}}' in placeholder_columns and i < len(project_data.get('项目时间', [])):
+            col = placeholder_columns['{{项目时间}}']
+            sheet.cell(row=current_row, column=col, value=project_data['项目时间'][i])
+            
+        # 项目角色
+        if '{{prj.role}}' in placeholder_columns and i < len(project_data.get('项目角色', [])):
+            col = placeholder_columns['{{prj.role}}']
+            sheet.cell(row=current_row, column=col, value=project_data['项目角色'][i])
+        elif '{{项目角色}}' in placeholder_columns and i < len(project_data.get('项目角色', [])):
+            col = placeholder_columns['{{项目角色}}']
+            sheet.cell(row=current_row, column=col, value=project_data['项目角色'][i])
     
     print(f"已填充 {data_length} 行项目经历数据")
 
