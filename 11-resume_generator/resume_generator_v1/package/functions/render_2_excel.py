@@ -335,6 +335,65 @@ def find_placeholder_columns(sheet: openpyxl.worksheet.worksheet.Worksheet, sect
     return placeholder_columns
 
 
+def copy_section_format(sheet: openpyxl.worksheet.worksheet.Worksheet) -> None:
+    """
+    复制章节格式：将各章节行的格式复制给对应的数据行
+    特别处理：将工作经历章节行的格式复制给项目经验章节行
+    
+    Args:
+        sheet: Excel工作表对象
+    """
+    # 查找所有章节行
+    sections = []
+    for row in range(1, sheet.max_row + 1):
+        cell = sheet.cell(row=row, column=1)  # 假设章节标题在第一列
+        if cell.value and isinstance(cell.value, str):
+            cell_value = str(cell.value).strip()
+            # 识别章节标题
+            if any(section in cell_value for section in ['工作经历', '工作经验', '项目经历', '项目经验', '教育背景', '专业技能', '自我评价']):
+                sections.append({
+                    'row': row,
+                    'name': cell_value,
+                    'type': 'work' if '工作' in cell_value else 'project' if '项目' in cell_value else 'other'
+                })
+    
+    # 按行号排序
+    sections.sort(key=lambda x: x['row'])
+    
+    print(f"找到章节: {[s['name'] + '(行' + str(s['row']) + ')' for s in sections]}")
+    
+    # 处理每个章节的格式复制
+    for i, section in enumerate(sections):
+        current_row = section['row']
+        
+        # 确定章节结束行（下一个章节行-1，或表格末尾）
+        if i + 1 < len(sections):
+            next_section_row = sections[i + 1]['row']
+            end_row = next_section_row - 1
+        else:
+            end_row = sheet.max_row
+        
+        # 将当前章节行的格式复制给该章节的所有数据行（下一行到结束行）
+        for target_row in range(current_row + 1, end_row + 1):
+            copy_row_format(sheet, current_row, target_row)
+        
+        print(f"已将章节 '{section['name']}'(行{current_row})的格式复制给行{current_row + 1}-{end_row}")
+    
+    # 特别处理：将工作经历章节行的格式复制给项目经验章节行
+    work_section = None
+    project_section = None
+    
+    for section in sections:
+        if section['type'] == 'work':
+            work_section = section
+        elif section['type'] == 'project':
+            project_section = section
+    
+    if work_section and project_section:
+        copy_row_format(sheet, work_section['row'], project_section['row'])
+        print(f"已将工作经历章节行(行{work_section['row']})的格式复制给项目经验章节行(行{project_section['row']})")
+
+
 def add_experience_rows(sheet: openpyxl.worksheet.worksheet.Worksheet, section_row: int, data_length: int, placeholder_columns: Dict[str, int] = None) -> None:
     """
     在章节下方添加新行以容纳经历数据
@@ -370,14 +429,7 @@ def add_experience_rows(sheet: openpyxl.worksheet.worksheet.Worksheet, section_r
     for i in range(rows_to_add):
         sheet.insert_rows(placeholder_row + 1 + i)
     
-    # 复制子标题行（章节行+1）的格式到从占位符行到占位符行+数据行数-1的所有行
-    subtitle_row = section_row + 1  # 子标题行
-    end_row = placeholder_row + data_length - 1  # 结束行（占位符行+新增行数）
-    
-    for row in range(placeholder_row, end_row + 1):
-        copy_row_format(sheet, subtitle_row, row)
-    
-    print(f"已添加 {rows_to_add} 行，并复制了子标题行格式到第 {placeholder_row}-{end_row} 行")
+    print(f"已添加 {rows_to_add} 行在占位符行下方")
 
 
 def copy_row_format(sheet: openpyxl.worksheet.worksheet.Worksheet, source_row: int, target_row: int) -> None:
@@ -853,14 +905,82 @@ def create_person_sheet_with_formatting(template_worksheet: openpyxl.worksheet.w
         project_experience_data = prepare_project_experience_data(person_data)
         print(f"项目经历数据: {project_experience_data}")
         if project_experience_data and any(project_experience_data.values()):
-            print(f"开始处理项目经历数据: {len(project_experience_data.get('开始时间', []))} 条记录")
-        if project_experience_data and any(project_experience_data.values()):
             print(f"开始处理项目经历数据: {len(project_experience_data.get('项目名称', []))} 条记录")
             # 使用预先保存的占位符位置，如果没有则重新查找
             fill_project_experience(new_sheet, project_experience_data, project_placeholder_columns)
             
     except Exception as e:
         print(f"处理工作经历和项目经历时出错: {str(e)}")
+        import traceback
+        traceback.print_exc()
+    
+    # 在所有数据处理完成后，执行章节格式复制
+    try:
+        print("开始执行章节格式复制...")
+        
+        # 查找工作经历和项目经历章节行
+        work_section_row = find_section_row(new_sheet, "工作经验")
+        if not work_section_row:
+            work_section_row = find_section_row(new_sheet, "工作经历")
+        
+        project_section_row = find_section_row(new_sheet, "项目经验")
+        if not project_section_row:
+            project_section_row = find_section_row(new_sheet, "项目经历")
+        
+        # 复制工作经历章节格式到其数据行
+        if work_section_row:
+            # 找到工作经历数据的结束行（下一章节的前一行）
+            work_end_row = None
+            if project_section_row and project_section_row > work_section_row:
+                work_end_row = project_section_row - 1
+            else:
+                # 如果没有项目经历，查找工作经历数据的实际结束行
+                work_end_row = work_section_row
+                for row in range(work_section_row + 1, new_sheet.max_row + 1):
+                    has_data = False
+                    for col in range(1, new_sheet.max_column + 1):
+                        cell = new_sheet.cell(row=row, column=col)
+                        if cell.value and str(cell.value).strip():
+                            has_data = True
+                            break
+                    if has_data:
+                        work_end_row = row
+                    else:
+                        break
+            
+            if work_end_row and work_end_row > work_section_row:
+                copy_section_format(new_sheet, work_section_row, work_section_row + 1, work_end_row)
+                print(f"已复制工作经历章节行 {work_section_row} 格式到数据行 {work_section_row + 1}-{work_end_row}")
+        
+        # 将工作经历章节格式复制到项目经验章节行
+        if work_section_row and project_section_row:
+            copy_section_format(new_sheet, work_section_row, project_section_row, project_section_row)
+            print(f"已复制工作经历章节行 {work_section_row} 格式到项目经验章节行 {project_section_row}")
+        
+        # 复制项目经历章节格式到其数据行
+        if project_section_row:
+            # 找到项目经历数据的结束行
+            project_end_row = project_section_row
+            for row in range(project_section_row + 1, new_sheet.max_row + 1):
+                has_data = False
+                for col in range(1, new_sheet.max_column + 1):
+                    cell = new_sheet.cell(row=row, column=col)
+                    if cell.value and str(cell.value).strip():
+                        has_data = True
+                        break
+                if has_data:
+                    project_end_row = row
+                else:
+                    break
+            
+            if project_end_row and project_end_row > project_section_row:
+                copy_section_format(new_sheet, project_section_row, project_section_row + 1, project_end_row)
+                print(f"已复制项目经历章节行 {project_section_row} 格式到数据行 {project_section_row + 1}-{project_end_row}")
+        
+        print("章节格式复制完成")
+        
+    except Exception as e:
+        print(f"执行章节格式复制时出错: {str(e)}")
         import traceback
         traceback.print_exc()
     
