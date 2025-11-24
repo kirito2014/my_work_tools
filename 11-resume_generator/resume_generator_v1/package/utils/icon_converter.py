@@ -12,10 +12,10 @@ import tempfile
 
 def convert_png_to_ico(png_path, ico_path=None, size=64):
     """
-    将 PNG 文件转换为 ICO 图标文件
+    将 PNG 或 JPG 文件转换为 ICO 图标文件，先将图像裁剪为正方形
     
     参数:
-        png_path: PNG 文件路径
+        png_path: 图像文件路径（支持 PNG 或 JPG/JPEG）
         ico_path: 输出 ICO 文件路径（可选）
         size: 图标尺寸，默认 64x64
     
@@ -28,8 +28,10 @@ def convert_png_to_ico(png_path, ico_path=None, size=64):
             print(f"错误: 文件不存在 - {png_path}")
             return False
         
-        if not png_path.lower().endswith('.png'):
-            print(f"错误: 文件不是 PNG 格式 - {png_path}")
+        # 检查文件格式
+        file_ext = os.path.splitext(png_path)[1].lower()
+        if file_ext not in ['.png', '.jpg', '.jpeg']:
+            print(f"错误: 文件不是支持的格式（PNG/JPG）- {png_path}")
             return False
         
         # 生成输出路径
@@ -40,12 +42,28 @@ def convert_png_to_ico(png_path, ico_path=None, size=64):
         print(f"正在转换: {os.path.basename(png_path)} -> ICO格式")
         
         try:
-            # 使用 PIL 打开 PNG 并转换为 ICO
+            # 使用 PIL 打开图像
             with Image.open(png_path) as img:
-                # 调整图像大小
-                img_resized = img.resize((size, size), Image.LANCZOS)
+                # 1. 裁剪为正方形
+                width, height = img.size
                 
-                # 确保图像模式适合 ICO 格式
+                # 计算正方形的大小（取最小的边长）
+                min_side = min(width, height)
+                
+                # 计算裁剪区域的中心点
+                left = (width - min_side) // 2
+                top = (height - min_side) // 2
+                right = left + min_side
+                bottom = top + min_side
+                
+                # 裁剪图像为正方形
+                img_cropped = img.crop((left, top, right, bottom))
+                print(f"  裁剪为正方形: {min_side}x{min_side} 像素")
+                
+                # 2. 调整图像大小到指定尺寸
+                img_resized = img_cropped.resize((size, size), Image.LANCZOS)
+                
+                # 3. 确保图像模式适合 ICO 格式
                 if img_resized.mode in ('RGBA', 'LA') or (img_resized.mode == 'P' and 'transparency' in img_resized.info):
                     # 保持透明度
                     ico_img = img_resized
@@ -53,7 +71,7 @@ def convert_png_to_ico(png_path, ico_path=None, size=64):
                     # 转换为 RGB 模式
                     ico_img = img_resized.convert('RGB')
                 
-                # 保存为 ICO 文件
+                # 4. 保存为 ICO 文件
                 ico_img.save(ico_path, format='ICO', sizes=[(size, size)])
             
             print(f"[OK] 转换完成: {os.path.basename(ico_path)}")
@@ -77,8 +95,8 @@ def convert_png_to_ico(png_path, ico_path=None, size=64):
             img.save(ico_path, format='ICO', sizes=[(size, size)])
             
             print(f"[OK] 创建了占位ICO文件: {os.path.basename(ico_path)}")
-            print("  警告: 无法正常处理PNG文件")
-            print("  建议: 检查PNG文件是否损坏或格式正确")
+            print("  警告: 无法正常处理图像文件")
+            print("  建议: 检查图像文件是否损坏或格式正确")
             
             return True
                 
@@ -88,12 +106,13 @@ def convert_png_to_ico(png_path, ico_path=None, size=64):
 
 def batch_convert_png_to_ico(input_folder, output_folder=None, size=64):
     """
-    批量转换文件夹中的所有 PNG 文件为 ICO 图标
+    批量将图像文件转换为ICO图标文件
+    支持 PNG 和 JPG/JPEG 格式
     
     参数:
         input_folder: 输入文件夹路径
         output_folder: 输出文件夹路径（可选）
-        size: 图标尺寸
+        size: 图标尺寸，默认 64x64
     
     返回:
         int: 成功转换的文件数量
@@ -107,60 +126,63 @@ def batch_convert_png_to_ico(input_folder, output_folder=None, size=64):
     else:
         os.makedirs(output_folder, exist_ok=True)
     
-    # 查找所有 PNG 文件
-    png_files = []
+    # 查找所有 PNG 和 JPG 文件
+    image_files = []
     for filename in os.listdir(input_folder):
-        if filename.lower().endswith('.png'):
-            png_files.append(filename)
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            image_files.append(filename)
     
-    if not png_files:
-        print("未找到 PNG 文件")
+    if not image_files:
+        print("未找到 PNG 或 JPG 文件")
         return 0
     
-    print(f"找到 {len(png_files)} 个 PNG 文件")
+    print(f"找到 {len(image_files)} 个图像文件")
     print("开始批量转换...")
     print("-" * 50)
     
     success_count = 0
     
-    for png_filename in png_files:
-        png_path = os.path.join(input_folder, png_filename)
+    for image_filename in image_files:
+        image_path = os.path.join(input_folder, image_filename)
         
         # 生成输出路径
-        base_name = os.path.splitext(png_filename)[0]
+        base_name = os.path.splitext(image_filename)[0]
         ico_filename = base_name + ".ico"
         ico_path = os.path.join(output_folder, ico_filename)
         
-        if convert_png_to_ico(png_path, ico_path, size):
+        if convert_png_to_ico(image_path, ico_path, size):
             success_count += 1
     
     print("-" * 50)
-    print(f"批量转换完成! 成功转换 {success_count}/{len(png_files)} 个文件")
+    print(f"批量转换完成! 成功转换 {success_count}/{len(image_files)} 个文件")
     
     return success_count
 
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(
-        description="PNG 转 ICO 转换器 - 将 PNG 文件转换为 ICO 图标",
+        description="图像转 ICO 转换器 - 将 PNG 或 JPG 文件转换为 ICO 图标",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
   # 转换单个文件
   %(prog)s image.png
+  %(prog)s image.jpg
   %(prog)s input.png output.ico
+  %(prog)s input.jpg output.ico
   
   # 转换单个文件并指定尺寸
   %(prog)s image.png -s 128
+  %(prog)s image.jpg -s 128
   
   # 批量转换文件夹
-  %(prog)s /path/to/png/folder -b
-  %(prog)s /path/to/png/folder -b -o /path/to/output/folder
+  %(prog)s /path/to/image/folder -b
+  %(prog)s /path/to/image/folder -b -o /path/to/output/folder
   
   # 递归批量转换
   %(prog)s /path/to/folder -b -r
-        """
-    )
+        """)
+    
     
     parser.add_argument(
         'input',

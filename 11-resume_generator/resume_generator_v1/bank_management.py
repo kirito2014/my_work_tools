@@ -86,14 +86,14 @@ class BankManagementDialog:
         main_frame = ttk.Frame(self.root, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # 1. PNG文件选择部分
-        png_frame = ttk.LabelFrame(main_frame, text="PNG文件选择", padding="10")
-        png_frame.pack(fill=tk.X, pady=10)
+        # 1. 图像文件选择部分
+        image_frame = ttk.LabelFrame(main_frame, text="图像文件选择", padding="10")
+        image_frame.pack(fill=tk.X, pady=10)
         
-        ttk.Label(png_frame, text="PNG图片路径:", font=self.font_config['label']).pack(side=tk.LEFT, padx=5)
+        ttk.Label(image_frame, text="图像路径:", font=self.font_config['label']).pack(side=tk.LEFT, padx=5)
         self.bank_png_path = tk.StringVar()
-        ttk.Entry(png_frame, textvariable=self.bank_png_path, width=50, font=self.font_config['entry']).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        ttk.Button(png_frame, text="浏览", command=self._select_png_file).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(image_frame, textvariable=self.bank_png_path, width=50, font=self.font_config['entry']).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        ttk.Button(image_frame, text="浏览", command=self._select_png_file).pack(side=tk.LEFT, padx=5)
         
         # 2. 银行名称输入部分
         name_frame = ttk.LabelFrame(main_frame, text="银行信息", padding="10")
@@ -154,15 +154,19 @@ class BankManagementDialog:
         style.configure("Accent.TButton", foreground="#0078D7")  # 设置强调按钮的前景色
     
     def _select_png_file(self):
-        """选择PNG文件"""
+        """选择图像文件（支持PNG和JPG格式）"""
         # 确保窗口在对话框打开前获得焦点
         self.root.lift()
         self.root.focus_force()
         
         file_path = filedialog.askopenfilename(
-            filetypes=[("PNG图片", "*.png")],
+            filetypes=[
+                ("图片文件", "*.png;*.jpg;*.jpeg"),
+                ("PNG图片", "*.png"),
+                ("JPG图片", "*.jpg;*.jpeg")
+            ],
             parent=self.root,
-            title="选择银行PNG图标"
+            title="选择银行图标"
         )
         
         if file_path:
@@ -222,7 +226,7 @@ class BankManagementDialog:
         
         # 验证输入
         if not png_path:
-            messagebox.showerror("错误", "请选择PNG文件")
+            messagebox.showerror("错误", "请选择图像文件")
             return
         
         if not bank_name:
@@ -230,7 +234,13 @@ class BankManagementDialog:
             return
         
         if not os.path.exists(png_path):
-            messagebox.showerror("错误", "选择的PNG文件不存在")
+            messagebox.showerror("错误", "选择的图像文件不存在")
+            return
+        
+        # 检查文件格式
+        file_ext = os.path.splitext(png_path)[1].lower()
+        if file_ext not in ['.png', '.jpg', '.jpeg']:
+            messagebox.showerror("错误", "请选择PNG或JPG格式的图像文件")
             return
         
         # 清空日志
