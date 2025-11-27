@@ -228,6 +228,11 @@ class DocumentMerger:
             for i, file_path in enumerate(remaining_files, 1):
                 try:
                     doc = Document(file_path)
+                    
+                    # 在追加文档之前添加分页符
+                    from docx.enum.text import WD_BREAK
+                    composer.doc.add_page_break()
+                    
                     composer.append(doc)
                     success_count += 1
                     
@@ -302,6 +307,10 @@ class DocumentMerger:
             # 执行合并
             if use_win32com:
                 success = self.merge_with_win32com(file_list, output_path)
+                # 如果win32com失败，尝试使用docxcompose
+                if not success:
+                    self.logger.info("win32com合并失败，尝试使用docxcompose")
+                    success = self.merge_with_docxcompose(file_list, output_path)
             else:
                 success = self.merge_with_docxcompose(file_list, output_path)
             

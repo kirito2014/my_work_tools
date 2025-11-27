@@ -6,6 +6,7 @@ import sys
 import json
 import subprocess
 import threading
+import logging
 from datetime import datetime, date
 import socket  # 用于进程锁检查
 # 导入PIL用于图像处理
@@ -181,7 +182,13 @@ class ResumeGeneratorGUI:
         
         # 创建文件菜单
         file_menu = tk.Menu(menubar, tearoff=0, font=self.font_config['button'])
-        file_menu.add_command(label="预处理", command=self._show_preprocess_dialog)
+        
+        # 创建预处理子菜单
+        preprocess_menu = tk.Menu(file_menu, tearoff=0, font=self.font_config['button'])
+        preprocess_menu.add_command(label="文档预处理", command=self._show_preprocess_dialog)
+        preprocess_menu.add_command(label="文件合并", command=self._show_file_merge_dialog)
+        
+        file_menu.add_cascade(label="文件处理", menu=preprocess_menu)
         file_menu.add_separator()
         file_menu.add_command(label="退出", command=self._quit_app)
         
@@ -626,7 +633,261 @@ class ResumeGeneratorGUI:
         finally:
             # 无论如何都将文本框设置为只读状态
             self.preprocess_log.config(state=tk.DISABLED)
+    
+    def _show_file_merge_dialog(self):
+        """显示文件合并对话框"""
+        # 创建新窗口
+        self.merge_dialog = tk.Toplevel(self.root)
+        self.merge_dialog.title("简历文档合并")
+        self.merge_dialog.geometry("800x700")
+        self.merge_dialog.resizable(False, False)
         
+        # 设置字体
+        dialog_font = self.font_config['label']
+        
+        # 创建主框架
+        main_frame = ttk.Frame(self.merge_dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 1. 文件夹选择部分
+        folder_frame = ttk.LabelFrame(main_frame, text="文件夹选择", padding="10")
+        folder_frame.pack(fill=tk.X, pady=10)
+        
+        # 简历文件夹选择
+        resume_folder_frame = ttk.Frame(folder_frame)
+        resume_folder_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(resume_folder_frame, text="生成完毕的简历文件夹:", font=dialog_font).pack(side=tk.LEFT, padx=5)
+        self.merge_resume_folder = tk.StringVar()
+        ttk.Entry(resume_folder_frame, textvariable=self.merge_resume_folder, width=40, font=dialog_font).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        ttk.Button(resume_folder_frame, text="浏览", command=lambda: self._select_folder(self.merge_resume_folder)).pack(side=tk.LEFT, padx=5)
+        ttk.Button(resume_folder_frame, text="确认选择", command=self._confirm_merge_folder).pack(side=tk.LEFT, padx=5)
+        
+        # 2. 日期选择部分
+        date_frame = ttk.LabelFrame(main_frame, text="日期选择", padding="10")
+        date_frame.pack(fill=tk.X, pady=10)
+        
+        # 日期下拉框
+        date_select_frame = ttk.Frame(date_frame)
+        date_select_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(date_select_frame, text="选择目标日期:", font=dialog_font).pack(side=tk.LEFT, padx=5)
+        self.merge_date_var = tk.StringVar(value="请先选择文件夹")
+        self.merge_date_combobox = ttk.Combobox(date_select_frame, textvariable=self.merge_date_var, state="readonly", font=dialog_font, width=20)
+        self.merge_date_combobox.pack(side=tk.LEFT, padx=5)
+        
+        # 3. 执行操作部分
+        action_frame = ttk.LabelFrame(main_frame, text="执行操作", padding="10")
+        action_frame.pack(fill=tk.X, pady=10)
+        
+        # 执行合并按钮
+        button_frame = ttk.Frame(action_frame)
+        button_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Button(button_frame, text="执行合并", command=self._execute_file_merge, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="取消", command=self.merge_dialog.destroy).pack(side=tk.LEFT, padx=5)
+        
+        # 4. 进度条
+        progress_frame = ttk.LabelFrame(main_frame, text="合并进度", padding="10")
+        progress_frame.pack(fill=tk.X, pady=10)
+        
+        self.merge_progress_var = tk.DoubleVar()
+        self.merge_progress_bar = ttk.Progressbar(progress_frame, variable=self.merge_progress_var, length=100, mode='determinate')
+        self.merge_progress_bar.pack(fill=tk.X, expand=True)
+        
+        self.merge_progress_label = ttk.Label(progress_frame, text="0%")
+        self.merge_progress_label.pack(pady=5)
+        
+        # 5. 日志显示部分
+        log_frame = ttk.LabelFrame(main_frame, text="执行日志", padding="10")
+        log_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        # 创建日志文本框
+        self.merge_log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, font=self.font_config['text'])
+        self.merge_log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.merge_log_text.config(state=tk.DISABLED)
+        
+        # 居中显示
+        self.merge_dialog.transient(self.root)
+        self.merge_dialog.grab_set()
+    
+    def _confirm_merge_folder(self):
+        """确认选择文件夹并分析日期"""
+        folder_path = self.merge_resume_folder.get()
+        
+        if not folder_path or not os.path.exists(folder_path):
+            messagebox.showerror("错误", "请选择有效的简历文件夹")
+            return
+        
+        # 清空日志
+        self._merge_log("开始分析文件夹...")
+        
+        # 在后台线程中分析文件日期
+        threading.Thread(target=self._analyze_file_dates, args=(folder_path,), daemon=True).start()
+    
+    def _analyze_file_dates(self, folder_path):
+        """分析文件夹中的文件，提取所有日期"""
+        try:
+            self._merge_log(f"正在扫描文件夹: {folder_path}")
+            
+            # 获取所有docx文件
+            docx_files = []
+            for root, _, files in os.walk(folder_path):
+                for file in files:
+                    if file.lower().endswith('.docx') and not file.startswith('~$'):
+                        docx_files.append(os.path.join(root, file))
+            
+            total_files = len(docx_files)
+            self._merge_log(f"找到 {total_files} 个docx文件")
+            
+            # 提取日期
+            dates = set()
+            for file_path in docx_files:
+                filename = os.path.basename(file_path)
+                # 解析文件名格式: XX银行人员简历_人员名称_20251120.docx
+                try:
+                    basename = os.path.splitext(filename)[0]
+                    parts = basename.split('_')
+                    if len(parts) >= 3:
+                        date_str = parts[2]
+                        # 验证日期格式
+                        if len(date_str) == 8 and date_str.isdigit():
+                            dates.add(date_str)
+                except Exception as e:
+                    self._merge_log(f"解析文件名失败: {filename}, 错误: {str(e)}")
+            
+            # 转换为排序后的列表
+            sorted_dates = sorted(dates, reverse=True)
+            
+            # 更新UI
+            self.merge_dialog.after(0, lambda: self._update_date_combobox(sorted_dates))
+            
+        except Exception as e:
+            error_msg = f"分析文件日期时出错: {str(e)}"
+            self._merge_log(f"[ERROR] {error_msg}")
+            self.merge_dialog.after(0, lambda: messagebox.showerror("错误", error_msg))
+    
+    def _update_date_combobox(self, dates):
+        """更新日期下拉框"""
+        if not dates:
+            self.merge_date_combobox['values'] = []
+            self.merge_date_var.set("未找到有效日期")
+            self._merge_log("未找到有效日期的文件")
+            return
+        
+        self.merge_date_combobox['values'] = dates
+        self.merge_date_var.set(dates[0])  # 默认选择最新日期
+        self._merge_log(f"找到 {len(dates)} 个不同日期")
+    
+    def _execute_file_merge(self):
+        """执行文件合并"""
+        folder_path = self.merge_resume_folder.get()
+        target_date = self.merge_date_var.get()
+        
+        # 验证输入
+        if not folder_path or not os.path.exists(folder_path):
+            messagebox.showerror("错误", "请选择有效的简历文件夹")
+            return
+        
+        if target_date in ["请先选择文件夹", "未找到有效日期"]:
+            messagebox.showerror("错误", "请选择目标日期")
+            return
+        
+        # 清空日志
+        self._merge_log("开始执行文件合并...")
+        
+        # 重置进度条
+        self.merge_progress_var.set(0)
+        self.merge_progress_label.config(text="0%")
+        
+        # 在后台线程中执行合并
+        threading.Thread(target=self._file_merge_thread, args=(folder_path, target_date), daemon=True).start()
+    
+    def _file_merge_thread(self, folder_path, target_date):
+        """文件合并线程"""
+        try:
+            self._merge_log(f"合并参数: 文件夹={folder_path}, 目标日期={target_date}")
+            
+            # 动态导入merge_files模块
+            merge_module = None
+            try:
+                from package.functions import merge_files
+                merge_module = merge_files
+            except ImportError:
+                # 尝试动态加载
+                merge_path = os.path.join(base_dir, "package", "functions", "merge_files.py")
+                if os.path.exists(merge_path):
+                    import importlib.util
+                    spec = importlib.util.spec_from_file_location("merge_files", merge_path)
+                    merge_module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(merge_module)
+                else:
+                    self._merge_log(f"[ERROR] 未找到merge_files.py文件: {merge_path}")
+                    messagebox.showerror("错误", "未找到merge_files模块")
+                    return
+            
+            # 创建合并器实例
+            merger = merge_module.DocumentMerger(log_level=logging.INFO)
+            
+            # 重定向日志
+            gui_instance = self
+            class LogHandler(logging.Handler):
+                def emit(self, record):
+                    gui_instance._merge_log(record.getMessage())
+            
+            log_handler = LogHandler()
+            log_handler.setLevel(logging.INFO)
+            merger.logger.addHandler(log_handler)
+            
+            # 执行合并
+            result = merger.merge_files(folder_path, target_date)
+            
+            # 更新进度
+            self.merge_dialog.after(0, lambda: self._update_merge_progress(100))
+            
+            # 显示结果
+            if result["status"] == "completed":
+                success_count = len([v for v in result["details"].values() if v["success"]])
+                total_count = len(result["details"])
+                self._merge_log(f"合并完成! 成功: {success_count}/{total_count} 个银行")
+                
+                # 显示详细结果
+                for bank_name, detail in result.get("details", {}).items():
+                    status = "成功" if detail["success"] else "失败"
+                    self._merge_log(f"  {bank_name}: {status} ({detail['input_files']} 个文件) -> {detail['output_path']}")
+                
+                messagebox.showinfo("完成", f"文件合并完成!\n成功: {success_count}/{total_count} 个银行")
+            else:
+                self._merge_log("[WARNING] 没有找到符合条件的文件")
+                messagebox.showwarning("警告", "没有找到符合条件的文件")
+                
+        except Exception as e:
+            error_msg = f"合并过程中出错: {str(e)}"
+            self._merge_log(f"[ERROR] {error_msg}")
+            import traceback
+            self._merge_log(traceback.format_exc())
+            messagebox.showerror("错误", error_msg)
+    
+    def _merge_log(self, message):
+        """向合并日志添加消息"""
+        def append_log():
+            if self.merge_dialog.winfo_exists():
+                self.merge_log_text.config(state=tk.NORMAL)
+                self.merge_log_text.insert(tk.END, message + "\n")
+                self.merge_log_text.see(tk.END)
+                self.merge_log_text.config(state=tk.DISABLED)
+        
+        self.merge_dialog.after(0, append_log)
+    
+    def _update_merge_progress(self, value):
+        """更新合并进度条"""
+        def update():
+            if self.merge_dialog.winfo_exists():
+                self.merge_progress_var.set(value)
+                self.merge_progress_label.config(text=f"{value}%")
+        
+        self.merge_dialog.after(0, update)
+    
     def _setup_fonts(self):
         # 设置中文字体为微软雅黑
         self.font_config['title'] = ('Microsoft YaHei', 12, 'bold')
