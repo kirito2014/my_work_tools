@@ -148,57 +148,111 @@ class DocumentMerger:
                 self.logger.error(f"删除文件失败: {file_path}, 错误: {str(e)}")
     
     def merge_with_win32com(self, file_list: List[str], output_path: str) -> bool:
-        """使用win32com合并文档"""
+        """使用win32com合并文档（优化版）"""
         self.logger.info("使用win32com进行合并...")
         
+        word = None
+        merged_doc = None
+        
         try:
-            word = win32.gencache.EnsureDispatch('Word.Application')
+            import pythoncom
+            import time
+            
+            # 初始化COM
+            pythoncom.CoInitialize()
+            
+            # 先清理可能的Word进程
+            self.cleanup_word_processes()
+            
+            # 创建Word实例（使用DispatchEx替代EnsureDispatch）
+            try:
+                word = win32.DispatchEx('Word.Application')
+            except:
+                word = win32.gencache.EnsureDispatch('Word.Application')
+                
             word.Visible = False
             word.DisplayAlerts = False
+            word.ScreenUpdating = False  # 禁用屏幕更新提高性能
+            
+            self.logger.info(f"✓ 成功创建Word实例，版本: {word.Version}")
             
             # 创建新文档
             merged_doc = word.Documents.Add()
-            
-            # 设置进度条
-            if TQDM_AVAILABLE:
-                file_iter = tqdm(file_list, desc="win32com合并")
-            else:
-                file_iter = file_list
-                self.logger.info(f"开始合并 {len(file_list)} 个文件")
+            self.logger.info("✓ 成功创建合并目标文档")
             
             success_count = 0
-            for i, file_path in enumerate(file_iter):
-                try:
-                    selection = word.Selection
-                    
-                    # 插入文件（保留所有格式）
-                    selection.InsertFile(file_path)
-                    
-                    # 在文档间添加分节符（最后一个不添加）
-                    if i < len(file_list) - 1:
-                        selection.InsertBreak(2)  # 2 = 分节符下一页
-                    
-                    success_count += 1
-                    
-                    # 每处理10个文件清理一次内存
-                    if success_count % 10 == 0:
-                        gc.collect()
+            max_retries = 2  # 重试机制
+            
+            for i, file_path in enumerate(file_list):
+                for retry in range(max_retries):
+                    try:
+                        self.logger.debug(f"正在处理文件: {os.path.basename(file_path)}")
                         
-                except Exception as e:
-                    self.logger.error(f"处理文件失败: {os.path.basename(file_path)}, 错误: {str(e)}")
-                    continue
+                        # 检查Word连接状态
+                        try:
+                            _ = word.Version
+                        except:
+                            self.logger.warning("Word连接丢失，尝试重新连接...")
+                            self.cleanup_word_processes()
+                            pythoncom.CoUninitialize()
+                            pythoncom.CoInitialize()
+                            word = win32.DispatchEx('Word.Application')
+                            word.Visible = False
+                            word.DisplayAlerts = False
+                            word.ScreenUpdating = False
+                        
+                        # 插入文件
+                        word.Selection.InsertFile(file_path)
+                        
+                        # 在文档间添加分节符（最后一个不添加）
+                        if i < len(file_list) - 1:
+                            word.Selection.InsertBreak(2)  # 2 = 分节符下一页
+                        
+                        success_count += 1
+                        self.logger.debug(f"✓ 成功处理文件: {os.path.basename(file_path)}")
+                        break  # 成功则跳出重试循环
+                        
+                    except Exception as e:
+                        self.logger.warning(f"处理文件失败(尝试 {retry+1}/{max_retries}): {os.path.basename(file_path)}, 错误: {str(e)}")
+                        
+                        if retry == max_retries - 1:  # 最后一次尝试
+                            self.logger.error(f"文件处理最终失败: {os.path.basename(file_path)}")
+                            continue
+                        
+                        # 重试前清理
+                        self.cleanup_word_processes()
+                        time.sleep(1)
             
-            # 保存文档
-            merged_doc.SaveAs(output_path)
-            merged_doc.Close()
-            word.Quit()
+            # 保存文档（增加错误处理）
+            try:
+                self.logger.info(f"正在保存最终合并文档到: {output_path}")
+                # 确保输出目录存在
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                merged_doc.SaveAs(output_path)
+                self.logger.info("✓ 文档保存成功")
+            except Exception as save_error:
+                self.logger.error(f"保存文档失败: {str(save_error)}")
+                # 尝试另存为临时位置
+                try:
+                    temp_path = output_path + ".temp.docx"
+                    merged_doc.SaveAs(temp_path)
+                    if os.path.exists(temp_path):
+                        import shutil
+                        shutil.move(temp_path, output_path)
+                        self.logger.info("✓ 通过临时文件保存成功")
+                except Exception as temp_error:
+                    self.logger.error(f"临时保存也失败: {str(temp_error)}")
+                    return False
             
-            self.logger.info(f"win32com合并完成: 成功 {success_count}/{len(file_list)} 个文件")
             return success_count > 0
             
         except Exception as e:
             self.logger.error(f"win32com合并失败: {str(e)}")
+            import traceback
+            self.logger.error(f"错误详情: {traceback.format_exc()}")
             return False
+        finally:
+            self.safe_cleanup_word(word, merged_doc)
     
     def merge_with_docxcompose(self, file_list: List[str], output_path: str) -> bool:
         """使用docxcompose合并文档"""
@@ -291,6 +345,13 @@ class DocumentMerger:
         for bank_name, file_list in classified_files.items():
             self.logger.info(f"处理银行: {bank_name}, 文件数: {len(file_list)}")
             
+            # 智能选择合并方法
+            if use_win32com is None:
+                merge_strategy = self.smart_merge_selection(file_list, bank_name)
+                use_win32com_local = (merge_strategy == 'win32com')
+            else:
+                use_win32com_local = use_win32com
+            
             # 创建输出文件夹
             output_folder = self.create_output_folder(input_folder, bank_name)
             
@@ -304,12 +365,11 @@ class DocumentMerger:
             # 按文件名排序
             file_list.sort()
             
-            # 执行合并
-            if use_win32com:
+            # 执行合并（带降级策略）
+            if use_win32com_local:
                 success = self.merge_with_win32com(file_list, output_path)
-                # 如果win32com失败，尝试使用docxcompose
                 if not success:
-                    self.logger.info("win32com合并失败，尝试使用docxcompose")
+                    self.logger.info("win32com合并失败，降级使用docxcompose")
                     success = self.merge_with_docxcompose(file_list, output_path)
             else:
                 success = self.merge_with_docxcompose(file_list, output_path)
@@ -338,7 +398,123 @@ class DocumentMerger:
             "details": results
         }
 
+    def health_check(self) -> Dict[str, bool]:
+        """系统健康检查"""
+        health_status = {
+            'win32com_available': False,
+            'word_running': False,
+            'memory_adequate': True
+        }
+        
+        # 检查win32com
+        try:
+            import win32com.client as win32
+            word = win32.DispatchEx('Word.Application')
+            health_status['win32com_available'] = True
+            word.Quit()
+        except:
+            pass
+        
+        # 检查Word进程
+        try:
+            import psutil
+            for proc in psutil.process_iter(['name']):
+                if 'winword' in proc.info['name'].lower():
+                    health_status['word_running'] = True
+                    break
+        except:
+            pass
+        
+        # 检查内存
+        memory_usage = self.get_memory_usage()
+        if memory_usage > 1000:  # 超过1GB
+            health_status['memory_adequate'] = False
+        
+        return health_status
 
+    def pre_merge_preparation(self):
+        """合并前准备"""
+        health = self.health_check()
+        
+        if health['word_running']:
+            self.logger.warning("检测到正在运行的Word进程，建议先关闭")
+            self.cleanup_word_processes()
+        
+        if not health['memory_adequate']:
+            self.logger.warning("内存使用较高，建议关闭其他应用程序")
+            gc.collect()
+    def cleanup_word_processes(self):
+        """清理Word进程"""
+        try:
+            import subprocess
+            # 在Windows上强制结束Word进程
+            if os.name == 'nt':
+                subprocess.run(['taskkill', '/f', '/im', 'winword.exe'], 
+                            capture_output=True, timeout=10)
+            # 在macOS/Linux上
+            else:
+                subprocess.run(['pkill', '-f', 'Microsoft Word'], 
+                            capture_output=True, timeout=10)
+            time.sleep(2)  # 等待进程完全结束
+            self.logger.info("✓ 已清理Word进程")
+        except Exception as e:
+            self.logger.debug(f"清理Word进程时出现警告: {str(e)}")
+
+    def safe_cleanup_word(self, word_app, document):
+        """安全清理Word资源"""
+        try:
+            if document:
+                document.Close(SaveChanges=False)
+        except:
+            pass
+        
+        try:
+            if word_app:
+                # 先尝试正常退出
+                word_app.Quit()
+        except:
+            pass
+        
+        try:
+            # 强制清理进程
+            self.cleanup_word_processes()
+        except:
+            pass
+        
+        try:
+            import pythoncom
+            pythoncom.CoUninitialize()
+        except:
+            pass
+        
+        # 强制垃圾回收
+        gc.collect()
+        self.logger.debug("✓ 已完成Word资源清理")
+    def smart_merge_selection(self, file_list: List[str], bank_name: str) -> str:
+        """
+        智能选择合并策略
+        返回: 'win32com', 'docxcompose', 或 'fallback'
+        """
+        # 小文件数量优先使用win32com
+        if len(file_list) <= 10:
+            if self.win32_available:
+                return 'win32com'
+        
+        # 大文件数量使用docxcompose避免内存问题
+        elif len(file_list) > 30:
+            return 'docxcompose'
+        
+        # 中等数量根据系统资源决定
+        else:
+            memory_usage = self.get_memory_usage()
+            if memory_usage < 500 and self.win32_available:  # 内存充足
+                return 'win32com'
+            else:
+                return 'docxcompose'
+        
+        return 'docxcompose'  # 默认回退
+
+        
 # 使用示例和测试代码
 if __name__ == "__main__":
     def main():
