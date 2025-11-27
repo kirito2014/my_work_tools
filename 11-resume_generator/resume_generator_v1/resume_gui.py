@@ -186,7 +186,7 @@ class ResumeGeneratorGUI:
         # 创建预处理子菜单
         preprocess_menu = tk.Menu(file_menu, tearoff=0, font=self.font_config['button'])
         preprocess_menu.add_command(label="文档预处理", command=self._show_preprocess_dialog)
-        preprocess_menu.add_command(label="文件合并", command=self._show_file_merge_dialog)
+        preprocess_menu.add_command(label="合并文件处理", command=self._show_file_merge_dialog)
         
         file_menu.add_cascade(label="文件处理", menu=preprocess_menu)
         file_menu.add_separator()
@@ -638,7 +638,7 @@ class ResumeGeneratorGUI:
         """显示文件合并对话框"""
         # 创建新窗口
         self.merge_dialog = tk.Toplevel(self.root)
-        self.merge_dialog.title("简历文档合并")
+        self.merge_dialog.title("简历文档合并与删除")
         self.merge_dialog.geometry("800x700")
         self.merge_dialog.resizable(False, False)
         
@@ -675,6 +675,9 @@ class ResumeGeneratorGUI:
         self.merge_date_var = tk.StringVar(value="请先选择文件夹")
         self.merge_date_combobox = ttk.Combobox(date_select_frame, textvariable=self.merge_date_var, state="readonly", font=dialog_font, width=20)
         self.merge_date_combobox.pack(side=tk.LEFT, padx=5)
+        
+        # 添加删除按钮
+        ttk.Button(date_select_frame, text="删除该日期文件", command=self._delete_selected_date_files, style="Danger.TButton").pack(side=tk.LEFT, padx=5)
         
         # 3. 执行操作部分
         action_frame = ttk.LabelFrame(main_frame, text="执行操作", padding="10")
@@ -888,6 +891,67 @@ class ResumeGeneratorGUI:
         
         self.merge_dialog.after(0, update)
     
+    def _delete_selected_date_files(self):
+        """删除所选日期下的所有文件"""
+        folder_path = self.merge_resume_folder.get()
+        target_date = self.merge_date_var.get()
+        
+        # 验证输入
+        if not folder_path or not os.path.exists(folder_path):
+            messagebox.showerror("错误", "请先选择有效的简历文件夹")
+            return
+        
+        if target_date in ["请先选择文件夹", "未找到有效日期"]:
+            messagebox.showerror("错误", "请先选择目标日期")
+            return
+        
+        # 查找对应日期的文件
+        files_to_delete = []
+        for root, _, files in os.walk(folder_path):
+            for file in files:
+                if file.lower().endswith('.docx') and not file.startswith('~$'):
+                    # 检查文件名是否包含目标日期
+                    if f"_{target_date}.docx" in file:
+                        files_to_delete.append(os.path.join(root, file))
+        
+        if not files_to_delete:
+            messagebox.showinfo("提示", f"未找到日期为 {target_date} 的文件")
+            return
+        
+        # 二次确认
+        confirm_msg = f"确定要删除以下 {len(files_to_delete)} 个文件吗？\n\n"
+        confirm_msg += "\n".join([os.path.basename(f) for f in files_to_delete[:5]])
+        if len(files_to_delete) > 5:
+            confirm_msg += f"\n... 等共 {len(files_to_delete)} 个文件"
+        
+        confirm_msg += "\n\n此操作不可恢复！"
+        
+        if not messagebox.askyesno("删除确认", confirm_msg):
+            return
+        
+        # 执行删除操作
+        self._merge_log(f"开始删除日期为 {target_date} 的文件...")
+        
+        success_count = 0
+        failed_count = 0
+        
+        for file_path in files_to_delete:
+            try:
+                os.remove(file_path)
+                success_count += 1
+                self._merge_log(f"✓ 已删除: {os.path.basename(file_path)}")
+            except Exception as e:
+                failed_count += 1
+                self._merge_log(f"✗ 删除失败: {os.path.basename(file_path)}, 错误: {str(e)}")
+        
+        # 更新UI
+        self._merge_log(f"删除完成！成功: {success_count} 个, 失败: {failed_count} 个")
+        
+        # 重新分析文件夹，更新日期下拉框
+        self._confirm_merge_folder()
+        
+        messagebox.showinfo("完成", f"删除完成！\n成功: {success_count} 个文件\n失败: {failed_count} 个文件")
+    
     def _setup_fonts(self):
         # 设置中文字体为微软雅黑
         self.font_config['title'] = ('Microsoft YaHei', 12, 'bold')
@@ -1090,6 +1154,11 @@ class ResumeGeneratorGUI:
         style.configure("Accent.TButton", font=self.font_config['button'])
         style.map("Accent.TButton", 
                   foreground=[('active', 'blue')])
+        
+        # 添加危险按钮样式
+        style.configure("Danger.TButton", font=self.font_config['button'], foreground='red')
+        style.map("Danger.TButton", 
+                  foreground=[('active', 'darkred')])
         
         # 为其他组件设置字体
         style.configure("TLabel", font=self.font_config['label'])
