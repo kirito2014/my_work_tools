@@ -193,6 +193,21 @@ def Resume_Data2table( file_path        #待解析简历绝对路径
                       ,Project_Data_tmp #简历信息字段（只含：工作经历 项目经历）    
                       ,target_dir       #未解析的格式有问题简历存放文件夹
                       ):
+    """
+    简历解析，提取内容写入df
+    参数：
+        file_path        待解析简历绝对路径
+        filename         待解析简历文件名
+        jl_df_tmp        简历信息字段（不含：工作经历 项目经历）
+        Project_Data_tmp 简历信息字段（只含：工作经历 项目经历）
+        target_dir       未解析的格式有问题简历存放文件夹
+    返回：
+        jl_df            基础信息数据
+        Project_Data_tmp 工作/项目经历信息（DataFrame格式）
+        status           解析状态：0正常 1异常
+        WorkExperience   工作经历列表（按照指定格式）
+        ProjectExperience 项目经历列表（按照指定格式）
+    """
     #test 辅助
     # file_path = r'E:\_02work\_07_公司内部\rsm2bank\sources\RESUME_RESOV\2025年上半年ERP简历收集_bak\泛金融业务部\泛金融业务1A部\23749+张立松+工作简历.docx'   
     # filename = r'23749+张立松+工作简历.docx'      
@@ -290,59 +305,92 @@ def Resume_Data2table( file_path        #待解析简历绝对路径
         if tech_index is None:
             log.logger.info('--能力与资质模块表头未找到，' + filename + ' at' + time.ctime(time.time()))
         
-        if prj_index is None:
-            prj_index = tech_index
+        # 初始化工作经历和项目经历列表，按照指定格式
+        WorkExperience = []
+        ProjectExperience = []
         
-        # 工作/项目经历表头字段开始 结束列号
-        wk_col = ['开始时间','结束时间','公司名称','担任职务','职责']
-        prj_col = ['开始时间','结束时间','项目名称','项目角色','职责']    
-        #工作经历模块 每个字段开始 结束列索引
-        wk_col_bgn_list, wk_col_end_list = find_pos_bgn_end_c( ori_tables[0]   #docx表格
-                                                              ,wk_index+1         #表格查找行号
-                                                              ,wk_col    #查找的字段list
-                                                              )
-        for w in wk_col:
-            if wk_col_bgn_list.get(w) is None:
-                log.logger.info('--工作经历模块表头：'+ w + '未找到，'+ filename + ' at' + time.ctime(time.time()))
+        # 工作经历模块处理
+        if wk_index is not None:
+            wk_col = ['开始时间','结束时间','公司名称','担任职务','职责']
+            #工作经历模块 每个字段开始 结束列索引
+            wk_col_bgn_list, wk_col_end_list = find_pos_bgn_end_c( ori_tables[0]   #docx表格
+                                                                 ,wk_index+1         #表格查找行号
+                                                                 ,wk_col    #查找的字段list
+                                                                 )
+            for w in wk_col:
+                if wk_col_bgn_list.get(w) is None:
+                    log.logger.info('--工作经历模块表头：'+ w + '未找到，'+ filename + ' at' + time.ctime(time.time()))
+            
+            # 确定工作经历的结束行号（如果有项目经历，则到项目经历前结束）
+            wk_end_index = prj_index if prj_index is not None else tech_index
+            if wk_end_index is not None and wk_index is not None:
+                # 提取工作经历数据
+                for s in range(wk_index+2, wk_end_index):
+                    start_date = ori_tables[0].rows[s].cells[wk_col_bgn_list['开始时间']].text if wk_col_bgn_list.get('开始时间') is not None else ''
+                    end_date = ori_tables[0].rows[s].cells[wk_col_bgn_list['结束时间']].text if wk_col_bgn_list.get('结束时间') is not None else ''
+                    company_name = ori_tables[0].rows[s].cells[wk_col_bgn_list['公司名称']].text if wk_col_bgn_list.get('公司名称') is not None else ''
+                    position = ori_tables[0].rows[s].cells[wk_col_bgn_list['担任职务']].text if wk_col_bgn_list.get('担任职务') is not None else ''
+                    job_description = ori_tables[0].rows[s].cells[wk_col_bgn_list['职责']].text if wk_col_bgn_list.get('职责') is not None else ''
+                    
+                    # 按照指定格式添加工作经历
+                    work_exp = {
+                        "StartTime": start_date,
+                        "EndTime": end_date,
+                        "CompanyName": company_name,
+                        "Position": position,
+                        "JobDescription": job_description
+                    }
+                    WorkExperience.append(work_exp)
+                    
+                    # 同时更新到Project_Data_tmp以保持兼容性
+                    new_data = [[empl_ID, name, '1', start_date, end_date, company_name, position, job_description]]
+                    new_row = pd.DataFrame(new_data, columns=Project_Data_tmp.columns)
+                    Project_Data_tmp = pd.concat([Project_Data_tmp, new_row], ignore_index=True)
         
-        #项目经历模块 每个字段开始 结束列索引
-        prj_col_bgn_list, prj_col_end_list = find_pos_bgn_end_c( ori_tables[0]   #docx表格
-                                                                ,prj_index+1         #表格查找行号
-                                                                ,prj_col    #查找的字段list
-                                                                )    
-        for p in prj_col:
-            if prj_col_bgn_list.get(p) is None:
-                log.logger.info('--项目经历模块表头：'+ p + '未找到，'+ filename + ' at' + time.ctime(time.time()))
-        
-        # 工作/项目经历
-        for s in range(wk_index+2,tech_index):
-            Wk_Prj_type = '0'
-            if s<prj_index:
-                Wk_Prj_type = '1'
-            elif s>=prj_index+2:
-                Wk_Prj_type = '2'
-            if Wk_Prj_type in ('1','2'):
-                col_start_date  = wk_col_bgn_list['开始时间'] if Wk_Prj_type == '1' else prj_col_bgn_list['开始时间']
-                col_end_date    = wk_col_bgn_list['结束时间'] if Wk_Prj_type == '1' else prj_col_bgn_list['结束时间']
-                col_Comp_Prj_nm = wk_col_bgn_list['公司名称'] if Wk_Prj_type == '1' else prj_col_bgn_list['项目名称']
-                col_position    = wk_col_bgn_list['担任职务'] if Wk_Prj_type == '1' else prj_col_bgn_list['项目角色']
-                col_Job_Desc    = wk_col_bgn_list['职责'] if Wk_Prj_type == '1' else prj_col_bgn_list['职责']
-                start_date  = ori_tables[0].rows[s].cells[col_start_date ].text
-                end_date    = ori_tables[0].rows[s].cells[col_end_date   ].text
-                Comp_Prj_nm = ori_tables[0].rows[s].cells[col_Comp_Prj_nm].text
-                position    = ori_tables[0].rows[s].cells[col_position   ].text
-                Job_Desc    = ori_tables[0].rows[s].cells[col_Job_Desc   ].text         
-                new_data = [[empl_ID, name, Wk_Prj_type, start_date, end_date, Comp_Prj_nm, position, Job_Desc]]
+        # 项目经历模块处理
+        if prj_index is not None and tech_index is not None:
+            prj_col = ['开始时间','结束时间','项目名称','项目角色','职责']    
+            #项目经历模块 每个字段开始 结束列索引
+            prj_col_bgn_list, prj_col_end_list = find_pos_bgn_end_c( ori_tables[0]   #docx表格
+                                                                   ,prj_index+1         #表格查找行号
+                                                                   ,prj_col    #查找的字段list
+                                                                   )    
+            for p in prj_col:
+                if prj_col_bgn_list.get(p) is None:
+                    log.logger.info('--项目经历模块表头：'+ p + '未找到，'+ filename + ' at' + time.ctime(time.time()))
+            
+            # 提取项目经历数据
+            for s in range(prj_index+2, tech_index):
+                start_date = ori_tables[0].rows[s].cells[prj_col_bgn_list['开始时间']].text if prj_col_bgn_list.get('开始时间') is not None else ''
+                end_date = ori_tables[0].rows[s].cells[prj_col_bgn_list['结束时间']].text if prj_col_bgn_list.get('结束时间') is not None else ''
+                project_name = ori_tables[0].rows[s].cells[prj_col_bgn_list['项目名称']].text if prj_col_bgn_list.get('项目名称') is not None else ''
+                project_role = ori_tables[0].rows[s].cells[prj_col_bgn_list['项目角色']].text if prj_col_bgn_list.get('项目角色') is not None else ''
+                job_description = ori_tables[0].rows[s].cells[prj_col_bgn_list['职责']].text if prj_col_bgn_list.get('职责') is not None else ''
+                
+                # 按照指定格式添加项目经历
+                project_exp = {
+                    "StartTime": start_date,
+                    "EndTime": end_date,
+                    "ProjectName": project_name,
+                    "ProjectRole": project_role,
+                    "JobDescription": job_description
+                }
+                ProjectExperience.append(project_exp)
+                
+                # 同时更新到Project_Data_tmp以保持兼容性
+                new_data = [[empl_ID, name, '2', start_date, end_date, project_name, project_role, job_description]]
                 new_row = pd.DataFrame(new_data, columns=Project_Data_tmp.columns)
-                Project_Data_tmp = pd.concat([Project_Data_tmp,new_row], ignore_index=True)
+                Project_Data_tmp = pd.concat([Project_Data_tmp, new_row], ignore_index=True)
         log.logger.info('--' + empl_ID + '-' + name + ' 工作/项目经历信息解析完成 at' + time.ctime(time.time()))
         log.logger.info('--' + empl_ID + '-' + name + ' 简历解析完成 at' + time.ctime(time.time()))
-        return jl_df_tmp,Project_Data_tmp,'0'
+        # 返回格式化后的工作经历和项目经历列表，以及原有的DataFrame和状态码
+        return jl_df_tmp, Project_Data_tmp, '0', WorkExperience, ProjectExperience
 
     except Exception as e:
         log.logger.error(f'{filename}简历格式异常错误：{e} at' + time.ctime(time.time()))
         cp_rsm2dir(file_path, target_dir) #异常复制到指定文件夹后 继续
-        return jl_df_tmp,Project_Data_tmp,'1'
+        # 异常情况下也返回空的工作经历和项目经历列表
+        return jl_df_tmp, Project_Data_tmp, '1', [], []
 
 ###word简历解析后字段映射 与模板中一致
 # 基础信息jl_df_tmp
@@ -386,7 +434,7 @@ col_mapping_edu_bg = {'empl_ID': '员工编号',
 功能: 遍历根据名单选择的ERP简历，解析数据为 基础信息数据 项目及工作经历数据
 参数说明：
     docxResumeDir word简历所在文件夹
-返回：
+返回：  
     jl_df           基础信息数据
     Project_Data    项目及工作经历数据 
     rsm_list        #名单信息获取情况(erp简历，技术人员信息，简历解析情况)
@@ -410,12 +458,12 @@ def docx_data_from_rsm_list( ERP_rsm_path_list   #名单中可获取的ERP简历
         if '工作简历' in filename and '~$' not in filename: #'~$' 临时文件标识符
             log.logger.info(f'{filename} 简历信息提取中（第{k}份）... at' + time.ctime(time.time()))
             if os.path.isfile(f):
-                jl_df_tmp,Project_Data_tmp,exception_flag = Resume_Data2table( f        #待解析简历绝对路径
-                                                                              ,filename         #待解析简历文件名
-                                                                              ,jl_df_tmp        #简历信息字段（不含：工作经历 项目经历）
-                                                                              ,Project_Data_tmp #简历信息字段（只含：工作经历 项目经历）    
-                                                                              ,target_dir       #未解析的格式有问题简历存放文件夹
-                                                                              )
+                jl_df_tmp, Project_Data_tmp, exception_flag, WorkExperience, ProjectExperience = Resume_Data2table( f        #待解析简历绝对路径
+                                                                                                      ,filename         #待解析简历文件名
+                                                                                                      ,jl_df_tmp        #简历信息字段（不含：工作经历 项目经历）
+                                                                                                      ,Project_Data_tmp #简历信息字段（只含：工作经历 项目经历）    
+                                                                                                      ,target_dir       #未解析的格式有问题简历存放文件夹
+                                                                                                      )
                 #解析异常简历添加到
                 if exception_flag == '1': exception_rsm_list.append(f)
     # log.logger.info(f'交付人员名单获取ERP简历基本信息：\n{jl_df_tmp}')

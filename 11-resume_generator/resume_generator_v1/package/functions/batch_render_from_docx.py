@@ -90,6 +90,26 @@ except ImportError:
         print(f"导入 doc_2_json 模块失败: {e}")
         sys.exit(1)
 
+# 导入备用的 doc_2_json_alter 模块（改进版）
+dj_alter = None
+try:
+    from package.functions import doc_2_json_alter as dj_alter
+except ImportError:
+    try:
+        # 尝试动态加载
+        import importlib.util
+        dj_alter_path = os.path.join(project_root, "package", "functions", "doc_2_json_alter.py")
+        if os.path.exists(dj_alter_path):
+            spec = importlib.util.spec_from_file_location("doc_2_json_alter", dj_alter_path)
+            dj_alter = importlib.util.module_from_spec(spec)
+            sys.modules["doc_2_json_alter"] = dj_alter
+            spec.loader.exec_module(dj_alter)
+            print(f"通过动态加载成功导入 doc_2_json_alter.py 文件")
+        else:
+            print(f"警告: 未找到 doc_2_json_alter.py 文件")
+    except Exception as e:
+        print(f"导入 doc_2_json_alter 模块失败: {e}，将无法使用备用提取功能")
+
 # 导入key_map_convert模块（用于键值映射转换）
 key_map_convert = None
 try:
@@ -110,6 +130,57 @@ except ImportError:
     except Exception as e:
         print(f"导入 key_map_convert 模块失败: {e}，将使用原始键值进行渲染")
 
+
+def check_json_data_validity(json_data):
+    """
+    检查JSON数据是否有效，确保重要字段不为空
+    
+    :param json_data: JSON数据字典
+    :return: tuple (is_valid, missing_info) - (是否有效, 缺失信息描述)
+    """
+    if not json_data or not isinstance(json_data, dict):
+        return False, "JSON数据为空或格式错误"
+    
+    person_name = list(json_data.keys())[0] if json_data else None
+    if not person_name:
+        return False, "未找到人员姓名"
+    
+    person_data = json_data.get(person_name, {})
+    
+    # 检查基本信息中的重要字段
+    basic_info = person_data.get("BasicInfo", {})
+    critical_basic_fields = ["Name", "EmpNo", "WorkYears"]
+    missing_basic_fields = [field for field in critical_basic_fields if not basic_info.get(field, "").strip()]
+    
+    # 检查工作经历
+    work_experience = person_data.get("WorkExperience", [])
+    if work_experience:
+        # 检查是否所有工作经历条目都为空
+        all_empty_work_exp = True
+        for exp in work_experience:
+            if any(exp.get(field, "").strip() for field in ["Company", "StartTime", "EndTime", "Position"]):
+                all_empty_work_exp = False
+                break
+        if all_empty_work_exp:
+            return False, "工作经历存在但所有条目为空"
+    
+    # 检查项目经历
+    project_experience = person_data.get("ProjectExperience", [])
+    if project_experience:
+        # 检查是否所有项目经历条目都为空
+        all_empty_project_exp = True
+        for exp in project_experience:
+            if any(exp.get(field, "").strip() for field in ["ProjectName", "StartTime", "EndTime", "Description"]):
+                all_empty_project_exp = False
+                break
+        if all_empty_project_exp:
+            return False, "项目经历存在但所有条目为空"
+    
+    # 如果有缺失的基本信息字段，返回无效
+    if missing_basic_fields:
+        return False, f"基本信息缺失关键字段: {', '.join(missing_basic_fields)}"
+    
+    return True, "数据有效"
 
 def batch_generate_resumes(json_files_dir, template_path, bankname, person_names="all"):
     """
@@ -535,14 +606,65 @@ def batch_modify_json(input_folder, excel_file=None):
             with open(json_file, 'w', encoding='utf-8') as f:
                 json.dump(template_data, f, ensure_ascii=False, indent=4)
             
+            # 检查生成的JSON数据是否有效
+            is_valid, missing_info = check_json_data_validity(template_data)
+            
+            # 记录失败的员工编号列表
+            failed_emp_numbers = []
+            
+            if not is_valid:
+                print(f"  - [WARNING] JSON数据验证失败：{missing_info}")
+                
+                # 如果有备用模块，尝试使用备用方式重新生成
+                if dj_alter:
+                    print(f"  - [INFO] 尝试使用备用提取方式(doc_2_json_alter)重新生成...")
+                    try:
+                        # 使用备用模块重新提取数据
+                        alt_result = dj_alter.extract_resume_alt(processed_doc_path)
+                        if alt_result:
+                            # 再次检查备用生成的数据
+                            is_alt_valid, alt_missing_info = check_json_data_validity(alt_result)
+                            if is_alt_valid:
+                                # 保存备用生成的JSON文件
+                                with open(json_file, 'w', encoding='utf-8') as f:
+                                    json.dump(alt_result, f, ensure_ascii=False, indent=4)
+                                print(f"  - [OK] 已使用备用方式生成更有效的JSON文件：{json_filename}")
+                            else:
+                                print(f"  - [WARNING] 备用提取方式生成的数据仍然存在问题：{alt_missing_info}")
+                                if emp_no:
+                                    failed_emp_numbers.append(emp_no)
+                        else:
+                            print(f"  - [ERROR] 备用提取方式失败")
+                            if emp_no:
+                                failed_emp_numbers.append(emp_no)
+                    except Exception as e:
+                        print(f"  - [ERROR] 使用备用提取方式时出错：{e}")
+                        if emp_no:
+                            failed_emp_numbers.append(emp_no)
+                else:
+                    # 如果没有备用模块，记录失败的工号
+                    if emp_no:
+                        failed_emp_numbers.append(emp_no)
+            
             processed_files += 1
             print(f"  - [OK] 成功生成JSON文件: {json_filename}")
             
         except Exception as e:
             print(f"  - [ERROR] 处理失败: {e}")
             failed_files += 1
+            # 尝试提取工号并记录
+            try:
+                emp_no = dj.extract_emp_no_from_filename(file_path)
+                if emp_no:
+                    failed_emp_numbers.append(emp_no)
+            except:
+                pass
             import traceback
             traceback.print_exc()
+    
+    # 打印处理失败的员工编号
+    if failed_emp_numbers:
+        print(f"\n[ERROR] 以下员工编号的简历处理失败或数据不完整: {', '.join(failed_emp_numbers)}")
     
     # 输出统计信息
     print("\n" + "=" * 50)

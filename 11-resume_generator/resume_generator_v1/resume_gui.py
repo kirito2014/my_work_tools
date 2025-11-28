@@ -57,6 +57,23 @@ try:
             else:
                 print(f"警告: 未找到 doc_2_json.py 文件在路径: {dj_file_path}")
     
+    # 动态导入doc_2_json_alter模块作为备用
+    dj_alter = None
+    try:
+        from package.functions import doc_2_json_alter as dj_alter
+    except ImportError:
+        try:
+            import package.functions.doc_2_json_alter as dj_alter
+        except ImportError:
+            dj_alter_file_path = os.path.join(base_dir, 'package', 'functions', 'doc_2_json_alter.py')
+            if os.path.exists(dj_alter_file_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("doc_2_json_alter", dj_alter_file_path)
+                dj_alter = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(dj_alter)
+            else:
+                print(f"警告: 未找到 doc_2_json_alter.py 文件在路径: {dj_alter_file_path}")
+    
     # 动态导入render_from_docx模块
     from package.functions import render_from_docx
     
@@ -83,6 +100,8 @@ try:
                 print(f"成功从路径动态导入check_resume_valid模块: {check_valid_path}")
     except Exception as e:
         print(f"导入check_resume_valid模块失败: {str(e)}")
+
+
     
     # 动态导入excel_reader模块
     from package.utils import excel_reader
@@ -132,6 +151,35 @@ except Exception as e:
     print(f"导入模块时出错: {e}")
 
 class ResumeGeneratorGUI:
+    def check_json_data_validity(self, json_data):
+        """验证JSON数据的有效性"""
+        if not isinstance(json_data, dict) or len(json_data) == 0:
+            return False
+            
+        person_key = next(iter(json_data.keys()))
+        person_data = json_data.get(person_key, {})
+        
+        # 检查基本信息关键字段
+        basic_info = person_data.get('BasicInfo', {})
+        required_basic_fields = ['Name', 'EmpNo', 'WorkYears']
+        if not all(basic_info.get(field) for field in required_basic_fields if field in basic_info):
+            return False
+        
+        # 检查工作经历和项目经历是否有有效条目
+        work_experience = person_data.get('WorkExperience', [])
+        project_experience = person_data.get('ProjectExperience', [])
+        
+        # 检查工作经历是否有非空条目
+        valid_work_exp = any(exp.get('CompanyName') or exp.get('Position') or exp.get('JobDescription')
+                          for exp in work_experience)
+        
+        # 检查项目经历是否有有效条目
+        valid_project_exp = any(proj.get('ProjectName') or proj.get('ProjectRole') or proj.get('JobDescription')
+                            for proj in project_experience)
+        
+        # 至少需要有工作经历或项目经历的有效条目
+        return valid_work_exp or valid_project_exp
+        
     def __init__(self, root):
         self.root = root
         self.root.title("长亮科技简历生成器")
@@ -1566,10 +1614,61 @@ class ResumeGeneratorGUI:
                         
                         # 验证文件是否成功保存
                         if os.path.exists(json_file) and os.path.getsize(json_file) > 0:
-                            processed_files += 1
-                            self._log(f"处理完成，JSON文件已保存至: {json_file}")
+                            # 读取并验证JSON数据
+                            with open(json_file, 'r', encoding='utf-8') as f:
+                                saved_json_data = json.load(f)
+                            
+                            # 检查JSON数据有效性
+                            if not self.check_json_data_validity(saved_json_data):
+                                self._log(f"JSON数据验证失败: {json_file}，尝试使用备用方法重新生成")
+                                
+                                # 如果备用模块存在，尝试使用备用方法
+                                if dj_alter:
+                                    try:
+                                        # 使用备用方法提取和转换数据
+                                        raw_resume_data_alter = dj_alter.extract_resume_universal(processed_doc_path)
+                                        if raw_resume_data_alter:
+                                            result_alter = dj_alter.convert_to_template_format(raw_resume_data_alter, emp_no)
+                                            if result_alter:
+                                                # 重新保存JSON文件
+                                                with open(json_file, 'w', encoding='utf-8') as f:
+                                                    json.dump(result_alter, f, ensure_ascii=False, indent=4)
+                                                
+                                                # 再次验证备用生成的JSON数据
+                                                with open(json_file, 'r', encoding='utf-8') as f:
+                                                    saved_json_data_alter = json.load(f)
+                                                
+                                                if self.check_json_data_validity(saved_json_data_alter):
+                                                    self._log(f"备用方法生成JSON成功: {json_file}")
+                                                    processed_files += 1
+                                                else:
+                                                    self._log(f"备用方法生成的JSON数据仍然无效: {json_file}")
+                                                    failed_files += 1
+                                                    continue
+                                            else:
+                                                self._log("备用方法转换失败")
+                                                failed_files += 1
+                                                continue
+                                        else:
+                                            self._log("备用方法提取数据失败")
+                                            failed_files += 1
+                                            continue
+                                    except Exception as e:
+                                        self._log(f"备用方法执行异常: {str(e)}")
+                                        failed_files += 1
+                                        continue
+                                else:
+                                    self._log("备用模块不可用")
+                                    failed_files += 1
+                                    continue
+                            else:
+                                # JSON数据验证通过
+                                processed_files += 1
+                                self._log(f"处理完成，JSON文件已保存至: {json_file}")
                         else:
-                            self._log(f"警告: JSON文件可能未正确保存: {json_file}")
+                            self._log(f"JSON文件保存失败: {json_file}")
+                            failed_files += 1
+                            continue
                             failed_files += 1
                             continue
                     except Exception as e:
