@@ -74,7 +74,8 @@ KEY_MAPPINGS = {
     
     # SpecialInfo (si) 部分映射
     'Degree': 'degree',
-    'StartWorkDate': 'workdt'
+    'StartWorkDate': 'workdt',
+    'EducationList': 'edu',
 }
 
 

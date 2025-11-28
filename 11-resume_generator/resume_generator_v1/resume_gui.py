@@ -161,7 +161,7 @@ class ResumeGeneratorGUI:
         
         # 检查基本信息关键字段
         basic_info = person_data.get('BasicInfo', {})
-        required_basic_fields = ['Name', 'EmpNo', 'WorkYears',"GraduationTime","GraduationSchool","Major","HighestEducation","Department","Title","PersonalProfile"]
+        required_basic_fields = ['Name', 'EmpNo', 'WorkYears',"GraduationTime","GraduationSchool","Major","HighestEducation","Department","PersonalProfile"]
         if not all(basic_info.get(field) for field in required_basic_fields if field in basic_info):
             return False
         

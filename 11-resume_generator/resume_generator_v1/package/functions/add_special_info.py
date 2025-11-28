@@ -67,18 +67,71 @@ def process_special_info(json_file_path: str) -> bool:
             if work_experiences:
                 # 获取最后一个工作经历的开始时间
                 last_experience = work_experiences[-1]
-                #start_time1 = last_experience[-1]["StartTime"]
                 start_time = last_experience.get("StartTime", "")
-                #print(start_time1)
-                #print(start_time)
 
                 if start_time:
                     # 格式化时间为"YYYY年MM月"
                     formatted_date = format_work_date(start_time)
-                    #print(formatted_date)
                     if formatted_date:
                         special_info["StartWorkDate"] = formatted_date
         
+        # 处理学历信息 - 修改后的逻辑
+        if "BasicInfo" in person_data and person_data["BasicInfo"]:
+            # 初始化教育经历列表
+            special_info["EducationList"] = []
+            
+            # 提取所有学历相关字段
+            graduation_time = person_data["BasicInfo"].get("GraduationTime", "")
+            graduation_school = person_data["BasicInfo"].get("GraduationSchool", "")
+            major = person_data["BasicInfo"].get("Major", "")
+            highest_education = person_data["BasicInfo"].get("HighestEducation", "")
+            
+            # 解析新的格式：最高学历:xxxx|第一学历:xxxx
+            def parse_education_field(field_value):
+                """解析教育相关字段，返回字典 {学历类型: 值}"""
+                result = {}
+                if field_value and field_value != '/':
+                    # 检查是否是新的格式（包含"最高学历:"和"|"）
+                    if '最高学历:' in field_value and '|' in field_value:
+                        # 按竖线分割不同的学历类型
+                        parts = field_value.split('|')
+                        for part in parts:
+                            # 按冒号分割类型和值
+                            if ':' in part:
+                                edu_type, edu_value = part.split(':', 1)
+                                result[edu_type.strip()] = edu_value.strip()
+                    else:
+                        # 如果是单独的值，默认为最高学历
+                        result["最高学历"] = field_value
+                return result
+            
+            # 解析各个字段
+            graduation_time_dict = parse_education_field(graduation_time)
+            graduation_school_dict = parse_education_field(graduation_school)
+            major_dict = parse_education_field(major)
+            highest_education_dict = parse_education_field(highest_education)
+            
+            # 获取所有存在的学历类型
+            all_edu_types = set()
+            all_edu_types.update(graduation_time_dict.keys())
+            all_edu_types.update(graduation_school_dict.keys())
+            all_edu_types.update(major_dict.keys())
+            all_edu_types.update(highest_education_dict.keys())
+            
+            # 如果没有检测到任何学历类型，默认使用最高学历
+            if not all_edu_types:
+                all_edu_types = ["最高学历"]
+            
+            # 为每种学历类型创建教育经历条目
+            for edu_type in all_edu_types:
+                special_info["EducationList"].append({
+                    "DegreeType": edu_type,
+                    "GraduationTime": graduation_time_dict.get(edu_type, ""),
+                    "GraduationSchool": graduation_school_dict.get(edu_type, ""),
+                    "Major": major_dict.get(edu_type, ""),
+                    "HighestEducation": highest_education_dict.get(edu_type, "")
+                })
+
         # 写回文件
         with open(json_file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)

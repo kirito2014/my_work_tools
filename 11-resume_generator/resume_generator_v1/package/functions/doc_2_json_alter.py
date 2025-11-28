@@ -193,7 +193,7 @@ def extract_basic_info(doc, filename):
         'Major': ['专业', '所学专业', "专    业"],
         'HighestEducation': ['最高学历', '学历'],
         'Department': ['所在部门', '部门'],
-        'Title': ['职称', '职位', '岗位', "职    称"],
+        'Title': ['职称','职    称'],
         'PersonalProfile': ['个人简介', '个人概述', '自我介绍'],
         'BusinessAbility': ['业务与技术能力', '业务与技术能力详述', '技术能力', '技能'],
         'Certification': ['资质认证', '证书', '认证'],
@@ -274,7 +274,7 @@ def extract_basic_info(doc, filename):
     for field in fields_to_process:
         if basic_info[field] != '/':
             # 将中文冒号替换为英文冒号
-            basic_info[field] = basic_info[field].replace('：', ':')
+            basic_info[field] = basic_info[field].replace('：', ':').replace('\n', '|')
             logger.debug(f"已将 {field} 中的中文冒号替换为英文冒号: {basic_info[field]}")
     
     # 按照要求不对学历进行处理
@@ -625,26 +625,26 @@ def extract_resume_alt(file_path):
         person_name = basic_info['Name'] if basic_info['Name'] != '/' else 'Unknown'
         
         # 输出结果
-        #print(f"【{person_name}的简历 - 原始提取数据】")
-        #print(json.dumps(raw_resume_data, ensure_ascii=False, indent=4))
+        print(f"【{person_name}的简历 - 原始提取数据】")
+        print(json.dumps(raw_resume_data, ensure_ascii=False, indent=4))
         
         print(f"\n【{person_name}的简历 - 模板格式数据】")
         template_json = json.dumps(template_formatted_data, ensure_ascii=False, indent=4)
         
         # 创建输出目录
-        #original_dir = os.path.join(base_dir, "output", "original_json")
+        original_dir = os.path.join(base_dir, "output", "original_json")
         modify_dir = os.path.join(base_dir, "output", "modify_json")
-        #os.makedirs(original_dir, exist_ok=True)
+        os.makedirs(original_dir, exist_ok=True)
         os.makedirs(modify_dir, exist_ok=True)
         
         # 获取原始文件名（去掉扩展名）
         original_filename = os.path.splitext(os.path.basename(file_path))[0]
         
         # 保存原始提取结果（文件名格式：工号_姓名_人员简历.json）
-        # raw_output_filename = os.path.join(original_dir, f"{emp_no}_{person_name}_人员简历.json")
-        # with open(raw_output_filename, "w", encoding="utf-8") as f:
-        #     json.dump(raw_resume_data, f, ensure_ascii=False, indent=2)
-        # print(f"[OK] 已保存{person_name}的简历原始提取数据到：{raw_output_filename}")
+        raw_output_filename = os.path.join(original_dir, f"{emp_no}_{person_name}_人员简历.json")
+        with open(raw_output_filename, "w", encoding="utf-8") as f:
+            json.dump(raw_resume_data, f, ensure_ascii=False, indent=2)
+        print(f"[OK] 已保存{person_name}的简历原始提取数据到：{raw_output_filename}")
         
         # 保存模板格式数据（文件名格式：工号_姓名_人员简历.json）
         modify_output_filename = os.path.join(modify_dir, f"{emp_no}_{person_name}_人员简历.json")
