@@ -12,15 +12,6 @@ import sys
 from docx import Document
 import re
 
-# # 导入项目中的工具函数
-# try:
-#     from .tools import is_real_docx, find_pos_bgn_end_r
-# except ImportError:
-#     # 如果相对导入失败，尝试绝对导入
-#     import sys
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# from tools import is_real_docx, find_pos_bgn_end_r
-
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -172,21 +163,20 @@ def extract_basic_info(doc, filename):
     """
     # 初始化基本信息
     basic_info = {
-        'empl_ID': extract_emp_no_from_filename(filename),
+        'Empno': extract_emp_no_from_filename(filename),
         'name': '/',
-        'work_years': '/',
-        'grad_date': '/',
-        'grad_school': '/',
-        'major': '/',
-        'high_Edu': '/',
-        'high_Degree': '/',  # 保留字段但不做处理
-        'department': '/',
-        'Jop_Title': '/',
-        'Per_Profile': '/',
-        'tech_skill': '/',
-        'credential': '/',
-        'training': '/',
-        'Skill_tags': '/'
+        'WorkYears': '/',
+        'GraduationTime': '/',
+        'GraduationSchool': '/',
+        'Major': '/',
+        'HighestEducation': '/',
+        'Department': '/',
+        'Title': '/',
+        'PersonalProfile': '/',
+        'BusinessAbility': '/',
+        'Certification': '/',
+        'Training': '/',
+        'SkillTag': '/'
     }
     
     # 确保文档有表格
@@ -197,18 +187,18 @@ def extract_basic_info(doc, filename):
     # 关键词映射，支持多个关键词变体
     keyword_mapping = {
         'name': ['姓名', '姓名：',"姓    名"],
-        'work_years': ['工作年限'],
-        'grad_date': ['毕业时间'],
-        'grad_school': ['毕业学校'],
-        'major': ['专业', '所学专业',"专    业"],
-        'high_Edu': ['最高学历', '学历'],
-        'department': ['所在部门', '部门'],
-        'Jop_Title': ['职称', '职位', '岗位',"职    称"],
-        'Per_Profile': ['个人简介', '个人概述', '自我介绍'],
-        'tech_skill': ['业务与技术能力', '业务与技术能力详述', '技术能力', '技能'],
-        'credential': ['资质认证', '证书', '认证'],
-        'training': ['参与培训', '培训经历'],
-        'Skill_tags': ['技能标签', '技术栈']
+        'WorkYears': ['工作年限'],
+        'GraduationTime': ['毕业时间'],
+        'GraduationSchool': ['毕业学校'],
+        'Major': ['专业', '所学专业',"专    业"],
+        'HighestEducation': ['最高学历', '学历'],
+        'Department': ['所在部门', '部门'],
+        'Title': ['职称', '职位', '岗位',"职    称"],
+        'PersonalProfile': ['个人简介', '个人概述', '自我介绍'],
+        'BusinessAbility': ['业务与技术能力', '业务与技术能力详述', '技术能力', '技能'],
+        'Certification': ['资质认证', '证书', '认证'],
+        'Training': ['参与培训', '培训经历'],
+        'SkillTag': ['技能标签', '技术栈']
     }
     
     # 遍历所有表格查找信息
@@ -281,25 +271,24 @@ def convert_to_template_format(raw_resume_data, emp_no):
     
     # 字段名称映射表
     basic_info_mapping = {
-        'empl_ID': 'EmpNo',
-        'name': 'Name',
-        'work_years': 'WorkYears',
-        'grad_date': 'GraduationTime',
-        'grad_school': 'GraduationSchool',
-        'major': 'Major',
-        'high_Edu': 'HighestEducation',
-        'high_Degree': 'Degree',
-        'department': 'Department',
-        'Jop_Title': 'Title',
-        'Per_Profile': 'PersonalProfile',
+        'Empno': 'EmpNo',
+        'Name': 'Name',
+        'WorkYears': 'WorkYears',
+        'GraduationTime': 'GraduationTime',
+        'GraduationSchool': 'GraduationSchool',
+        'Major': 'Major',
+        'HighestEducation': 'HighestEducation',
+        'Department': 'Department',
+        'Title': 'Title',
+        'PersonalProfile': 'PersonalProfile',
         'EmpNo': 'EmpNo'
     }
     
     work_ability_mapping = {
-        'tech_skill': 'BusinessAbility',
-        'credential': 'Certification',
-        'training': 'Training',
-        'Skill_tags': 'SkillTag'
+        'BusinessAbility': 'BusinessAbility',
+        'Certification': 'Certification',
+        'Training': 'Training',
+        'SkillTag': 'SkillTag'
     }
     
     # 转换BasicInfo字段名称
@@ -325,13 +314,216 @@ def convert_to_template_format(raw_resume_data, emp_no):
             'BasicInfo': formatted_basic_info,
             'WorkExperience': raw_resume_data.get('WorkExperience', []),
             'ProjectExperience': raw_resume_data.get('ProjectExperience', []),
-            'WorkAbility': formatted_work_ability,
-            'AdditionInfo': raw_resume_data.get('AdditionInfo', {}),
-            'SpecialInfo': raw_resume_data.get('SpecialInfo', {})
+            'WorkAbility': formatted_work_ability
         }
     }
     
     return template_data
+
+def extract_work_experience(doc):
+    """
+    提取工作经历信息
+    
+    Args:
+        doc: Document对象
+    
+    Returns:
+        list: 工作经历列表，每个元素为字典
+    """
+    work_experience = []
+    
+    # 关键词映射
+    section_keywords = ['工作经历（由近至远）']
+    project_keywords = ['项目经历（由近至远）']
+    
+    # 遍历所有表格
+    for table_idx, table in enumerate(doc.tables):
+        logger.debug(f"处理表格 {table_idx+1} 中的工作经历")
+        
+        # 查找包含工作经历关键词的单元格
+        found_section = False
+        start_row = -1
+        
+        # 同时查找项目经历位置作为终止点
+        project_end_row = len(table.rows)  # 默认到表格末尾
+        
+        # 先查找项目经历的位置
+        for r, row in enumerate(table.rows):
+            for c, cell in enumerate(row.cells):
+                for keyword in project_keywords:
+                    if clean_keyword(keyword) in clean_keyword(cell.text):
+                        project_end_row = r
+                        logger.debug(f"在表格 {table_idx+1} 行 {r+1} 找到项目经历部分，作为工作经历的终止位置")
+                        break
+        
+        # 再查找工作经历的开始位置
+        for r, row in enumerate(table.rows):
+            for c, cell in enumerate(row.cells):
+                for keyword in section_keywords:
+                    if clean_keyword(keyword) in clean_keyword(cell.text):
+                        found_section = True
+                        start_row = r
+                        logger.debug(f"在表格 {table_idx+1} 行 {r+1} 找到工作经历部分")
+                        break
+                if found_section:
+                    break
+            if found_section:
+                break
+        
+        if found_section:
+            # 尝试提取表头
+            header_row = None
+            for r in range(start_row + 1, project_end_row):  # 只搜索到项目经历前
+                if len(table.rows[r].cells) >= 5:  # 假设至少有5列
+                    header_row = r
+                    break
+            
+            if header_row:
+                # 识别列名
+                col_mapping = {}
+                for c, cell in enumerate(table.rows[header_row].cells):
+                    cell_text = clean_keyword(cell.text)
+                    logger.debug(f"表头单元格内容: {cell_text}")
+                    if '开始时间' in cell_text:
+                        col_mapping['StartTime'] = c
+                    elif '结束时间' in cell_text:
+                        col_mapping['EndTime'] = c
+                    elif '公司名称' in cell_text or '单位' in cell_text:
+                        col_mapping['CompanyName'] = c
+                    elif '担任职务' in cell_text or '岗位' in cell_text:
+                        col_mapping['Position'] = c
+                    elif '工作职责说明' in cell_text or '工作职责说明（稍微详细一点）' in cell_text or '职责' in cell_text:
+                        col_mapping['JobDescription'] = c
+                
+                # 提取数据行，只提取到项目经历之前
+                for r in range(header_row + 1, project_end_row):
+                    row_data = table.rows[r].cells
+                    # 检查col_mapping是否为空
+                    if not col_mapping:
+                        continue
+                    if len(row_data) >= max(col_mapping.values()) + 1 if col_mapping else False:
+                        exp = {
+                            'StartTime': row_data[col_mapping.get('StartTime', 0)].text.strip() if 'StartTime' in col_mapping else '',
+                            'EndTime': row_data[col_mapping.get('EndTime', 1)].text.strip() if 'EndTime' in col_mapping else '',
+                            'CompanyName': row_data[col_mapping.get('CompanyName', 0)].text.strip() if 'CompanyName' in col_mapping else '',
+                            'Position': row_data[col_mapping.get('Position', 1)].text.strip() if 'Position' in col_mapping else '',
+                            'JobDescription': row_data[col_mapping.get('JobDescription', 2)].text.strip() if 'JobDescription' in col_mapping else ''
+                        }
+                        # 只添加有效数据
+                        if any(exp.values()):
+                            work_experience.append(exp)
+                            logger.debug(f"提取到工作经历: {exp}")
+    
+    return work_experience
+
+def extract_project_experience(doc):
+    """
+    提取项目经历信息
+    
+    Args:
+        doc: Document对象
+    
+    Returns:
+        list: 项目经历列表，每个元素为字典
+    """
+    project_experience = []
+    
+    # 关键词映射
+    section_keywords = ['项目经历（由近至远）']
+    end_section_keywords = ['能力与资质']
+    
+    # 遍历所有表格
+    for table_idx, table in enumerate(doc.tables):
+        logger.debug(f"处理表格 {table_idx+1} 中的项目经历")
+        
+        # 查找包含项目经历关键词的单元格
+        found_section = False
+        start_row = -1
+        
+        # 同时查找"能力与资质"位置作为终止点
+        end_row = len(table.rows)  # 默认到表格末尾
+        
+        # 先查找"能力与资质"的位置
+        for r, row in enumerate(table.rows):
+            for c, cell in enumerate(row.cells):
+                for keyword in end_section_keywords:
+                    if clean_keyword(keyword) in clean_keyword(cell.text):
+                        end_row = r
+                        logger.debug(f"在表格 {table_idx+1} 行 {r+1} 找到'能力与资质'部分，作为项目经历的终止位置")
+                        break
+        
+        # 再查找项目经历的开始位置
+        for r, row in enumerate(table.rows):
+            for c, cell in enumerate(row.cells):
+                for keyword in section_keywords:
+                    if clean_keyword(keyword) in clean_keyword(cell.text):
+                        found_section = True
+                        start_row = r
+                        logger.debug(f"在表格 {table_idx+1} 行 {r+1} 找到项目经历部分")
+                        break
+                if found_section:
+                    break
+            if found_section:
+                break
+        
+        if found_section:
+            # 尝试提取表头
+            header_row = None
+            for r in range(start_row + 1, end_row):  # 只搜索到"能力与资质"前
+                if len(table.rows[r].cells) >= 5:  # 假设至少有4列
+                    header_row = r
+                    break
+
+            if header_row:
+                # 识别列名
+                col_mapping = {}
+                for c, cell in enumerate(table.rows[header_row].cells):
+                    cell_text = clean_keyword(cell.text)
+                    #print(f"表头单元格内容: {cell_text}")
+                    logger.debug(f"表头单元格内容: {cell_text}")
+                    if '开始时间' in cell_text:
+                        col_mapping['StartTime'] = c
+                    elif '结束时间' in cell_text:
+                        col_mapping['EndTime'] = c
+                    elif '项目名称' in cell_text:
+                        col_mapping['ProjectName'] = c
+                    elif '项目角色' in cell_text:
+                        col_mapping['ProjectRole'] = c
+                    elif '项目职责说明' in cell_text or '项目职责说明（稍微详细一点）' in cell_text or '项目描述' in cell_text:
+                        col_mapping['JobDescription'] = c
+                
+                # 提取数据行，只提取到"能力与资质"之前
+                for r in range(header_row + 1, end_row):
+                    row_data = table.rows[r].cells
+                    # 检查col_mapping是否为空
+                    if not col_mapping:
+                        continue
+                    if len(row_data) >= max(col_mapping.values()) + 1 if col_mapping else False:
+                        exp = {
+                            'StartTime': row_data[col_mapping.get('StartTime', 0)].text.strip() if 'StartTime' in col_mapping else '',
+                            'EndTime': row_data[col_mapping.get('EndTime', 1)].text.strip() if 'EndTime' in col_mapping else '',
+                            'ProjectName': row_data[col_mapping.get('ProjectName', 0)].text.strip() if 'ProjectName' in col_mapping else '',
+                            'ProjectRole': row_data[col_mapping.get('ProjectRole', 1)].text.strip() if 'ProjectRole' in col_mapping else '',
+                            'JobDescription': row_data[col_mapping.get('JobDescription', 2)].text.strip() if 'JobDescription' in col_mapping else ''
+                        }
+                        # 只添加有效数据，并且过滤掉明显不是项目经历的数据（比如包含"能力与资质"等关键词的行）
+                        if any(exp.values()):
+                            # 检查是否包含终止关键词
+                            contains_end_keyword = False
+                            for cell in row_data:
+                                cell_text = clean_keyword(cell.text)
+                                for keyword in end_section_keywords:
+                                    if keyword in cell_text:
+                                        contains_end_keyword = True
+                                        break
+                                if contains_end_keyword:
+                                    break
+                            
+                            if not contains_end_keyword:
+                                project_experience.append(exp)
+                                logger.debug(f"提取到项目经历: {exp}")
+    
+    return project_experience
 
 def extract_resume_alt(file_path):
     """
@@ -363,28 +555,33 @@ def extract_resume_alt(file_path):
         # 提取基本信息
         basic_info = extract_basic_info(doc, filename)
         
+        # 提取工作经历
+        work_experience = extract_work_experience(doc)
+        
+        # 提取项目经历
+        project_experience = extract_project_experience(doc)
+        
         # 创建原始提取数据结构
         raw_resume_data = {
             'BasicInfo': {
-                'empl_ID': emp_no,
+                'Empno': emp_no,
                 'name': basic_info['name'],
-                'work_years': basic_info['work_years'],
-                'grad_date': basic_info['grad_date'],
-                'grad_school': basic_info['grad_school'],
-                'major': basic_info['major'],
-                'high_Edu': basic_info['high_Edu'],
-                'high_Degree': basic_info['high_Degree'],
-                'department': basic_info['department'],
-                'Jop_Title': basic_info['Jop_Title'],
-                'Per_Profile': basic_info['Per_Profile']
+                'WorkYears': basic_info['WorkYears'],
+                'GraduationTime': basic_info['GraduationTime'],
+                'GraduationSchool': basic_info['GraduationSchool'],
+                'Major': basic_info['Major'],
+                'HighestEducation': basic_info['HighestEducation'],
+                'Department': basic_info['Department'],
+                'Title': basic_info['Title'],
+                'PersonalProfile': basic_info['PersonalProfile']
             },
-            'WorkExperience': [],
-            'ProjectExperience': [],
+            'WorkExperience': work_experience,
+            'ProjectExperience': project_experience,
             'WorkAbility': {
-                'tech_skill': basic_info['tech_skill'],
-                'credential': basic_info['credential'],
-                'training': basic_info['training'],
-                'Skill_tags': basic_info['Skill_tags']
+                'BusinessAbility': basic_info['BusinessAbility'],
+                'Certification': basic_info['Certification'],
+                'Training': basic_info['Training'],
+                'SkillTag': basic_info['SkillTag']
             }
         }
         
@@ -410,16 +607,16 @@ def extract_resume_alt(file_path):
         # 获取原始文件名（去掉扩展名）
         original_filename = os.path.splitext(os.path.basename(file_path))[0]
         
-        # 保存原始提取结果，保持文件名不变
-        raw_output_filename = os.path.join(original_dir, f"{original_filename}.json")
+        # 保存原始提取结果（文件名格式：工号_姓名_人员简历.json）
+        raw_output_filename = os.path.join(original_dir, f"{emp_no}_{person_name}_人员简历.json")
         with open(raw_output_filename, "w", encoding="utf-8") as f:
-            json.dump(raw_resume_data, f, ensure_ascii=False, indent=4)
+            json.dump(raw_resume_data, f, ensure_ascii=False, indent=2)
         print(f"[OK] 已保存{person_name}的简历原始提取数据到：{raw_output_filename}")
         
-        # 保存模板格式数据，保持文件名不变
-        modify_output_filename = os.path.join(modify_dir, f"{original_filename}.json")
+        # 保存模板格式数据（文件名格式：工号_姓名_人员简历.json）
+        modify_output_filename = os.path.join(modify_dir, f"{emp_no}_{person_name}_人员简历.json")
         with open(modify_output_filename, "w", encoding="utf-8") as f:
-            json.dump(template_formatted_data, f, ensure_ascii=False, indent=4)
+            f.write(template_json)
         print(f"[OK] 已保存{person_name}的简历模板格式数据到：{modify_output_filename}")
         
         return True
@@ -428,30 +625,6 @@ def extract_resume_alt(file_path):
         logger.error(f"提取简历数据时出错: {str(e)}", exc_info=True)
         return False
 
-
-def test_functions():
-    """
-    测试函数的正确性
-    """
-    print("=== 开始测试函数 ===")
-    
-    # 测试clean_keyword函数
-    test_keywords = [
-        "姓名：",
-        "工作 年限",
-        "毕业\n时间",
-        "业务与技术能力\t详述",
-        ""
-    ]
-    
-    print("\n测试clean_keyword函数:")
-    for keyword in test_keywords:
-        cleaned = clean_keyword(keyword)
-        print(f"原始: '{keyword}' -> 清理后: '{cleaned}'")
-    
-    # 由于不再处理学历，移除dilopma2degree测试
-    
-    print("\n=== 测试完成 ===")
 
 
 def main():
