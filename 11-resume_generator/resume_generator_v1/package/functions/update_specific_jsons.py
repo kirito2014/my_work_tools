@@ -20,6 +20,21 @@ try:
         print("警告: 无法导入add_special_info模块，跳过特殊字段处理")
         process_special_info = None
         has_special_info_module = False
+    dj_alter = None
+    try:
+        from package.functions import doc_2_json_alter as dj_alter
+    except ImportError:
+        try:
+            import package.functions.doc_2_json_alter as dj_alter
+        except ImportError:
+            dj_alter_file_path = os.path.join(base_dir, 'package', 'functions', 'doc_2_json_alter.py')
+            if os.path.exists(dj_alter_file_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("doc_2_json_alter", dj_alter_file_path)
+                dj_alter = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(dj_alter)
+            else:
+                print(f"警告: 未找到 doc_2_json_alter.py 文件在路径: {dj_alter_file_path}")
 except ImportError as e:
     print(f"导入模块失败: {e}")
     sys.exit(1)
@@ -132,54 +147,98 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
                                     print(f"  - [ERROR] 文档信息提取失败")
                                     continue
                                 
-                                # 转换为模板格式
-                                template_data = dj.convert_to_template_format(raw_resume_data, file_emp_no)
-                                if not template_data:
-                                    print(f"  - [ERROR] 数据转换失败")
-                                    continue
+                                # 生成JSON文件名（借鉴batch_render_from_docx中的命名逻辑）
+                                base_name = os.path.splitext(os.path.basename(processed_doc_path))[0]
                                 
-                                # 生成JSON文件名
-                                if template_data:
-                                    name = list(template_data.keys())[0]
-                                    json_filename = f"{file_emp_no.zfill(5)}_{name}_人员简历.json"
-                                    json_file = os.path.join(resume_dir, json_filename)
+                                # 初始化emp_no默认值
+                                emp_no = "unknown"
+                                # 从文件名提取工号和姓名
+                                parts = base_name.split('+')
+                                if len(parts) >= 2:
+                                    emp_no = parts[0]
+                                    name = parts[1]
+                                    json_filename = f"{emp_no}_{name}_人员简历.json"
+                                else:
+                                    json_filename = f"{base_name}.json"
+                                print(f"Processing file: {json_filename}")
+                                print(f"Processing file: {emp_no}")
+
+                                # 转换为模板格式
+                                result = dj.convert_to_template_format(raw_resume_data, emp_no)
+                                if not result:
+                                    print("转换失败，请检查文档数据格式")
                                     
-                                    # 保存JSON文件
-                                    with open(json_file, 'w', encoding='utf-8') as f:
-                                        json.dump(template_data, f, ensure_ascii=False, indent=4)
+                                    continue
+                                # 设置JSON文件路径
+                                json_file = os.path.join(resume_dir, json_filename)
                                     
-                                    print(f"  - [OK] 成功从Word文档生成JSON: {json_filename}")
-                                    """
-                                    # 如果在Excel数据中找到该员工，更新AdditionInfo
-                                    if file_emp_no.zfill(5) in emp_map:
-                                        try:
-                                            resume_data = template_data
-                                            emp_data = emp_map[file_emp_no.zfill(5)]
-                                            if name in resume_data:
-                                                resume_data[name]["AdditionInfo"] = emp_data
-                                                # 写回文件
-                                                updated_content = json.dumps(resume_data, ensure_ascii=False, indent=4)
-                                                with open(json_file, 'w', encoding='utf-8') as f:
-                                                    f.write(updated_content)
-                                                print(f"  - [OK] 已更新AdditionInfo信息")
+                                # 保存JSON文件
+                                with open(json_file, 'w', encoding='utf-8') as f:
+                                    json.dump(result, f, ensure_ascii=False, indent=4)
+
+
+                                if os.path.exists(json_file) and os.path.getsize(json_file) > 0:
+                                    # 读取并验证JSON数据
+                                    with open(json_file, 'r', encoding='utf-8') as f:
+                                        saved_json_data = json.load(f)
+                                    #print(222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222)
+                                    # 检查JSON数据有效性
+                                    if not check_json_data_validity(saved_json_data):
+                                        print(f"JSON数据验证失败: {json_file}，尝试使用备用方法重新生成")
+                                        #print(3333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333)
+                                        # 如果备用模块存在，尝试使用备用方法
+                                        if dj_alter:
+                                            try:
+                                                # 使用备用方法提取和转换数据
+                                                raw_resume_data_alter = dj_alter.extract_resume_alt(processed_doc_path)
+                                                if isinstance(raw_resume_data_alter, dict):
+                                                    result_alter = dj_alter.convert_to_template_format(raw_resume_data_alter, emp_no)
+                                                    if isinstance(result_alter, dict):
+                                                    # 重新保存JSON文件
+                                                        with open(json_file, 'w', encoding='utf-8') as f:
+                                                            json.dump(result_alter, f, ensure_ascii=False, indent=4)
+                                                        
+                                                        # 再次验证备用生成的JSON数据
+                                                        with open(json_file, 'r', encoding='utf-8') as f:
+                                                            saved_json_data_alter = json.load(f)
+                                                        
+                                                            if check_json_data_validity(saved_json_data_alter):
+                                                                print(f"备用方法生成JSON成功: {json_file}")
+                                                                
+                                                            else:
+                                                                print(f"备用方法生成的JSON数据仍然无效: {json_file}")
+                                                                
+                                                                continue
+                                                    else:
+                                                        print("备用方法转换失败")
+                                                        
+                                                        continue
+                                                else:
+                                                    print("备用方法提取数据失败")
+                                                    
+                                                    continue
+                                            except Exception as e:
+                                                print(f"备用方法执行异常: {str(e)}")
                                                 
-                                                # 处理特殊字段信息
-                                                if has_special_info_module and process_directory:
-                                                    try:
-                                                        if process_special_info(json_file):
-                                                            print(f"  - [OK] 特殊字段处理成功")
-                                                        else:
-                                                            print(f"  - [WARNING] 特殊字段处理失败")
-                                                    except Exception as si_e:
-                                                        print(f"  - [ERROR] 特殊字段处理出错: {si_e}")
-                                        except Exception as e:
-                                            print(f"  - [ERROR] 更新AdditionInfo时出错: {e}")
-                                        """
+                                                continue
+                                        else:
+                                            print("备用模块不可用")
+                                            
+                                            continue
+                                    else:
+                                        # JSON数据验证通过
+                                        
+                                        print(f"处理完成，JSON文件已保存至: {json_file}")
+                                else:
+                                    print(f"JSON文件保存失败: {json_file}")
+                                    
+                                    continue
+                                    
                         except Exception as e:
                             print(f"  - [ERROR] 处理文件时出错: {e}")
                             import traceback
                             traceback.print_exc()
-    
+   
     # 查找并更新对应的简历JSON文件（使用Excel数据更新AdditionInfo）
     print(f"\n  - [INFO] 正在更新简历JSON的AdditionInfo信息...")
     for emp_no in target_emp_numbers:
@@ -240,6 +299,35 @@ def update_resume_jsons(employee_numbers, excel_data, base_dir="output", word_di
             print(f"  - [WARNING] 未找到工号 {emp_no} 对应的简历JSON文件")
     
     return updated_count
+    
+def check_json_data_validity(json_data):
+        """验证JSON数据的有效性"""
+        if not isinstance(json_data, dict) or len(json_data) == 0:
+            return False
+            
+        person_key = next(iter(json_data.keys()))
+        person_data = json_data.get(person_key, {})
+        
+        # 检查基本信息关键字段
+        basic_info = person_data.get('BasicInfo', {})
+        required_basic_fields = ['Name', 'EmpNo', 'WorkYears',"GraduationTime","GraduationSchool","Major","HighestEducation","Department","Title","PersonalProfile"]
+        if not all(basic_info.get(field) for field in required_basic_fields if field in basic_info):
+            return False
+        
+        # 检查工作经历和项目经历是否有有效条目
+        work_experience = person_data.get('WorkExperience', [])
+        project_experience = person_data.get('ProjectExperience', [])
+        
+        # 检查工作经历是否有非空条目
+        valid_work_exp = any(exp.get('CompanyName') or exp.get('Position') or exp.get('JobDescription')
+                          for exp in work_experience)
+        
+        # 检查项目经历是否有有效条目
+        valid_project_exp = any(proj.get('ProjectName') or proj.get('ProjectRole') or proj.get('JobDescription')
+                            for proj in project_experience)
+        
+        # 至少需要有工作经历或项目经历的有效条目
+        return valid_work_exp or valid_project_exp
 
 def update_info_jsons(employee_numbers, excel_data, base_dir="output"):
     """

@@ -163,8 +163,8 @@ def extract_basic_info(doc, filename):
     """
     # 初始化基本信息
     basic_info = {
-        'Empno': extract_emp_no_from_filename(filename),
-        'name': '/',
+        'EmpNo': extract_emp_no_from_filename(filename),
+        'Name': '/',
         'WorkYears': '/',
         'GraduationTime': '/',
         'GraduationSchool': '/',
@@ -186,7 +186,7 @@ def extract_basic_info(doc, filename):
     
     # 关键词映射，支持多个关键词变体
     keyword_mapping = {
-        'name': ['姓名', '姓名：',"姓    名"],
+        'Name': ['姓名', '姓名：',"姓    名"],
         'WorkYears': ['工作年限'],
         'GraduationTime': ['毕业时间'],
         'GraduationSchool': ['毕业学校'],
@@ -265,13 +265,13 @@ def convert_to_template_format(raw_resume_data, emp_no):
     basic_info = raw_resume_data.get('BasicInfo', {})
     
     # 提取姓名
-    person_name = basic_info.get('name', '')
+    person_name = basic_info.get('Name', '')
     if not person_name or person_name.strip() == '':
         person_name = 'Unknown'
     
     # 字段名称映射表
     basic_info_mapping = {
-        'Empno': 'EmpNo',
+        'EmpNo': 'EmpNo',
         'Name': 'Name',
         'WorkYears': 'WorkYears',
         'GraduationTime': 'GraduationTime',
@@ -564,8 +564,8 @@ def extract_resume_alt(file_path):
         # 创建原始提取数据结构
         raw_resume_data = {
             'BasicInfo': {
-                'Empno': emp_no,
-                'name': basic_info['name'],
+                'EmpNo': emp_no,
+                'Name': basic_info['Name'],
                 'WorkYears': basic_info['WorkYears'],
                 'GraduationTime': basic_info['GraduationTime'],
                 'GraduationSchool': basic_info['GraduationSchool'],
@@ -589,29 +589,29 @@ def extract_resume_alt(file_path):
         template_formatted_data = convert_to_template_format(raw_resume_data, emp_no)
         
         # 获取人员姓名
-        person_name = basic_info['name'] if basic_info['name'] != '/' else 'Unknown'
+        person_name = basic_info['Name'] if basic_info['Name'] != '/' else 'Unknown'
         
         # 输出结果
-        print(f"【{person_name}的简历 - 原始提取数据】")
-        print(json.dumps(raw_resume_data, ensure_ascii=False, indent=4))
+        #print(f"【{person_name}的简历 - 原始提取数据】")
+        #print(json.dumps(raw_resume_data, ensure_ascii=False, indent=4))
         
         print(f"\n【{person_name}的简历 - 模板格式数据】")
         template_json = json.dumps(template_formatted_data, ensure_ascii=False, indent=4)
         
         # 创建输出目录
-        original_dir = os.path.join(base_dir, "output", "original_json")
+        #original_dir = os.path.join(base_dir, "output", "original_json")
         modify_dir = os.path.join(base_dir, "output", "modify_json")
-        os.makedirs(original_dir, exist_ok=True)
+        #os.makedirs(original_dir, exist_ok=True)
         os.makedirs(modify_dir, exist_ok=True)
         
         # 获取原始文件名（去掉扩展名）
         original_filename = os.path.splitext(os.path.basename(file_path))[0]
         
         # 保存原始提取结果（文件名格式：工号_姓名_人员简历.json）
-        raw_output_filename = os.path.join(original_dir, f"{emp_no}_{person_name}_人员简历.json")
-        with open(raw_output_filename, "w", encoding="utf-8") as f:
-            json.dump(raw_resume_data, f, ensure_ascii=False, indent=2)
-        print(f"[OK] 已保存{person_name}的简历原始提取数据到：{raw_output_filename}")
+        # raw_output_filename = os.path.join(original_dir, f"{emp_no}_{person_name}_人员简历.json")
+        # with open(raw_output_filename, "w", encoding="utf-8") as f:
+        #     json.dump(raw_resume_data, f, ensure_ascii=False, indent=2)
+        # print(f"[OK] 已保存{person_name}的简历原始提取数据到：{raw_output_filename}")
         
         # 保存模板格式数据（文件名格式：工号_姓名_人员简历.json）
         modify_output_filename = os.path.join(modify_dir, f"{emp_no}_{person_name}_人员简历.json")

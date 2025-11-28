@@ -98,7 +98,7 @@ def generate_resume_from_json(person_data, template_path, output_folder, person_
     :return: 生成的简历文件路径。
     """
 
-
+ 
     #todo:添加对xlsx文件的支持,并渲染到模板中，需要判断传入的文件格式
     try:
         # 检查模板文件格式
@@ -473,7 +473,7 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
                         except ImportError:
                             print("错误: 未找到 render_2_excel.py 文件")
                             success_count = 0
-                    
+
                     # 调用批量生成函数
                     batch_success, batch_failed = r2e.batch_generate_resumes_excel(
                         temp_dir, template_path, bankname, 

@@ -14,3 +14,4 @@ tqdm==4.66.1
 ttkthemes==3.2.2
 xlrd==2.0.2
 xlutils==2.0.0
+jsonschema==4.19.2
