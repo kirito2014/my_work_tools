@@ -51,6 +51,8 @@ def process_special_info(json_file_path: str) -> bool:
             # 学位转码逻辑
             if highest_education == "大专":
                 special_info["Degree"] = "/"
+            elif highest_education == "专科":
+                special_info["Degree"] = "/"
             elif highest_education == "本科":
                 special_info["Degree"] = "学士"
             elif highest_education == "研究生":
