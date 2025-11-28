@@ -1611,44 +1611,44 @@ class ResumeGeneratorGUI:
                     try:
                         with open(json_file, 'w', encoding='utf-8') as f:
                             json.dump(result, f, ensure_ascii=False, indent=4)
-                        
+                        print(111111111111111111111111111111111111111111111111111111)
                         # 验证文件是否成功保存
                         if os.path.exists(json_file) and os.path.getsize(json_file) > 0:
                             # 读取并验证JSON数据
                             with open(json_file, 'r', encoding='utf-8') as f:
                                 saved_json_data = json.load(f)
-                            
+                            print(222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222)
                             # 检查JSON数据有效性
                             if not self.check_json_data_validity(saved_json_data):
                                 self._log(f"JSON数据验证失败: {json_file}，尝试使用备用方法重新生成")
-                                
+                                print(3333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333)
                                 # 如果备用模块存在，尝试使用备用方法
                                 if dj_alter:
                                     try:
                                         # 使用备用方法提取和转换数据
-                                        raw_resume_data_alter = dj_alter.extract_resume_universal(processed_doc_path)
+                                        raw_resume_data_alter = dj_alter.extract_resume_alt(processed_doc_path)
                                         if raw_resume_data_alter:
-                                            result_alter = dj_alter.convert_to_template_format(raw_resume_data_alter, emp_no)
-                                            if result_alter:
-                                                # 重新保存JSON文件
-                                                with open(json_file, 'w', encoding='utf-8') as f:
-                                                    json.dump(result_alter, f, ensure_ascii=False, indent=4)
-                                                
-                                                # 再次验证备用生成的JSON数据
-                                                with open(json_file, 'r', encoding='utf-8') as f:
-                                                    saved_json_data_alter = json.load(f)
-                                                
-                                                if self.check_json_data_validity(saved_json_data_alter):
-                                                    self._log(f"备用方法生成JSON成功: {json_file}")
-                                                    processed_files += 1
-                                                else:
-                                                    self._log(f"备用方法生成的JSON数据仍然无效: {json_file}")
-                                                    failed_files += 1
-                                                    continue
+                                            #result_alter = dj_alter.convert_to_template_format(raw_resume_data_alter, emp_no)
+                                            #if result_alter:
+                                            # 重新保存JSON文件
+                                            with open(json_file, 'w', encoding='utf-8') as f:
+                                                json.dump(result_alter, f, ensure_ascii=False, indent=4)
+                                            
+                                            # 再次验证备用生成的JSON数据
+                                            with open(json_file, 'r', encoding='utf-8') as f:
+                                                saved_json_data_alter = json.load(f)
+                                            
+                                            if self.check_json_data_validity(saved_json_data_alter):
+                                                self._log(f"备用方法生成JSON成功: {json_file}")
+                                                processed_files += 1
                                             else:
-                                                self._log("备用方法转换失败")
+                                                self._log(f"备用方法生成的JSON数据仍然无效: {json_file}")
                                                 failed_files += 1
                                                 continue
+                                            #else:
+                                                # self._log("备用方法转换失败")
+                                                # failed_files += 1
+                                                # continue
                                         else:
                                             self._log("备用方法提取数据失败")
                                             failed_files += 1
