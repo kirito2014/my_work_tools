@@ -186,14 +186,14 @@ def extract_basic_info(doc, filename):
     
     # 关键词映射，支持多个关键词变体
     keyword_mapping = {
-        'Name': ['姓名', '姓名：',"姓    名"],
+        'Name': ['姓名', '姓名：', "姓    名"],
         'WorkYears': ['工作年限'],
         'GraduationTime': ['毕业时间'],
         'GraduationSchool': ['毕业学校'],
-        'Major': ['专业', '所学专业',"专    业"],
+        'Major': ['专业', '所学专业', "专    业"],
         'HighestEducation': ['最高学历', '学历'],
         'Department': ['所在部门', '部门'],
-        'Title': ['职称', '职位', '岗位',"职    称"],
+        'Title': ['职称', '职位', '岗位', "职    称"],
         'PersonalProfile': ['个人简介', '个人概述', '自我介绍'],
         'BusinessAbility': ['业务与技术能力', '业务与技术能力详述', '技术能力', '技能'],
         'Certification': ['资质认证', '证书', '认证'],
@@ -216,6 +216,19 @@ def extract_basic_info(doc, filename):
                     # 尝试所有可能的关键词变体
                     for keyword in keywords:
                         if getPosCell(table, r, c, keyword):
+                            # 对HighestEducation字段进行特殊处理，检查关键词后是否有冒号
+                            cell_text = cell.text.strip()
+                            if field == 'HighestEducation':
+                                # 仅匹配完全等于关键词的单元格
+                                if cell_text != keyword:
+                                    # 检查是否以关键词加冒号开头
+                                    pattern = re.compile(rf'^{re.escape(keyword)}[:：]')
+                                    if pattern.search(cell_text):
+                                        logger.debug(f"跳过包含冒号的{field}关键词: {cell_text}")
+                                    else:
+                                        logger.debug(f"跳过非精确匹配的{field}关键词: {cell_text}")
+                                    continue
+                            
                             # 尝试获取下一个单元格的值
                             if c + 1 < len(row.cells):
                                 value = table.rows[r].cells[c+1].text.strip()
@@ -229,6 +242,18 @@ def extract_basic_info(doc, filename):
                                 # 尝试提取关键词后面的内容
                                 for keyword_variant in keywords:
                                     if keyword_variant in cell_text:
+                                        # 对HighestEducation字段进行特殊处理
+                                        if field == 'HighestEducation':
+                                            # 仅匹配完全等于关键词的单元格
+                                            if cell_text != keyword_variant:
+                                                # 检查是否以关键词加冒号开头
+                                                pattern = re.compile(rf'^{re.escape(keyword_variant)}[:：]')
+                                                if pattern.search(cell_text):
+                                                    logger.debug(f"跳过包含冒号的{field}关键词: {cell_text}")
+                                                else:
+                                                    logger.debug(f"跳过非精确匹配的{field}关键词: {cell_text}")
+                                                continue
+                                        
                                         # 尝试提取关键词后面的内容
                                         try:
                                             value = cell_text.split(keyword_variant, 1)[1].strip()
@@ -243,6 +268,14 @@ def extract_basic_info(doc, filename):
         if all(value != '/' for value in basic_info.values()):
             logger.debug("所有基本信息已找到，提前退出")
             break
+    
+    # 在最后处理特定字段中的中文冒号替换为英文冒号
+    fields_to_process = ['GraduationTime', 'GraduationSchool', 'Major']
+    for field in fields_to_process:
+        if basic_info[field] != '/':
+            # 将中文冒号替换为英文冒号
+            basic_info[field] = basic_info[field].replace('：', ':')
+            logger.debug(f"已将 {field} 中的中文冒号替换为英文冒号: {basic_info[field]}")
     
     # 按照要求不对学历进行处理
     return basic_info
