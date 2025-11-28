@@ -76,6 +76,7 @@ KEY_MAPPINGS = {
     'Degree': 'degree',
     'StartWorkDate': 'workdt',
     'EducationList': 'edu',
+    'DegreeType': 'type',
 }
 
 

@@ -229,14 +229,33 @@ def extract_basic_info(doc, filename):
                                         logger.debug(f"跳过非精确匹配的{field}关键词: {cell_text}")
                                     continue
                             
-                            # 尝试获取下一个单元格的值
-                            if c + 1 < len(row.cells):
-                                value = table.rows[r].cells[c+1].text.strip()
-                                if value:  # 确保值不为空
-                                    basic_info[field] = value
-                                    logger.debug(f"在表格 {table_idx+1} 行 {r+1} 列 {c+1} 找到 {field}: {value}")
+                            # 尝试获取右侧单元格的值，跳过与关键词相同的内容
+                            found_value = None
+                            current_col = c + 1
+                            
+                            # 向右查找直到找到有效值或到达行尾
+                            while current_col < len(row.cells):
+                                candidate_value = table.rows[r].cells[current_col].text.strip()
+                                
+                                # 如果候选值与任何关键词变体都不相同，则认为是有效值
+                                is_keyword = False
+                                for keyword_variant in keywords:
+                                    if clean_keyword(candidate_value) == clean_keyword(keyword_variant):
+                                        is_keyword = True
+                                        break
+                                
+                                if candidate_value and not is_keyword:
+                                    found_value = candidate_value
                                     break
-                            # 如果没有下一个单元格，尝试获取同一单元格中的内容（关键词后面的部分）
+                                
+                                current_col += 1
+                            
+                            if found_value:
+                                basic_info[field] = found_value
+                                logger.debug(f"在表格 {table_idx+1} 行 {r+1} 列 {current_col+1} 找到 {field}: {found_value}")
+                                break
+                            
+                            # 如果没有找到右侧的有效值，尝试获取同一单元格中的内容（关键词后面的部分）
                             else:
                                 cell_text = cell.text.strip()
                                 # 尝试提取关键词后面的内容
@@ -258,9 +277,17 @@ def extract_basic_info(doc, filename):
                                         try:
                                             value = cell_text.split(keyword_variant, 1)[1].strip()
                                             if value:
-                                                basic_info[field] = value
-                                                logger.debug(f"在表格 {table_idx+1} 行 {r+1} 列 {c+1} 同一单元格中找到 {field}: {value}")
-                                                break
+                                                # 检查提取的值是否不是关键词
+                                                is_extracted_keyword = False
+                                                for kw in keywords:
+                                                    if clean_keyword(value) == clean_keyword(kw):
+                                                        is_extracted_keyword = True
+                                                        break
+                                                
+                                                if not is_extracted_keyword:
+                                                    basic_info[field] = value
+                                                    logger.debug(f"在表格 {table_idx+1} 行 {r+1} 列 {c+1} 同一单元格中找到 {field}: {value}")
+                                                    break
                                         except:
                                             pass
                     
