@@ -19,6 +19,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 处理PyInstaller打包后的路径问题
+if getattr(sys, 'frozen', False):
+    # 打包后的环境
+    base_dir = os.path.dirname(sys.executable)
+    # 确保工作目录设置为当前目录（exe所在目录）
+    os.chdir(base_dir)
+else:
+    # 开发环境
+    # 获取项目根目录（package 的上两级）
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+# 添加项目根目录到Python路径，以便能够导入package模块
+sys.path.append(base_dir)
 
 '''
 功能: 判断是否docx文件（通过文件头magic number）
@@ -596,8 +608,18 @@ def extract_resume_alt(file_path):
         bool: 是否成功提取
     """
     try:
-        # 获取base_dir，确保在打包环境中输出到正确位置
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        # 处理PyInstaller打包后的路径问题
+        if getattr(sys, 'frozen', False):
+            # 打包后的环境
+            base_dir = os.path.dirname(sys.executable)
+            # 确保工作目录设置为当前目录（exe所在目录）
+            os.chdir(base_dir)
+        else:
+            # 开发环境
+            # 获取项目根目录（package 的上两级）
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+        # 添加项目根目录到Python路径，以便能够导入package模块
+        sys.path.append(base_dir)
         
         # 检查文件格式
         is_valid, file_path = check_file_format(file_path)
@@ -659,19 +681,19 @@ def extract_resume_alt(file_path):
         template_json = json.dumps(template_formatted_data, ensure_ascii=False, indent=4)
         
         # 创建输出目录
-        original_dir = os.path.join(base_dir, "output", "original_json")
+        #original_dir = os.path.join(base_dir, "output", "original_json")
         modify_dir = os.path.join(base_dir, "output", "modify_json")
-        os.makedirs(original_dir, exist_ok=True)
+        #os.makedirs(original_dir, exist_ok=True)
         os.makedirs(modify_dir, exist_ok=True)
         
         # 获取原始文件名（去掉扩展名）
         original_filename = os.path.splitext(os.path.basename(file_path))[0]
         
         # 保存原始提取结果（文件名格式：工号_姓名_人员简历.json）
-        raw_output_filename = os.path.join(original_dir, f"{emp_no}_{person_name}_人员简历.json")
-        with open(raw_output_filename, "w", encoding="utf-8") as f:
-            json.dump(raw_resume_data, f, ensure_ascii=False, indent=2)
-        print(f"[OK] 已保存{person_name}的简历原始提取数据到：{raw_output_filename}")
+        # raw_output_filename = os.path.join(original_dir, f"{emp_no}_{person_name}_人员简历.json")
+        # with open(raw_output_filename, "w", encoding="utf-8") as f:
+        #     json.dump(raw_resume_data, f, ensure_ascii=False, indent=2)
+        # print(f"[OK] 已保存{person_name}的简历原始提取数据到：{raw_output_filename}")
         
         # 保存模板格式数据（文件名格式：工号_姓名_人员简历.json）
         modify_output_filename = os.path.join(modify_dir, f"{emp_no}_{person_name}_人员简历.json")

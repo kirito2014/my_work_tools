@@ -14,7 +14,8 @@ if getattr(sys, 'frozen', False):
     os.chdir(base_dir)
 else:
     # 开发环境
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # 获取项目根目录（package 的上两级）
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 # 添加项目根目录到Python路径，以便能够导入package模块
 sys.path.append(base_dir)
 
