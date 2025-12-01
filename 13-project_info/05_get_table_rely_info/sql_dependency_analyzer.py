@@ -746,13 +746,13 @@ class ResultExporter:
                             cls='text-lg text-gray-600 mb-6')
                             
                             # 配置信息
-                            with div(cls='bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4'):
-                                with div(cls='text-sm text-yellow-800'):
-                                    p('当前配置：')
-                                    config_ul = ul(cls='list-disc list-inside mt-2')
-                                    with config_ul:
-                                        li(f'后缀处理: {"开启" if remove_suffix == "Y" else "关闭"} (标识符: {suffix_identifier})')
-                                        li(f'来源库筛选: {filter_schema}')
+                            # with div(cls='bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4'):
+                            #     with div(cls='text-sm text-yellow-800'):
+                            #         p('当前配置：')
+                            #         config_ul = ul(cls='list-disc list-inside mt-2')
+                            #         with config_ul:
+                            #             li(f'后缀处理: {"开启" if remove_suffix == "Y" else "关闭"} (标识符: {suffix_identifier})')
+                            #             li(f'来源库筛选: {filter_schema}')
                             
                             # 统计信息卡片
                             with div(cls='grid grid-cols-1 md:grid-cols-3 gap-6'):
