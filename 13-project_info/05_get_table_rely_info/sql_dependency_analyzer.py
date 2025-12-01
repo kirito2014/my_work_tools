@@ -261,22 +261,23 @@ class SQLDependencyAnalyzer:
         table_clean = self._clean_table_name(table_name)
         
         # 排除自引用
-        if (self.config['filters']['exclude_self_reference'] and 
+        if (self.config.get('filters', {}).get('exclude_self_reference', True) and 
             source_base in table_clean):
             return False
         
         # 排除同层引用
-        if (self.config['filters']['exclude_same_layer'] and 
+        if (self.config.get('filters', {}).get('exclude_same_layer', True) and 
             self._is_same_layer(source_base, table_clean)):
             return False
         
         # 排除模式
-        for pattern in self.config['filters']['exclude_patterns']:
+        exclude_patterns = self.config.get('filters', {}).get('exclude_patterns', [])
+        for pattern in exclude_patterns:
             if re.search(pattern, table_clean, re.IGNORECASE):
                 return False
         
         # 包含模式（如果有定义）
-        include_patterns = self.config['filters']['include_patterns']
+        include_patterns = self.config.get('filters', {}).get('include_patterns', [])
         if include_patterns:
             for pattern in include_patterns:
                 if re.search(pattern, table_clean, re.IGNORECASE):
@@ -288,7 +289,8 @@ class SQLDependencyAnalyzer:
     def _clean_table_name(self, table_name: str) -> str:
         """清理表名"""
         cleaned = table_name
-        for pattern in self.config['regex_patterns']['table_cleanup']:
+        cleanup_patterns = self.config['regex_patterns'].get('table_cleanup', [])
+        for pattern in cleanup_patterns:
             cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
         return cleaned
     
@@ -302,10 +304,8 @@ class SQLDependencyAnalyzer:
         """处理文件夹中的所有SQL文件"""
         data = []
         
-        # 获取所有SQL文件
-        sql_files = []
-        for ext in ['hql', 'sql', 'HQL', 'SQL']:
-            sql_files.extend(Path(folder_path).glob(f"**/*.{ext}"))
+        # 修复：使用更精确的文件搜索方法，避免重复
+        sql_files = self._find_sql_files(folder_path)
         
         total_files = len(sql_files)
         if total_files == 0:
@@ -316,7 +316,7 @@ class SQLDependencyAnalyzer:
         
         for i, file_path in enumerate(sql_files, 1):
             try:
-                file_data = self.process_single_file(str(file_path))
+                file_data = self.process_single_file(file_path)
                 data.extend(file_data)
                 
                 # 更新进度
@@ -328,6 +328,33 @@ class SQLDependencyAnalyzer:
         print()  # 进度条换行
         logger.info(f"分析完成，共处理 {len(data)} 条依赖关系")
         return data
+
+    def _find_sql_files(self, folder_path: str) -> List[str]:
+        """
+        查找SQL文件，避免重复
+        修复：使用不区分大小写的搜索，但去重
+        """
+        sql_files = set()  # 使用集合避免重复
+        folder = Path(folder_path)
+        
+        # 首先尝试使用不区分大小写的搜索
+        pattern = re.compile(r'.*\.(hql|sql)$', re.IGNORECASE)
+        
+        for file_path in folder.rglob('*'):
+            if file_path.is_file() and pattern.match(file_path.name):
+                # 使用规范化的路径来避免重复
+                normalized_path = str(file_path.resolve())
+                sql_files.add(normalized_path)
+        
+        # 转换为列表并排序
+        result = sorted(list(sql_files))
+        
+        # 调试信息
+        logger.debug(f"找到的SQL文件列表:")
+        for i, file_path in enumerate(result, 1):
+            logger.debug(f"  {i:3d}. {os.path.basename(file_path)}")
+        
+        return result
     
     def process_single_file(self, file_path: str) -> List[Tuple]:
         """处理单个SQL文件"""
@@ -385,7 +412,7 @@ class SQLDependencyAnalyzer:
     
     def _update_progress(self, current: int, total: int, prefix: str = "处理"):
         """更新进度条"""
-        bar_length = self.config['progress']['bar_length']
+        bar_length = self.config.get('progress', {}).get('bar_length', 30)
         progress = current / total
         block = int(bar_length * progress)
         percentage = progress * 100
@@ -556,6 +583,9 @@ def main():
   
   # 指定输出格式和配置文件
   python sql_dependency_analyzer.py /path/to/sql/scripts -o output.csv -f csv -c my_config.yaml
+  
+  # 显示详细日志（包含文件列表）
+  python sql_dependency_analyzer.py /path/to/sql/scripts -v
         """
     )
     
@@ -569,13 +599,14 @@ def main():
     parser.add_argument('-d', '--dependency-file', 
                        help='依赖清单文件路径（用于生成完整依赖信息）')
     parser.add_argument('-v', '--verbose', action='store_true',
-                       help='显示详细日志信息')
+                       help='显示详细日志信息（包含找到的文件列表）')
     
     args = parser.parse_args()
     
     # 设置日志级别
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+        logger.info("启用详细日志模式")
     
     # 检查文件夹是否存在
     if not os.path.exists(args.folder_path):
