@@ -12,7 +12,7 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 import threading
 import queue
 from pathlib import Path
-import yaml
+import yaml  # 在顶部导入yaml
 import logging
 from datetime import datetime
 
@@ -69,7 +69,8 @@ class SQLDependencyAnalyzerGUI:
         
         # 初始化变量
         self.config_path = tk.StringVar()
-        self.output_path = tk.StringVar()
+        self.output_folder = tk.StringVar()
+        self.output_filename = tk.StringVar(value="dependency_analysis")
         self.output_format = tk.StringVar(value="excel")
         self.dependency_file_path = tk.StringVar()
         self.folder_path = tk.StringVar()
@@ -93,7 +94,7 @@ class SQLDependencyAnalyzerGUI:
         """设置窗口图标"""
         try:
             # 尝试加载图标文件
-            icon_path = "sunline.ico"
+            icon_path = "icon.ico"
             if os.path.exists(icon_path):
                 self.root.iconbitmap(icon_path)
         except:
@@ -111,9 +112,8 @@ class SQLDependencyAnalyzerGUI:
         else:
             self.config_path.set(default_config)
         
-        # 设置默认输出文件路径
-        default_output = os.path.join(current_dir, "dependency_analysis.xlsx")
-        self.output_path.set(default_output)
+        # 设置默认输出文件夹
+        self.output_folder.set(current_dir)
     
     def _create_styles(self):
         """创建样式"""
@@ -273,36 +273,45 @@ class SQLDependencyAnalyzerGUI:
         
         row += 1
         
-        # 输出文件选择
-        ttk.Label(parent, text="输出文件:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        # 输出文件夹选择
+        ttk.Label(parent, text="输出文件夹:").grid(row=row, column=0, sticky=tk.W, pady=5)
         
-        output_entry = ttk.Entry(parent, textvariable=self.output_path, width=50)
-        output_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
+        folder_output_entry = ttk.Entry(parent, textvariable=self.output_folder, width=50)
+        folder_output_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
         
         ttk.Button(
             parent, 
             text="浏览", 
-            command=lambda: self.browse_file(self.output_path, "选择输出文件", 
-                                           [("Excel文件", "*.xlsx"), ("CSV文件", "*.csv"), 
-                                            ("JSON文件", "*.json"), ("HTML文件", "*.html"),
-                                            ("所有文件", "*.*")])
+            command=lambda: self.browse_folder(self.output_folder)
         ).grid(row=row, column=2, padx=5, pady=5)
         
         row += 1
         
-        # 输出格式选择
-        ttk.Label(parent, text="输出格式:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        # 输出文件名
+        ttk.Label(parent, text="输出文件名:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        
+        filename_frame = ttk.Frame(parent)
+        filename_frame.grid(row=row, column=1, sticky=tk.W, padx=5, pady=5)
+        
+        filename_entry = ttk.Entry(filename_frame, textvariable=self.output_filename, width=30)
+        filename_entry.pack(side=tk.LEFT)
         
         format_combo = ttk.Combobox(
-            parent, 
+            filename_frame, 
             textvariable=self.output_format, 
             values=["excel", "csv", "json", "html"],
             state="readonly",
-            width=20
+            width=10
         )
-        format_combo.grid(row=row, column=1, sticky=tk.W, padx=5, pady=5)
+        format_combo.pack(side=tk.LEFT, padx=(5, 0))
         
-        row += 1
+        # 显示完整路径
+        ttk.Label(parent, text="完整路径:").grid(row=row+1, column=0, sticky=tk.W, pady=5)
+        
+        self.full_path_label = ttk.Label(parent, text="", foreground="blue")
+        self.full_path_label.grid(row=row+1, column=1, columnspan=2, sticky=tk.W, padx=5, pady=5)
+        
+        row += 2
         
         # 依赖清单文件选择
         ttk.Label(parent, text="依赖清单文件:").grid(row=row, column=0, sticky=tk.W, pady=5)
@@ -352,6 +361,38 @@ class SQLDependencyAnalyzerGUI:
         
         # 配置权重
         parent.columnconfigure(1, weight=1)
+        
+        # 绑定事件来更新完整路径显示
+        self.output_folder.trace_add("write", self._update_full_path)
+        self.output_filename.trace_add("write", self._update_full_path)
+        self.output_format.trace_add("write", self._update_full_path)
+        
+        # 初始更新
+        self._update_full_path()
+    
+    def _update_full_path(self, *args):
+        """更新完整路径显示"""
+        folder = self.output_folder.get()
+        filename = self.output_filename.get()
+        format_ = self.output_format.get()
+        
+        if folder and filename:
+            # 确保文件名有正确的扩展名
+            extension_map = {
+                'excel': '.xlsx',
+                'csv': '.csv',
+                'json': '.json',
+                'html': '.html'
+            }
+            
+            extension = extension_map.get(format_, '.xlsx')
+            
+            # 如果文件名已经包含扩展名，确保它是正确的
+            base_name = os.path.splitext(filename)[0]
+            full_filename = base_name + extension
+            
+            full_path = os.path.join(folder, full_filename)
+            self.full_path_label.config(text=full_path)
     
     def _create_log_tab(self, parent):
         """创建日志标签页"""
@@ -395,7 +436,7 @@ class SQLDependencyAnalyzerGUI:
     def browse_folder(self, path_var):
         """浏览文件夹"""
         folder = filedialog.askdirectory(
-            title="选择SQL文件夹",
+            title="选择文件夹",
             initialdir=path_var.get() if path_var.get() else os.getcwd()
         )
         
@@ -430,7 +471,6 @@ class SQLDependencyAnalyzerGUI:
             
             if self.config_data:
                 # 格式化YAML内容
-                import yaml
                 formatted_config = yaml.dump(
                     self.config_data, 
                     allow_unicode=True, 
@@ -511,6 +551,19 @@ class SQLDependencyAnalyzerGUI:
             messagebox.showwarning("警告", "SQL文件夹不存在")
             return
         
+        # 检查输出文件夹
+        output_folder = self.output_folder.get()
+        if not output_folder:
+            messagebox.showwarning("警告", "请选择输出文件夹")
+            return
+        
+        if not os.path.exists(output_folder):
+            try:
+                os.makedirs(output_folder, exist_ok=True)
+            except Exception as e:
+                messagebox.showerror("错误", f"创建输出文件夹失败: {e}")
+                return
+        
         # 重置进度条
         self.progress_var.set(0)
         self.progress_label.config(text="0%")
@@ -527,12 +580,29 @@ class SQLDependencyAnalyzerGUI:
     def run_analysis(self):
         """运行分析任务"""
         try:
+            # 构建输出文件路径
+            output_folder = self.output_folder.get()
+            filename = self.output_filename.get()
+            format_ = self.output_format.get()
+            
+            # 确保文件名有正确的扩展名
+            extension_map = {
+                'excel': '.xlsx',
+                'csv': '.csv',
+                'json': '.json',
+                'html': '.html'
+            }
+            
+            extension = extension_map.get(format_, '.xlsx')
+            base_name = os.path.splitext(filename)[0]
+            output_file = os.path.join(output_folder, base_name + extension)
+            
             # 准备参数
             args = {
                 'folder_path': self.folder_path.get(),
-                'output': self.output_path.get(),
+                'output': output_file,
                 'config': self.config_path.get(),
-                'format': self.output_format.get(),
+                'format': format_,
                 'dependency_file': self.dependency_file_path.get() or None,
                 'verbose': self.verbose_mode.get()
             }
@@ -605,7 +675,8 @@ class SQLDependencyAnalyzerGUI:
                 f"分析完成！\n\n"
                 f"处理文件数: {total_files}\n"
                 f"依赖关系数: {len(data)}\n"
-                f"输出文件: {args['output']}"
+                f"输出文件: {args['output']}\n\n"
+                f"输出文件夹: {output_folder}"
             ))
             
         except Exception as e:
@@ -629,19 +700,9 @@ class SQLDependencyAnalyzerGUI:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         formatted_message = f"[{timestamp}] [{level}] {message}"
         
-        # 根据日志级别设置颜色
-        colors = {
-            "INFO": "black",
-            "WARNING": "orange",
-            "ERROR": "red",
-            "DEBUG": "gray"
-        }
-        
-        color = colors.get(level, "black")
-        
         # 在日志文本框中添加消息
         self.log_text.configure(state='normal')
-        self.log_text.insert(tk.END, formatted_message + '\n', color)
+        self.log_text.insert(tk.END, formatted_message + '\n')
         self.log_text.see(tk.END)
         self.log_text.configure(state='disabled')
     
@@ -653,11 +714,14 @@ class SQLDependencyAnalyzerGUI:
     
     def save_log(self):
         """保存日志到文件"""
+        # 使用输出文件夹作为默认保存位置
+        default_dir = self.output_folder.get() if self.output_folder.get() else os.getcwd()
+        
         filename = filedialog.asksaveasfilename(
             title="保存日志文件",
             defaultextension=".log",
             filetypes=[("日志文件", "*.log"), ("文本文件", "*.txt"), ("所有文件", "*.*")],
-            initialdir=os.getcwd()
+            initialdir=default_dir
         )
         
         if filename:
