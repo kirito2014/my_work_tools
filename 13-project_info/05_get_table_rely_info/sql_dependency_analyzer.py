@@ -17,6 +17,8 @@ from typing import List, Dict, Tuple, Optional, Any
 from pathlib import Path
 import json
 import logging
+from dominate import document
+from dominate.tags import *
 
 # 配置日志
 logging.basicConfig(
@@ -588,8 +590,10 @@ class ResultExporter:
         
         logger.info(f"JSON文件已保存: {output_file}")
     
+
+
     def export_to_html(self, data: List[Tuple], output_file: str):
-        """导出到HTML"""
+        """导出到HTML - 使用dominate库安全生成"""
         logger.info(f"正在导出结果到HTML: {output_file}")
         
         columns = [col['name'] for col in self.config['output']['basic_columns']]
@@ -598,17 +602,13 @@ class ResultExporter:
         # 获取列标题映射
         column_titles = {col['name']: col['title'] for col in self.config['output']['basic_columns']}
         
-        # 重命名列以使用中文标题
-        df_display = df.rename(columns=column_titles)
+        # 创建HTML文档
+        doc = document(title='SQL依赖关系分析报告')
         
-        html_content = """
-        <!DOCTYPE html>
-        <html lang="zh-CN">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>SQL依赖关系分析报告</title>
-            <style>
+        with doc.head:
+            meta(charset='UTF-8')
+            meta(name='viewport', content='width=device-width, initial-scale=1.0')
+            style("""
                 * {
                     margin: 0;
                     padding: 0;
@@ -686,36 +686,46 @@ class ResultExporter:
                         font-size: 12px;
                     }
                 }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>📊 SQL依赖关系分析报告</h1>
-                
-                <div class="summary">
-                    <strong>报告摘要：</strong><br>
-                    • 生成时间: {generate_time}<br>
-                    • 总记录数: {record_count} 条<br>
-                    • 数据表数量: {table_count} 个
-                </div>
-                
-                {table_content}
-                
-                <div class="timestamp">
-                    生成时间: {generate_time} | 工具版本: 2.0
-                </div>
-            </div>
-        </body>
-        </html>
-        """.format(
-            generate_time=pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S'),
-            record_count=len(df),
-            table_count=df['target_table'].nunique(),
-            table_content=df_display.to_html(index=False, escape=False, classes='data-table')
-        )
+            """)
         
+        generate_time = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
+        record_count = len(df)
+        table_count = df['target_table'].nunique()
+        
+        with doc:
+            with div(cls='container'):
+                h1('📊 SQL依赖关系分析报告')
+                
+                with div(cls='summary'):
+                    strong('报告摘要：')
+                    br()
+                    p(f'• 生成时间: {generate_time}')
+                    p(f'• 总记录数: {record_count} 条')
+                    p(f'• 数据表数量: {table_count} 个')
+                
+                # 创建表格
+                with table().add(tbody()):
+                    # 表头
+                    with tr():
+                        for col_config in self.config['output']['basic_columns']:
+                            th(col_config['title'])
+                    
+                    # 表格数据
+                    for _, row in df.iterrows():
+                        with tr():
+                            for col in columns:
+                                value = row[col]
+                                if pd.isna(value):
+                                    td('')
+                                else:
+                                    td(str(value))
+                
+                with div(cls='timestamp'):
+                    p(f'生成时间: {generate_time} | 工具版本: 2.0')
+        
+        # 写入文件
         with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(html_content)
+            f.write(doc.render())
         
         logger.info(f"HTML文件已保存: {output_file}")
 
