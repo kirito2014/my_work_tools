@@ -1,6 +1,12 @@
 # config.yaml
 # SQL依赖关系分析工具配置文件
 
+# 新增配置项
+processing:
+  remove_suffix: "Y"  # 是否去除后缀：Y/N，默认Y
+  suffix_identifier: "_PC"  # 后缀标识符，默认_PC
+  filter_schema: "AGL"  # 筛选值，默认AGL，用于筛选掉对应的来源库和表名
+
 # 项目配置
 projects:
   AGL:
@@ -102,6 +108,10 @@ output:
     - name: "source_table_clean"
       title: "清理后表名"
       width: 35
+    - name: "file_name"  # 新增文件名列，默认不显示
+      title: "文件名"
+      width: 30
+      hidden: true  # HTML中默认不显示
   extended_columns:
     - name: "etl_job_no"
       title: "作业编号"

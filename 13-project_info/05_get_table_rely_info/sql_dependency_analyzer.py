@@ -228,7 +228,7 @@ class SQLDependencyAnalyzer:
         return None
     
     def get_base_table_name(self, file_name: str) -> str:
-        """从文件名提取基础表名"""
+        """从文件名提取基础表名，根据配置决定是否去除后缀"""
         file_upper = file_name.upper()
         
         # 移除扩展名
@@ -245,21 +245,31 @@ class SQLDependencyAnalyzer:
         for pattern in patterns:
             base_name = re.sub(pattern, '', base_name)
         
+        # 根据配置决定是否去除后缀
+        remove_suffix = self.config.get('processing', {}).get('remove_suffix', 'Y') == 'Y'
+        if remove_suffix:
+            suffix_identifier = self.config.get('processing', {}).get('suffix_identifier', '_PC')
+            # 去除后缀标识符
+            base_name = re.sub(f'{re.escape(suffix_identifier)}$', '', base_name, flags=re.IGNORECASE)
+        
         return base_name
-    
+
     def intelligent_filter_tables(self, source_file: str, table_names: List[str]) -> List[str]:
-        """智能过滤表名"""
+        """智能过滤表名，根据配置筛选掉指定的来源库"""
         filtered_tables = []
         source_base = self.get_base_table_name(source_file)
         
+        # 获取配置的筛选值
+        filter_schema = self.config.get('processing', {}).get('filter_schema', 'AGL')
+        
         for table_name in table_names:
-            if self._should_include_table(source_base, table_name):
+            if self._should_include_table(source_base, table_name, filter_schema):
                 filtered_tables.append(table_name)
         
         return list(set(filtered_tables))
-    
-    def _should_include_table(self, source_base: str, table_name: str) -> bool:
-        """判断是否应该包含该表"""
+
+    def _should_include_table(self, source_base: str, table_name: str, filter_schema: str) -> bool:
+        """判断是否应该包含该表，根据配置筛选掉指定的来源库"""
         table_clean = self._clean_table_name(table_name)
         
         # 排除自引用
@@ -270,6 +280,10 @@ class SQLDependencyAnalyzer:
         # 排除同层引用
         if (self.config.get('filters', {}).get('exclude_same_layer', True) and 
             self._is_same_layer(source_base, table_clean)):
+            return False
+        
+        # 根据配置筛选掉指定的来源库
+        if filter_schema and table_name.startswith(f"{filter_schema}."):
             return False
         
         # 排除模式
@@ -390,7 +404,8 @@ class SQLDependencyAnalyzer:
                     metadata['developer'],                  # 开发人员
                     table_name,                             # 来源表名
                     source_schema,                          # 来源库名
-                    source_table_clean                      # 清理后表名
+                    source_table_clean,                     # 清理后表名
+                    file_name                               # 新增：文件名
                 ))
                 
         except Exception as e:
