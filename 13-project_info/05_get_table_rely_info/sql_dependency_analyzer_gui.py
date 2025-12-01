@@ -12,7 +12,7 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 import threading
 import queue
 from pathlib import Path
-import yaml
+import yaml  # 在顶部导入yaml
 import logging
 from datetime import datetime
 
@@ -59,7 +59,7 @@ class SQLDependencyAnalyzerGUI:
             self.root = ThemedTk()
         
         self.root.title("SQL依赖关系分析工具 v2.0")
-        self.root.geometry("1000x850")  # 增加高度以适应新的配置界面
+        self.root.geometry("1000x750")
         
         # 设置图标（如果有）
         self._set_icon()
@@ -77,9 +77,6 @@ class SQLDependencyAnalyzerGUI:
         self.verbose_mode = tk.BooleanVar(value=False)
         self.config_data = {}
         self.is_running = False
-        
-        # 配置项变量
-        self.config_vars = {}
         
         # 设置默认值
         self._set_default_paths()
@@ -142,10 +139,6 @@ class SQLDependencyAnalyzerGUI:
             title_font = (font_name, 12, "bold")
             style.configure("Title.TLabel", font=title_font)
             
-            # 分组标题字体
-            group_font = (font_name, 11, "bold")
-            style.configure("Group.TLabel", font=group_font)
-            
         except Exception:
             # 如果微软雅黑不可用，使用默认字体
             pass
@@ -154,7 +147,6 @@ class SQLDependencyAnalyzerGUI:
         style.configure("Success.TLabel", foreground="green")
         style.configure("Error.TLabel", foreground="red")
         style.configure("Warning.TLabel", foreground="orange")
-        style.configure("Group.TLabel", foreground="#2c3e50", background="#ecf0f1")
     
     def _create_widgets(self):
         """创建界面控件"""
@@ -226,253 +218,42 @@ class SQLDependencyAnalyzerGUI:
         ).pack(side=tk.LEFT, padx=5)
     
     def _create_config_tab(self, parent):
-        """创建配置标签页 - 填空版本"""
-        # 创建滚动框架
-        canvas = tk.Canvas(parent, borderwidth=0)
-        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
+        """创建配置标签页"""
         # 配置文件选择
         row = 0
-        ttk.Label(scrollable_frame, text="配置文件:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Label(parent, text="配置文件:").grid(row=row, column=0, sticky=tk.W, pady=5)
         
-        config_entry = ttk.Entry(scrollable_frame, textvariable=self.config_path, width=50)
+        config_entry = ttk.Entry(parent, textvariable=self.config_path, width=50)
         config_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
         
         ttk.Button(
-            scrollable_frame, 
+            parent, 
             text="浏览", 
             command=lambda: self.browse_file(self.config_path, "选择配置文件", [("YAML文件", "*.yaml;*.yml"), ("所有文件", "*.*")])
         ).grid(row=row, column=2, padx=5, pady=5)
         
         row += 1
         
-        # 按钮框架
-        button_frame = ttk.Frame(scrollable_frame)
-        button_frame.grid(row=row, column=0, columnspan=3, pady=10)
-        
         ttk.Button(
-            button_frame, 
+            parent, 
             text="加载配置", 
             command=self.load_configuration,
             width=15
-        ).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Button(
-            button_frame, 
-            text="恢复默认", 
-            command=self.reset_to_default,
-            width=15
-        ).pack(side=tk.LEFT, padx=5)
+        ).grid(row=row, column=0, columnspan=3, pady=10)
         
         row += 1
         
-        # 创建配置项的框架容器
-        self.config_container = ttk.Frame(scrollable_frame)
-        self.config_container.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+        # 配置显示区域
+        ttk.Label(parent, text="当前配置:").grid(row=row, column=0, sticky=tk.W, pady=(10, 5))
+        row += 1
         
-        # 配置权重
-        parent.columnconfigure(0, weight=1)
-        parent.rowconfigure(0, weight=1)
-        scrollable_frame.columnconfigure(1, weight=1)
+        # 创建配置显示文本框
+        self.config_text = scrolledtext.ScrolledText(parent, width=80, height=20, font=("Consolas", 10))
+        self.config_text.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
         
-        # 将canvas和scrollbar放置到父框架
-        canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        
-        parent.columnconfigure(0, weight=1)
-        parent.rowconfigure(0, weight=1)
-    
-    def _create_config_form(self):
-        """创建配置表单"""
-        # 清除旧的配置项
-        for widget in self.config_container.winfo_children():
-            widget.destroy()
-        
-        if not self.config_data:
-            return
-        
-        # 定义配置项分组
-        config_groups = [
-            {
-                'name': '文件处理配置',
-                'path': ['processing'],
-                'items': [
-                    {'key': 'remove_suffix', 'label': '是否去除后缀', 'type': 'choice', 'options': ['Y', 'N'], 'default': 'Y'},
-                    {'key': 'suffix_identifier', 'label': '后缀标识符', 'type': 'text', 'default': '_PC'},
-                    {'key': 'filter_schema', 'label': '筛选来源库', 'type': 'text', 'default': 'AGL'}
-                ]
-            },
-            {
-                'name': '过滤器配置',
-                'path': ['filters'],
-                'items': [
-                    {'key': 'exclude_self_reference', 'label': '排除自引用', 'type': 'bool', 'default': True},
-                    {'key': 'exclude_same_layer', 'label': '排除同层引用', 'type': 'bool', 'default': True},
-                    {'key': 'exclude_patterns', 'label': '排除模式(正则表达式，每行一个)', 'type': 'multiline', 'default': []},
-                    {'key': 'include_patterns', 'label': '包含模式(正则表达式，每行一个)', 'type': 'multiline', 'default': []}
-                ]
-            },
-            {
-                'name': '项目配置',
-                'path': ['projects'],
-                'items': [
-                    {'key': 'DEFAULT', 'label': '默认项目配置', 'type': 'subsection'},
-                ]
-            },
-            {
-                'name': '文件模板配置',
-                'path': ['file_templates'],
-                'items': [
-                    {'key': 'default', 'label': '默认模板配置', 'type': 'subsection'},
-                ]
-            },
-            {
-                'name': '正则表达式配置',
-                'path': ['regex_patterns'],
-                'items': [
-                    {'key': 'table_reference', 'label': '表引用正则表达式(每行一个)', 'type': 'multiline', 
-                     'default': ['(?:FROM|JOIN)\\s+(\\w+\\.\\w+)\\s+', '(?:INSERT\\s+INTO|INSERT\\s+OVERWRITE)\\s+(\\w+\\.\\w+)\\b']},
-                    {'key': 'file_extension', 'label': '文件扩展名正则', 'type': 'text', 'default': '\\.(hql|sql)$'}
-                ]
-            },
-            {
-                'name': '输出配置',
-                'path': ['output'],
-                'items': [
-                    {'key': 'basic_columns', 'label': '输出列配置', 'type': 'subsection'},
-                ]
-            }
-        ]
-        
-        current_row = 0
-        
-        for group in config_groups:
-            # 创建分组框架
-            group_frame = ttk.LabelFrame(self.config_container, text=f" {group['name']} ", padding="10")
-            group_frame.grid(row=current_row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15), padx=5)
-            group_frame.columnconfigure(1, weight=1)
-            
-            group_row = 0
-            
-            for item in group['items']:
-                full_path = group['path'] + [item['key']]
-                var_key = '.'.join(full_path)
-                
-                # 获取当前值或默认值
-                current_value = self._get_config_value(full_path)
-                if current_value is None:
-                    current_value = item.get('default', '')
-                
-                if item['type'] == 'text':
-                    var = tk.StringVar(value=str(current_value))
-                    self.config_vars[var_key] = var
-                    
-                    ttk.Label(group_frame, text=f"{item['label']}:").grid(row=group_row, column=0, sticky=tk.W, pady=3)
-                    ttk.Entry(group_frame, textvariable=var, width=50).grid(row=group_row, column=1, sticky=(tk.W, tk.E), padx=5, pady=3)
-                    
-                elif item['type'] == 'choice':
-                    var = tk.StringVar(value=str(current_value))
-                    self.config_vars[var_key] = var
-                    
-                    ttk.Label(group_frame, text=f"{item['label']}:").grid(row=group_row, column=0, sticky=tk.W, pady=3)
-                    ttk.Combobox(
-                        group_frame, 
-                        textvariable=var, 
-                        values=item['options'],
-                        state="readonly",
-                        width=10
-                    ).grid(row=group_row, column=1, sticky=tk.W, padx=5, pady=3)
-                    
-                elif item['type'] == 'bool':
-                    var = tk.BooleanVar(value=bool(current_value))
-                    self.config_vars[var_key] = var
-                    
-                    ttk.Checkbutton(
-                        group_frame, 
-                        text=item['label'], 
-                        variable=var
-                    ).grid(row=group_row, column=0, columnspan=2, sticky=tk.W, pady=3)
-                    
-                elif item['type'] == 'multiline':
-                    var = tk.StringVar()
-                    self.config_vars[var_key] = var
-                    
-                    # 将列表转换为多行文本
-                    if isinstance(current_value, list):
-                        text_value = '\n'.join(current_value)
-                    else:
-                        text_value = str(current_value)
-                    
-                    ttk.Label(group_frame, text=f"{item['label']}:").grid(row=group_row, column=0, sticky=tk.NW, pady=3)
-                    
-                    # 创建文本输入框
-                    text_frame = ttk.Frame(group_frame)
-                    text_frame.grid(row=group_row, column=1, sticky=(tk.W, tk.E), padx=5, pady=3)
-                    
-                    text_widget = scrolledtext.ScrolledText(text_frame, width=50, height=4, font=("Consolas", 9))
-                    text_widget.insert(1.0, text_value)
-                    text_widget.pack(fill=tk.BOTH, expand=True)
-                    
-                    # 保存文本小部件引用
-                    self.config_vars[var_key + '_widget'] = text_widget
-                    
-                elif item['type'] == 'subsection':
-                    # 对于子节，显示一个简化的视图
-                    ttk.Label(group_frame, text=f"{item['label']}:").grid(row=group_row, column=0, sticky=tk.W, pady=3)
-                    
-                    if full_path[-1] == 'DEFAULT':
-                        default_config = self._get_config_value(['projects', 'DEFAULT']) or {}
-                        text_widget = scrolledtext.ScrolledText(group_frame, width=50, height=3, font=("Consolas", 9))
-                        text_widget.insert(1.0, yaml.dump(default_config, allow_unicode=True, default_flow_style=False))
-                        text_widget.grid(row=group_row, column=1, sticky=(tk.W, tk.E), padx=5, pady=3)
-                        text_widget.configure(state='disabled')
-                    
-                    elif full_path[-1] == 'default':
-                        default_config = self._get_config_value(['file_templates', 'default']) or {}
-                        text_widget = scrolledtext.ScrolledText(group_frame, width=50, height=3, font=("Consolas", 9))
-                        text_widget.insert(1.0, yaml.dump(default_config, allow_unicode=True, default_flow_style=False))
-                        text_widget.grid(row=group_row, column=1, sticky=(tk.W, tk.E), padx=5, pady=3)
-                        text_widget.configure(state='disabled')
-                    
-                    elif full_path[-1] == 'basic_columns':
-                        columns = self._get_config_value(['output', 'basic_columns']) or []
-                        text_widget = scrolledtext.ScrolledText(group_frame, width=50, height=4, font=("Consolas", 9))
-                        for col in columns:
-                            text_widget.insert(tk.END, f"{col.get('name', '')}: {col.get('title', '')}\n")
-                        text_widget.grid(row=group_row, column=1, sticky=(tk.W, tk.E), padx=5, pady=3)
-                        text_widget.configure(state='disabled')
-                
-                group_row += 1
-            
-            current_row += 1
-    
-    def _get_config_value(self, path):
-        """递归获取配置值"""
-        current = self.config_data
-        for key in path:
-            if isinstance(current, dict) and key in current:
-                current = current[key]
-            else:
-                return None
-        return current
-    
-    def _set_config_value(self, path, value):
-        """递归设置配置值"""
-        current = self.config_data
-        for i, key in enumerate(path[:-1]):
-            if key not in current:
-                current[key] = {}
-            current = current[key]
-        current[path[-1]] = value
+        # 配置文本框所在行和列的权重
+        parent.rowconfigure(row, weight=1)
+        parent.columnconfigure(1, weight=1)
     
     def _create_generate_tab(self, parent):
         """创建生成标签页"""
@@ -677,36 +458,47 @@ class SQLDependencyAnalyzerGUI:
                 with open(config_file, 'w', encoding='utf-8') as f:
                     yaml.dump(default_config, f, allow_unicode=True, default_flow_style=False)
                 messagebox.showinfo("信息", f"已创建默认配置文件: {config_file}")
-                self.config_data = default_config
             except Exception as e:
                 messagebox.showerror("错误", f"创建配置文件失败: {e}")
                 return
-        else:
-            try:
-                with open(config_file, 'r', encoding='utf-8') as f:
-                    self.config_data = yaml.safe_load(f)
-            except Exception as e:
-                self.log_message("ERROR", f"加载配置文件失败: {e}")
-                messagebox.showerror("错误", f"加载配置文件失败: {e}")
-                return
         
-        # 创建配置表单
-        self._create_config_form()
-        
-        self.log_message("INFO", f"配置文件加载成功: {config_file}")
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                self.config_data = yaml.safe_load(f)
+            
+            # 在文本框中显示配置
+            self.config_text.delete(1.0, tk.END)
+            
+            if self.config_data:
+                # 格式化YAML内容
+                formatted_config = yaml.dump(
+                    self.config_data, 
+                    allow_unicode=True, 
+                    default_flow_style=False,
+                    indent=2,
+                    sort_keys=False
+                )
+                self.config_text.insert(tk.END, formatted_config)
+            
+            self.log_message("INFO", f"配置文件加载成功: {config_file}")
+            
+            # 根据配置文件更新UI
+            self._update_ui_from_config()
+            
+        except Exception as e:
+            self.log_message("ERROR", f"加载配置文件失败: {e}")
+            messagebox.showerror("错误", f"加载配置文件失败: {e}")
     
-    def reset_to_default(self):
-        """恢复默认配置"""
-        if messagebox.askyesno("确认", "确定要恢复默认配置吗？当前配置将被覆盖。"):
-            try:
-                default_config = analyzer.ConfigManager()._get_default_config()
-                self.config_data = default_config
-                self._create_config_form()
-                self.log_message("INFO", "已恢复默认配置")
-                messagebox.showinfo("成功", "已恢复默认配置")
-            except Exception as e:
-                self.log_message("ERROR", f"恢复默认配置失败: {e}")
-                messagebox.showerror("错误", f"恢复默认配置失败: {e}")
+    def _update_ui_from_config(self):
+        """根据配置文件更新UI"""
+        if not self.config_data:
+            return
+        
+        # 根据配置文件中的设置更新输出格式
+        output_config = self.config_data.get('output', {})
+        if output_config:
+            # 可以根据配置设置默认输出格式
+            pass
     
     def save_configuration(self):
         """保存配置文件"""
@@ -717,44 +509,31 @@ class SQLDependencyAnalyzerGUI:
             return
         
         try:
-            # 从表单收集数据
-            self._collect_form_data()
+            # 从文本框获取配置内容
+            config_text = self.config_text.get(1.0, tk.END).strip()
+            
+            if not config_text:
+                messagebox.showwarning("警告", "配置内容为空")
+                return
+            
+            # 解析YAML内容
+            try:
+                config_data = yaml.safe_load(config_text)
+            except yaml.YAMLError as e:
+                messagebox.showerror("错误", f"YAML格式错误: {e}")
+                return
             
             # 保存到文件
             with open(config_file, 'w', encoding='utf-8') as f:
-                yaml.dump(self.config_data, f, allow_unicode=True, default_flow_style=False, indent=2)
+                yaml.dump(config_data, f, allow_unicode=True, default_flow_style=False, indent=2)
             
+            self.config_data = config_data
             self.log_message("INFO", f"配置文件保存成功: {config_file}")
             messagebox.showinfo("成功", "配置文件保存成功")
             
         except Exception as e:
             self.log_message("ERROR", f"保存配置文件失败: {e}")
             messagebox.showerror("错误", f"保存配置文件失败: {e}")
-    
-    def _collect_form_data(self):
-        """从表单收集数据"""
-        for var_key, var in self.config_vars.items():
-            if '_widget' in var_key:
-                continue
-                
-            # 解析路径
-            path = var_key.split('.')
-            
-            if isinstance(var, tk.StringVar):
-                value = var.get()
-                # 处理多行文本
-                if var_key + '_widget' in self.config_vars:
-                    text_widget = self.config_vars[var_key + '_widget']
-                    lines = text_widget.get(1.0, tk.END).strip().split('\n')
-                    value = [line.strip() for line in lines if line.strip()]
-                
-                self._set_config_value(path, value)
-                
-            elif isinstance(var, tk.BooleanVar):
-                self._set_config_value(path, var.get())
-                
-            elif isinstance(var, tk.IntVar):
-                self._set_config_value(path, var.get())
     
     def start_analysis(self):
         """开始分析"""
