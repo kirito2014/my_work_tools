@@ -608,11 +608,16 @@ class ResultExporter:
 
 
     def export_to_html(self, data: List[Tuple], output_file: str):
-        """导出到HTML - 使用Tailwind CSS美化"""
+        """导出到HTML - 使用Tailwind CSS美化，支持悬浮显示文件名"""
         logger.info(f"正在导出结果到HTML: {output_file}")
         
-        columns = [col['name'] for col in self.config['output']['basic_columns']]
-        df = pd.DataFrame(data, columns=columns)
+        # 获取基本列（排除隐藏列）
+        basic_columns = [col for col in self.config['output']['basic_columns'] if not col.get('hidden', False)]
+        columns = [col['name'] for col in basic_columns]
+        
+        # 创建包含所有列的DataFrame（包括隐藏列）
+        all_columns = [col['name'] for col in self.config['output']['basic_columns']]
+        df = pd.DataFrame(data, columns=all_columns)
         
         # 获取列标题映射
         column_titles = {col['name']: col['title'] for col in self.config['output']['basic_columns']}
@@ -638,11 +643,42 @@ class ResultExporter:
                     top: 0;
                     z-index: 10;
                 }
+                .tooltip {
+                    position: relative;
+                    display: inline-block;
+                }
+                .tooltip .tooltiptext {
+                    visibility: hidden;
+                    width: 200px;
+                    background-color: #333;
+                    color: #fff;
+                    text-align: center;
+                    border-radius: 6px;
+                    padding: 5px;
+                    position: absolute;
+                    z-index: 100;
+                    bottom: 125%;
+                    left: 50%;
+                    margin-left: -100px;
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                    font-size: 12px;
+                }
+                .tooltip:hover .tooltiptext {
+                    visibility: visible;
+                    opacity: 1;
+                }
             """)
         
         generate_time = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
         record_count = len(df)
         table_count = df['target_table'].nunique()
+        
+        # 获取配置信息
+        processing_config = self.config.get('processing', {})
+        remove_suffix = processing_config.get('remove_suffix', 'Y')
+        suffix_identifier = processing_config.get('suffix_identifier', '_PC')
+        filter_schema = processing_config.get('filter_schema', 'AGL')
         
         with doc:
             # 主容器
@@ -654,27 +690,42 @@ class ResultExporter:
                         with div(cls='bg-white rounded-2xl shadow-lg p-8 mb-6'):
                             h1('📊 SQL依赖关系分析报告', 
                             cls='text-3xl font-bold text-gray-800 mb-4')
-                            p('基于SQL/HQL脚本的自动化依赖关系分析', 
+                            p('基于HQL脚本的自动化依赖关系分析', 
                             cls='text-lg text-gray-600 mb-6')
+                            
+                            # 配置信息
+                            # with div(cls='bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4'):
+                            #     with div(cls='text-sm text-yellow-800'):
+                            #         p('当前配置：')
+                            #         config_ul = ul(cls='list-disc list-inside mt-2')
+                            #         with config_ul:
+                            #             li(f'后缀处理: {"开启" if remove_suffix == "Y" else "关闭"} (标识符: {suffix_identifier})')
+                            #             li(f'来源库筛选: {filter_schema}')
                             
                             # 统计信息卡片
                             with div(cls='grid grid-cols-1 md:grid-cols-3 gap-6'):
-                                with div(cls='bg-blue-50 rounded-xl p-6 text-center border border-blue-200'):
+                                # 生成时间卡片
+                                time_card = div(cls='bg-blue-50 rounded-xl p-6 text-center border border-blue-200')
+                                with time_card:
                                     with div(cls='text-blue-600 mb-2'):
                                         span('📅', cls='text-2xl')
-                                    h3(cls='text-sm font-semibold text-gray-600 mb-1')('生成时间')
+                                    h3('生成时间', cls='text-sm font-semibold text-gray-600 mb-1')
                                     p(generate_time, cls='text-lg font-bold text-gray-800')
                                 
-                                with div(cls='bg-green-50 rounded-xl p-6 text-center border border-green-200'):
+                                # 总记录数卡片
+                                record_card = div(cls='bg-green-50 rounded-xl p-6 text-center border border-green-200')
+                                with record_card:
                                     with div(cls='text-green-600 mb-2'):
                                         span('📈', cls='text-2xl')
-                                    h3(cls='text-sm font-semibold text-gray-600 mb-1')('总记录数')
+                                    h3('总记录数', cls='text-sm font-semibold text-gray-600 mb-1')
                                     p(f'{record_count} 条', cls='text-lg font-bold text-gray-800')
                                 
-                                with div(cls='bg-purple-50 rounded-xl p-6 text-center border border-purple-200'):
+                                # 数据表数量卡片
+                                table_card = div(cls='bg-purple-50 rounded-xl p-6 text-center border border-purple-200')
+                                with table_card:
                                     with div(cls='text-purple-600 mb-2'):
                                         span('🗂️', cls='text-2xl')
-                                    h3(cls='text-sm font-semibold text-gray-600 mb-1')('数据表数量')
+                                    h3('数据表数量', cls='text-sm font-semibold text-gray-600 mb-1')
                                     p(f'{table_count} 个', cls='text-lg font-bold text-gray-800')
                     
                     # 数据表格区域
@@ -692,28 +743,46 @@ class ResultExporter:
                         with div(cls='p-6'):
                             with div(cls='table-container border border-gray-200 rounded-lg'):
                                 # 创建表格
-                                with table(cls='min-w-full divide-y divide-gray-200'):
+                                dependency_table = table(cls='min-w-full divide-y divide-gray-200')
+                                with dependency_table:
                                     # 表头
-                                    with thead(cls='bg-gray-50'):
-                                        with tr():
-                                            for col_config in self.config['output']['basic_columns']:
+                                    table_head = thead(cls='bg-gray-50')
+                                    with table_head:
+                                        header_row = tr()
+                                        with header_row:
+                                            for col_config in basic_columns:
                                                 th(col_config['title'], 
                                                 cls='px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sticky top-0 bg-gray-50')
                                     
                                     # 表格数据
-                                    with tbody(cls='bg-white divide-y divide-gray-200'):
+                                    table_body = tbody(cls='bg-white divide-y divide-gray-200')
+                                    with table_body:
                                         for i, (_, row) in enumerate(df.iterrows()):
                                             # 交替行颜色
                                             row_class = 'bg-white' if i % 2 == 0 else 'bg-gray-50'
-                                            with tr(cls=f'{row_class} hover:bg-blue-50 transition-colors duration-150'):
-                                                for col in columns:
+                                            data_row = tr(cls=f'{row_class} hover:bg-blue-50 transition-colors duration-150')
+                                            with data_row:
+                                                for col_config in basic_columns:
+                                                    col = col_config['name']
                                                     value = row[col]
                                                     cell_class = 'px-6 py-4 whitespace-nowrap text-sm'
+                                                    
                                                     if pd.isna(value):
                                                         td('', cls=f'{cell_class} text-gray-400')
                                                     else:
-                                                        # 对特定列添加特殊样式
-                                                        if col == 'developer':
+                                                        # 对目标表名添加悬浮提示（显示文件名）
+                                                        if col == 'target_table':
+                                                            file_name = row['file_name']  # 获取隐藏的文件名
+                                                            target_cell = td(cls=f'{cell_class} text-gray-700')
+                                                            with target_cell:
+                                                                tooltip_div = div(cls='tooltip')
+                                                                with tooltip_div:
+                                                                    span(str(value), cls='font-semibold text-blue-600')
+                                                                    tooltip_text = div(cls='tooltiptext')
+                                                                    with tooltip_text:
+                                                                        p(f'来源文件: {file_name}', cls='mb-1')
+                                                                        p('悬浮查看详细信息', cls='text-xs text-gray-300')
+                                                        elif col == 'developer':
                                                             td(str(value), 
                                                             cls=f'{cell_class} text-purple-600 font-medium')
                                                         elif col == 'theme':
@@ -726,38 +795,20 @@ class ResultExporter:
                     # 页脚
                     with div(cls='mt-8 text-center'):
                         with div(cls='bg-white rounded-xl shadow-sm p-6'):
-                            with div(cls='flex flex-col md:flex-row justify-between items-center text-sm text-gray-600'):
+                            footer_div = div(cls='flex flex-col md:flex-row justify-between items-center text-sm text-gray-600')
+                            with footer_div:
                                 with div(cls='mb-4 md:mb-0'):
                                     span('🔧 SQL依赖关系分析工具', 
                                         cls='font-semibold text-gray-700')
                                     span(' v2.0', cls='text-blue-600')
-                                with div(cls='flex items-center space-x-6'):
+                                footer_info = div(cls='flex items-center space-x-6')
+                                with footer_info:
                                     with div(cls='flex items-center space-x-2'):
                                         span('🕒', cls='text-lg')
                                         span(f'生成时间: {generate_time}')
                                     with div(cls='flex items-center space-x-2'):
                                         span('⚡', cls='text-lg')
                                         span('Powered by Python & Tailwind CSS')
-            
-            # 添加一些交互效果
-            script("""
-                // 添加表格行点击效果
-                document.addEventListener('DOMContentLoaded', function() {
-                    const rows = document.querySelectorAll('tbody tr');
-                    rows.forEach(row => {
-                        row.addEventListener('click', function() {
-                            this.classList.toggle('bg-yellow-50');
-                        });
-                    });
-                    
-                    // 添加打印按钮功能
-                    const printButton = document.createElement('button');
-                    printButton.innerHTML = '🖨️ 打印报告';
-                    printButton.className = 'fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-full shadow-lg transition-all duration-200 transform hover:scale-105';
-                    printButton.onclick = () => window.print();
-                    document.body.appendChild(printButton);
-                });
-            """)
         
         # 写入文件
         with open(output_file, 'w', encoding='utf-8') as f:
