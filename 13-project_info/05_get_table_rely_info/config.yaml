@@ -1,130 +1,120 @@
-# config.yaml
-# SQL依赖关系分析工具配置文件
-
-# 新增配置项
-processing:
-  remove_suffix: "Y"  # 是否去除后缀：Y/N，默认Y
-  suffix_identifier: "_PC"  # 后缀标识符，默认_PC
-  filter_schema: "AGL"  # 筛选值，默认AGL，用于筛选掉对应的来源库和表名
-
-# 项目配置
-projects:
-  AGL:
-    prefix: "AGL_"
-    theme: "AGL"
-    description: "聚合层"
-  ODS:
-    prefix: "ODS_"
-    theme: "ODS"
-    description: "操作数据层"
-  DWD:
-    prefix: "DWD_"
-    theme: "DWD"
-    description: "数据仓库明细层"
-  DIM:
-    prefix: "DIM_"
-    theme: "DIM"
-    description: "维度层"
-  DEFAULT:
-    prefix: ""
-    theme: "通用"
-    description: "通用项目"
-
-# 文件模板配置
 file_templates:
-  tg_pc:
-    name: "TG聚合表模板"
-    lines:
-      table_name: 10  # 第11行 (0-based index)
-      developer: 16   # 第17行
-    delimiter: "："
-    file_pattern: ".*tg_pc\\.hql$"
-  ta_pc:
-    name: "TA明细表模板"
-    lines:
-      table_name: 8   # 第9行
-      developer: 14   # 第15行
-    delimiter: "："
-    file_pattern: ".*ta_pc\\.hql$"
-  tf_pc:
-    name: "TF事实表模板"
-    lines:
-      table_name: 8   # 第9行
-      developer: 14   # 第15行
-    delimiter: "："
-    file_pattern: ".*tf_pc\\.hql$"
   default:
-    name: "默认模板"
+    delimiter: ':'
+    file_pattern: .*\.(hql|sql)$
     lines:
-      table_name: 8   # 第9行
-      developer: 14   # 第15行
-    delimiter: ":"
-    file_pattern: ".*\\.(hql|sql)$"
-
-# 正则表达式配置
-regex_patterns:
-  table_reference:
-    - "(?:FROM|JOIN)\\s+(\\w+\\.\\w+)\\s+"
-    - "(?:INSERT\\s+INTO|INSERT\\s+OVERWRITE)\\s+(\\w+\\.\\w+)\\b"
-    - "(?:TABLE|INTO)\\s+(\\w+\\.\\w+)\\b"
-    - "CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(\\w+\\.\\w+)\\b"
-  file_extension: "\\.(hql|sql)$"
-  table_cleanup:
-    - "_PC$"
-    - "_TMP$"
-    - "_BAK$"
-
-# 过滤规则
+      developer: 14
+      table_name: 8
+    name: 默认模板
+  ta_pc:
+    delimiter: ：
+    file_pattern: .*ta_pc\.hql$
+    lines:
+      developer: 14
+      table_name: 8
+    name: TA明细表模板
+  tf_pc:
+    delimiter: ：
+    file_pattern: .*tf_pc\.hql$
+    lines:
+      developer: 14
+      table_name: 8
+    name: TF事实表模板
+  tg_pc:
+    delimiter: ：
+    file_pattern: .*tg_pc\.hql$
+    lines:
+      developer: 16
+      table_name: 10
+    name: TG聚合表模板
 filters:
-  exclude_self_reference: true
-  exclude_same_layer: true
   exclude_patterns:
-    - "^TMP_"
-    - "^BAK_"
-    - "^TEST_"
+  - ^TMP_
+  - ^BAK_
+  - ^TEST_
+  exclude_same_layer: true
+  exclude_self_reference: true
   include_patterns: []
-
-# 输出配置
 output:
   basic_columns:
-    - name: "theme"
-      title: "主题领域"
-      width: 12
-    - name: "target_table"
-      title: "目标表名"
-      width: 35
-    - name: "table_cn_name"
-      title: "中文表名"
-      width: 30
-    - name: "developer"
-      title: "开发人员"
-      width: 12
-    - name: "source_table"
-      title: "来源表名"
-      width: 35
-    - name: "source_schema"
-      title: "来源库名"
-      width: 15
-    - name: "source_table_clean"
-      title: "清理后表名"
-      width: 35
-    - name: "file_name"  # 新增文件名列，默认不显示
-      title: "文件名"
-      width: 30
-      hidden: true  # HTML中默认不显示
+  - hidden: false
+    name: theme
+    title: 主题领域
+    width: 12
+  - hidden: false
+    name: target_table
+    title: 目标表名
+    width: 35
+  - hidden: false
+    name: table_cn_name
+    title: 中文表名
+    width: 30
+  - hidden: false
+    name: developer
+    title: 开发人员
+    width: 12
+  - hidden: false
+    name: source_table
+    title: 来源表名
+    width: 35
+  - hidden: false
+    name: source_schema
+    title: 来源库名
+    width: 15
+  - hidden: false
+    name: source_table_clean
+    title: 清理后表名
+    width: 35
+  - hidden: true
+    name: file_name
+    title: 文件名
+    width: 30
   extended_columns:
-    - name: "etl_job_no"
-      title: "作业编号"
-      width: 15
-    - name: "etl_job_name"
-      title: "作业名称"
-      width: 25
-    - name: "dependency_level"
-      title: "依赖层级"
-      width: 10
-
-# 进度条配置
+  - hidden: false
+    name: etl_job_no
+    title: 作业编号
+    width: 15
+  - hidden: false
+    name: etl_job_name
+    title: 作业名称
+    width: 25
+  - hidden: false
+    name: dependency_level
+    title: 依赖层级
+    width: 10
+processing:
+  filter_schema: AGL
+  remove_suffix: Y
+  suffix_identifier: _PC
 progress:
   bar_length: 30
   show_percentage: true
   update_frequency: 1
+projects:
+  AGL:
+    description: 聚合层
+    prefix: AGL_
+    theme: AGL
+  DIM:
+    description: 维度层
+    prefix: DIM_
+    theme: DIM
+  DWD:
+    description: 数据仓库明细层
+    prefix: DWD_
+    theme: DWD
+  ODS:
+    description: 操作数据层
+    prefix: ODS_
+    theme: ODS
+regex_patterns:
+  file_extension: \.(hql|sql)$
+  table_cleanup:
+  - _PC$
+  - _TMP$
+  - _BAK$
+  table_reference:
+  - (?:FROM|JOIN)\s+(\w+\.\w+)\s+
+  - (?:INSERT\s+INTO|INSERT\s+OVERWRITE)\s+(\w+\.\w+)\b
+  - (?:TABLE|INTO)\s+(\w+\.\w+)\b
+  - CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+\.\w+)\b
