@@ -593,7 +593,7 @@ class ResultExporter:
 
 
     def export_to_html(self, data: List[Tuple], output_file: str):
-        """导出到HTML - 使用dominate库安全生成"""
+        """导出到HTML - 使用Tailwind CSS美化"""
         logger.info(f"正在导出结果到HTML: {output_file}")
         
         columns = [col['name'] for col in self.config['output']['basic_columns']]
@@ -608,83 +608,20 @@ class ResultExporter:
         with doc.head:
             meta(charset='UTF-8')
             meta(name='viewport', content='width=device-width, initial-scale=1.0')
+            # 引入Tailwind CSS
+            link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css')
             style("""
-                * {
-                    margin: 0;
-                    padding: 0;
-                    box-sizing: border-box;
-                }
                 body {
                     font-family: 'Microsoft YaHei', Arial, sans-serif;
-                    margin: 20px;
-                    background-color: #f5f5f5;
-                    color: #333;
                 }
-                .container {
-                    max-width: 100%;
-                    background: white;
-                    border-radius: 8px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    padding: 20px;
-                    overflow-x: auto;
+                .table-container {
+                    max-height: 70vh;
+                    overflow: auto;
                 }
-                h1 {
-                    text-align: center;
-                    color: #366092;
-                    margin-bottom: 20px;
-                    padding-bottom: 10px;
-                    border-bottom: 2px solid #366092;
-                }
-                .summary {
-                    background: #e8f4ff;
-                    padding: 15px;
-                    border-radius: 5px;
-                    margin-bottom: 20px;
-                    border-left: 4px solid #366092;
-                }
-                table {
-                    border-collapse: collapse;
-                    width: 100%;
-                    min-width: 800px;
-                    font-size: 14px;
-                }
-                th {
-                    background-color: #366092;
-                    color: white;
-                    padding: 12px 8px;
-                    text-align: left;
-                    font-weight: bold;
+                table th {
                     position: sticky;
                     top: 0;
-                }
-                td {
-                    padding: 10px 8px;
-                    border-bottom: 1px solid #ddd;
-                }
-                tr:nth-child(even) {
-                    background-color: #f8f9fa;
-                }
-                tr:hover {
-                    background-color: #e3f2fd;
-                }
-                .timestamp {
-                    text-align: right;
-                    color: #666;
-                    font-size: 12px;
-                    margin-top: 20px;
-                    padding-top: 10px;
-                    border-top: 1px solid #ddd;
-                }
-                @media (max-width: 768px) {
-                    body {
-                        margin: 10px;
-                    }
-                    .container {
-                        padding: 10px;
-                    }
-                    table {
-                        font-size: 12px;
-                    }
+                    z-index: 10;
                 }
             """)
         
@@ -693,35 +630,119 @@ class ResultExporter:
         table_count = df['target_table'].nunique()
         
         with doc:
-            with div(cls='container'):
-                h1('📊 SQL依赖关系分析报告')
-                
-                with div(cls='summary'):
-                    strong('报告摘要：')
-                    br()
-                    p(f'• 生成时间: {generate_time}')
-                    p(f'• 总记录数: {record_count} 条')
-                    p(f'• 数据表数量: {table_count} 个')
-                
-                # 创建表格
-                with table().add(tbody()):
-                    # 表头
-                    with tr():
-                        for col_config in self.config['output']['basic_columns']:
-                            th(col_config['title'])
+            # 主容器
+            with div(cls='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4'):
+                # 内容卡片
+                with div(cls='max-w-7xl mx-auto'):
+                    # 标题区域
+                    with div(cls='text-center mb-8'):
+                        with div(cls='bg-white rounded-2xl shadow-lg p-8 mb-6'):
+                            h1('📊 SQL依赖关系分析报告', 
+                            cls='text-3xl font-bold text-gray-800 mb-4')
+                            p('基于SQL/HQL脚本的自动化依赖关系分析', 
+                            cls='text-lg text-gray-600 mb-6')
+                            
+                            # 统计信息卡片
+                            with div(cls='grid grid-cols-1 md:grid-cols-3 gap-6'):
+                                with div(cls='bg-blue-50 rounded-xl p-6 text-center border border-blue-200'):
+                                    with div(cls='text-blue-600 mb-2'):
+                                        span('📅', cls='text-2xl')
+                                    h3(cls='text-sm font-semibold text-gray-600 mb-1')('生成时间')
+                                    p(generate_time, cls='text-lg font-bold text-gray-800')
+                                
+                                with div(cls='bg-green-50 rounded-xl p-6 text-center border border-green-200'):
+                                    with div(cls='text-green-600 mb-2'):
+                                        span('📈', cls='text-2xl')
+                                    h3(cls='text-sm font-semibold text-gray-600 mb-1')('总记录数')
+                                    p(f'{record_count} 条', cls='text-lg font-bold text-gray-800')
+                                
+                                with div(cls='bg-purple-50 rounded-xl p-6 text-center border border-purple-200'):
+                                    with div(cls='text-purple-600 mb-2'):
+                                        span('🗂️', cls='text-2xl')
+                                    h3(cls='text-sm font-semibold text-gray-600 mb-1')('数据表数量')
+                                    p(f'{table_count} 个', cls='text-lg font-bold text-gray-800')
                     
-                    # 表格数据
-                    for _, row in df.iterrows():
-                        with tr():
-                            for col in columns:
-                                value = row[col]
-                                if pd.isna(value):
-                                    td('')
-                                else:
-                                    td(str(value))
-                
-                with div(cls='timestamp'):
-                    p(f'生成时间: {generate_time} | 工具版本: 2.0')
+                    # 数据表格区域
+                    with div(cls='bg-white rounded-2xl shadow-lg overflow-hidden'):
+                        # 表格标题栏
+                        with div(cls='bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4'):
+                            with div(cls='flex justify-between items-center'):
+                                h2('依赖关系明细', 
+                                cls='text-xl font-bold text-white')
+                                with div(cls='text-blue-100'):
+                                    span(f'共 {len(df)} 条记录', 
+                                        cls='text-sm bg-blue-500 bg-opacity-20 px-3 py-1 rounded-full')
+                        
+                        # 表格容器
+                        with div(cls='p-6'):
+                            with div(cls='table-container border border-gray-200 rounded-lg'):
+                                # 创建表格
+                                with table(cls='min-w-full divide-y divide-gray-200'):
+                                    # 表头
+                                    with thead(cls='bg-gray-50'):
+                                        with tr():
+                                            for col_config in self.config['output']['basic_columns']:
+                                                th(col_config['title'], 
+                                                cls='px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sticky top-0 bg-gray-50')
+                                    
+                                    # 表格数据
+                                    with tbody(cls='bg-white divide-y divide-gray-200'):
+                                        for i, (_, row) in enumerate(df.iterrows()):
+                                            # 交替行颜色
+                                            row_class = 'bg-white' if i % 2 == 0 else 'bg-gray-50'
+                                            with tr(cls=f'{row_class} hover:bg-blue-50 transition-colors duration-150'):
+                                                for col in columns:
+                                                    value = row[col]
+                                                    cell_class = 'px-6 py-4 whitespace-nowrap text-sm'
+                                                    if pd.isna(value):
+                                                        td('', cls=f'{cell_class} text-gray-400')
+                                                    else:
+                                                        # 对特定列添加特殊样式
+                                                        if col == 'developer':
+                                                            td(str(value), 
+                                                            cls=f'{cell_class} text-purple-600 font-medium')
+                                                        elif col == 'theme':
+                                                            td(str(value), 
+                                                            cls=f'{cell_class} text-blue-600 font-semibold')
+                                                        else:
+                                                            td(str(value), 
+                                                            cls=f'{cell_class} text-gray-700')
+                    
+                    # 页脚
+                    with div(cls='mt-8 text-center'):
+                        with div(cls='bg-white rounded-xl shadow-sm p-6'):
+                            with div(cls='flex flex-col md:flex-row justify-between items-center text-sm text-gray-600'):
+                                with div(cls='mb-4 md:mb-0'):
+                                    span('🔧 SQL依赖关系分析工具', 
+                                        cls='font-semibold text-gray-700')
+                                    span(' v2.0', cls='text-blue-600')
+                                with div(cls='flex items-center space-x-6'):
+                                    with div(cls='flex items-center space-x-2'):
+                                        span('🕒', cls='text-lg')
+                                        span(f'生成时间: {generate_time}')
+                                    with div(cls='flex items-center space-x-2'):
+                                        span('⚡', cls='text-lg')
+                                        span('Powered by Python & Tailwind CSS')
+            
+            # 添加一些交互效果
+            script("""
+                // 添加表格行点击效果
+                document.addEventListener('DOMContentLoaded', function() {
+                    const rows = document.querySelectorAll('tbody tr');
+                    rows.forEach(row => {
+                        row.addEventListener('click', function() {
+                            this.classList.toggle('bg-yellow-50');
+                        });
+                    });
+                    
+                    // 添加打印按钮功能
+                    const printButton = document.createElement('button');
+                    printButton.innerHTML = '🖨️ 打印报告';
+                    printButton.className = 'fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-full shadow-lg transition-all duration-200 transform hover:scale-105';
+                    printButton.onclick = () => window.print();
+                    document.body.appendChild(printButton);
+                });
+            """)
         
         # 写入文件
         with open(output_file, 'w', encoding='utf-8') as f:
