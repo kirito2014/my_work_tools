@@ -1,1 +1,7 @@
-pip install pyyaml pandas openpyxl
+# requirements.txt
+sql_dependency_analyzer.py  # 您的原始脚本
+ttkthemes>=3.2.2
+pyyaml>=6.0
+pandas>=1.5.0
+openpyxl>=3.1.0
+dominate>=2.7.0
