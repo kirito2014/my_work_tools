@@ -434,6 +434,9 @@ class ResultExporter:
         """导出结果到文件"""
         format = format.lower()
         
+        # 确保输出文件扩展名与格式匹配
+        output_file = self._ensure_correct_extension(output_file, format)
+        
         if format == 'excel':
             self.export_to_excel(data, output_file, include_dependency, dependency_file)
         elif format == 'csv':
@@ -444,6 +447,28 @@ class ResultExporter:
             self.export_to_html(data, output_file)
         else:
             raise ValueError(f"不支持的格式: {format}")
+    
+    def _ensure_correct_extension(self, output_file: str, format: str) -> str:
+        """确保输出文件扩展名与格式匹配"""
+        base_name = os.path.splitext(output_file)[0]
+        
+        extension_map = {
+            'excel': '.xlsx',
+            'csv': '.csv',
+            'json': '.json',
+            'html': '.html'
+        }
+        
+        correct_extension = extension_map.get(format, '.xlsx')
+        
+        # 如果当前扩展名不正确，则修正
+        current_extension = os.path.splitext(output_file)[1].lower()
+        if current_extension != correct_extension:
+            new_output_file = base_name + correct_extension
+            logger.info(f"修正输出文件扩展名: {output_file} -> {new_output_file}")
+            return new_output_file
+        
+        return output_file
     
     def export_to_excel(self, data: List[Tuple], output_file: str, 
                        include_dependency: bool = False, dependency_file: str = None):
@@ -471,6 +496,11 @@ class ResultExporter:
     def _add_dependency_info(self, df: pd.DataFrame, dependency_file: str) -> pd.DataFrame:
         """添加依赖信息"""
         try:
+            # 检查依赖文件是否存在
+            if not os.path.exists(dependency_file):
+                logger.warning(f"依赖文件不存在: {dependency_file}")
+                return df
+            
             dependency_df = pd.read_excel(dependency_file, sheet_name=None)
             
             # 合并依赖信息
@@ -493,6 +523,11 @@ class ResultExporter:
             # 添加作业信息
             result_df['etl_job_no'] = result_df['etl_system'].fillna('无对应作业编号')
             result_df['etl_job_name'] = 'IMP:' + result_df['etl_system'].fillna('') + '_' + result_df['etl_job'].fillna('')
+            
+            # 重新排列列顺序，将新增列放在最后
+            original_columns = [col['name'] for col in self.config['output']['basic_columns']]
+            new_columns = original_columns + ['etl_job_no', 'etl_job_name']
+            result_df = result_df[new_columns]
             
             return result_df
             
@@ -518,19 +553,36 @@ class ResultExporter:
     
     def export_to_csv(self, data: List[Tuple], output_file: str):
         """导出到CSV"""
+        logger.info(f"正在导出结果到CSV: {output_file}")
+        
         columns = [col['name'] for col in self.config['output']['basic_columns']]
         df = pd.DataFrame(data, columns=columns)
-        df.to_csv(output_file, index=False, encoding='utf-8-sig')
+        
+        # CSV特定设置
+        df.to_csv(output_file, index=False, encoding='utf-8-sig', sep=',')
         logger.info(f"CSV文件已保存: {output_file}")
     
     def export_to_json(self, data: List[Tuple], output_file: str):
         """导出到JSON"""
+        logger.info(f"正在导出结果到JSON: {output_file}")
+        
         columns = [col['name'] for col in self.config['output']['basic_columns']]
         df = pd.DataFrame(data, columns=columns)
         
-        # 转换为字典格式
-        records = df.to_dict('records')
+        # 转换为字典格式，处理特殊类型
+        records = []
+        for _, row in df.iterrows():
+            record = {}
+            for col in columns:
+                value = row[col]
+                # 处理NaN值
+                if pd.isna(value):
+                    record[col] = None
+                else:
+                    record[col] = str(value) if not isinstance(value, (str, int, float, bool)) else value
+            records.append(record)
         
+        # 写入JSON文件
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(records, f, ensure_ascii=False, indent=2)
         
@@ -538,29 +590,129 @@ class ResultExporter:
     
     def export_to_html(self, data: List[Tuple], output_file: str):
         """导出到HTML"""
+        logger.info(f"正在导出结果到HTML: {output_file}")
+        
         columns = [col['name'] for col in self.config['output']['basic_columns']]
         df = pd.DataFrame(data, columns=columns)
         
+        # 获取列标题映射
+        column_titles = {col['name']: col['title'] for col in self.config['output']['basic_columns']}
+        
+        # 重命名列以使用中文标题
+        df_display = df.rename(columns=column_titles)
+        
         html_content = """
         <!DOCTYPE html>
-        <html>
+        <html lang="zh-CN">
         <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>SQL依赖关系分析报告</title>
             <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                table { border-collapse: collapse; width: 100%; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #366092; color: white; }
-                tr:nth-child(even) { background-color: #f2f2f2; }
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
+                body {
+                    font-family: 'Microsoft YaHei', Arial, sans-serif;
+                    margin: 20px;
+                    background-color: #f5f5f5;
+                    color: #333;
+                }
+                .container {
+                    max-width: 100%;
+                    background: white;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    padding: 20px;
+                    overflow-x: auto;
+                }
+                h1 {
+                    text-align: center;
+                    color: #366092;
+                    margin-bottom: 20px;
+                    padding-bottom: 10px;
+                    border-bottom: 2px solid #366092;
+                }
+                .summary {
+                    background: #e8f4ff;
+                    padding: 15px;
+                    border-radius: 5px;
+                    margin-bottom: 20px;
+                    border-left: 4px solid #366092;
+                }
+                table {
+                    border-collapse: collapse;
+                    width: 100%;
+                    min-width: 800px;
+                    font-size: 14px;
+                }
+                th {
+                    background-color: #366092;
+                    color: white;
+                    padding: 12px 8px;
+                    text-align: left;
+                    font-weight: bold;
+                    position: sticky;
+                    top: 0;
+                }
+                td {
+                    padding: 10px 8px;
+                    border-bottom: 1px solid #ddd;
+                }
+                tr:nth-child(even) {
+                    background-color: #f8f9fa;
+                }
+                tr:hover {
+                    background-color: #e3f2fd;
+                }
+                .timestamp {
+                    text-align: right;
+                    color: #666;
+                    font-size: 12px;
+                    margin-top: 20px;
+                    padding-top: 10px;
+                    border-top: 1px solid #ddd;
+                }
+                @media (max-width: 768px) {
+                    body {
+                        margin: 10px;
+                    }
+                    .container {
+                        padding: 10px;
+                    }
+                    table {
+                        font-size: 12px;
+                    }
+                }
             </style>
         </head>
         <body>
-            <h1>SQL依赖关系分析报告</h1>
-        """ + df.to_html(index=False, escape=False) + """
+            <div class="container">
+                <h1>📊 SQL依赖关系分析报告</h1>
+                
+                <div class="summary">
+                    <strong>报告摘要：</strong><br>
+                    • 生成时间: {generate_time}<br>
+                    • 总记录数: {record_count} 条<br>
+                    • 数据表数量: {table_count} 个
+                </div>
+                
+                {table_content}
+                
+                <div class="timestamp">
+                    生成时间: {generate_time} | 工具版本: 2.0
+                </div>
+            </div>
         </body>
         </html>
-        """
+        """.format(
+            generate_time=pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S'),
+            record_count=len(df),
+            table_count=df['target_table'].nunique(),
+            table_content=df_display.to_html(index=False, escape=False, classes='data-table')
+        )
         
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
