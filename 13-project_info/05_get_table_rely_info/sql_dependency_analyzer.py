@@ -608,7 +608,7 @@ class ResultExporter:
 
 
     def export_to_html(self, data: List[Tuple], output_file: str):
-        """导出到HTML - 使用Tailwind CSS美化，支持悬浮显示文件名"""
+        """导出到HTML - 使用Tailwind CSS美化，支持自适应悬浮窗口"""
         logger.info(f"正在导出结果到HTML: {output_file}")
         
         # 获取基本列（排除隐藏列）
@@ -643,30 +643,82 @@ class ResultExporter:
                     top: 0;
                     z-index: 10;
                 }
-                .tooltip {
+                /* 自适应悬浮提示样式 */
+                .tooltip-wrapper {
                     position: relative;
                     display: inline-block;
+                    cursor: pointer;
                 }
-                .tooltip .tooltiptext {
+                .tooltip-content {
                     visibility: hidden;
-                    width: 200px;
-                    background-color: #333;
-                    color: #fff;
-                    text-align: center;
-                    border-radius: 6px;
-                    padding: 5px;
+                    background-color: rgba(0, 0, 0, 0.85);
+                    color: white;
+                    text-align: left;
+                    border-radius: 8px;
+                    padding: 12px;
                     position: absolute;
                     z-index: 100;
-                    bottom: 125%;
+                    bottom: 150%;
                     left: 50%;
-                    margin-left: -100px;
+                    transform: translateX(-50%);
                     opacity: 0;
-                    transition: opacity 0.3s;
-                    font-size: 12px;
+                    transition: opacity 0.3s, visibility 0.3s;
+                    white-space: normal;
+                    max-width: 400px;
+                    min-width: 200px;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    backdrop-filter: blur(5px);
+                    word-break: break-word;
+                    overflow-wrap: break-word;
                 }
-                .tooltip:hover .tooltiptext {
+                /* 悬浮提示箭头 */
+                .tooltip-content::after {
+                    content: "";
+                    position: absolute;
+                    top: 100%;
+                    left: 50%;
+                    margin-left: -5px;
+                    border-width: 5px;
+                    border-style: solid;
+                    border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent;
+                }
+                .tooltip-wrapper:hover .tooltip-content {
                     visibility: visible;
                     opacity: 1;
+                }
+                /* 文件名样式 */
+                .filename-item {
+                    margin-bottom: 6px;
+                    padding: 4px 8px;
+                    background: rgba(255, 255, 255, 0.1);
+                    border-radius: 4px;
+                    border-left: 3px solid #3b82f6;
+                }
+                .filename-item:last-child {
+                    margin-bottom: 0;
+                }
+                .filename-label {
+                    font-weight: 600;
+                    color: #93c5fd;
+                    margin-right: 6px;
+                }
+                .filename-value {
+                    color: white;
+                }
+                .tooltip-header {
+                    font-weight: bold;
+                    color: #60a5fa;
+                    margin-bottom: 8px;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+                    padding-bottom: 4px;
+                }
+                .tooltip-footer {
+                    font-size: 11px;
+                    color: #9ca3af;
+                    margin-top: 8px;
+                    text-align: center;
+                    font-style: italic;
                 }
             """)
         
@@ -694,13 +746,13 @@ class ResultExporter:
                             cls='text-lg text-gray-600 mb-6')
                             
                             # 配置信息
-                            # with div(cls='bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4'):
-                            #     with div(cls='text-sm text-yellow-800'):
-                            #         p('当前配置：')
-                            #         config_ul = ul(cls='list-disc list-inside mt-2')
-                            #         with config_ul:
-                            #             li(f'后缀处理: {"开启" if remove_suffix == "Y" else "关闭"} (标识符: {suffix_identifier})')
-                            #             li(f'来源库筛选: {filter_schema}')
+                            with div(cls='bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4'):
+                                with div(cls='text-sm text-yellow-800'):
+                                    p('当前配置：')
+                                    config_ul = ul(cls='list-disc list-inside mt-2')
+                                    with config_ul:
+                                        li(f'后缀处理: {"开启" if remove_suffix == "Y" else "关闭"} (标识符: {suffix_identifier})')
+                                        li(f'来源库筛选: {filter_schema}')
                             
                             # 统计信息卡片
                             with div(cls='grid grid-cols-1 md:grid-cols-3 gap-6'):
@@ -770,18 +822,31 @@ class ResultExporter:
                                                     if pd.isna(value):
                                                         td('', cls=f'{cell_class} text-gray-400')
                                                     else:
-                                                        # 对目标表名添加悬浮提示（显示文件名）
+                                                        # 对目标表名添加自适应悬浮提示（显示文件名）
                                                         if col == 'target_table':
                                                             file_name = row['file_name']  # 获取隐藏的文件名
                                                             target_cell = td(cls=f'{cell_class} text-gray-700')
                                                             with target_cell:
-                                                                tooltip_div = div(cls='tooltip')
-                                                                with tooltip_div:
-                                                                    span(str(value), cls='font-semibold text-blue-600')
-                                                                    tooltip_text = div(cls='tooltiptext')
-                                                                    with tooltip_text:
-                                                                        p(f'来源文件: {file_name}', cls='mb-1')
-                                                                        p('悬浮查看详细信息', cls='text-xs text-gray-300')
+                                                                tooltip_wrapper = div(cls='tooltip-wrapper')
+                                                                with tooltip_wrapper:
+                                                                    # 显示的表名
+                                                                    span(str(value), cls='font-semibold text-blue-600 hover:text-blue-800 cursor-pointer')
+                                                                    
+                                                                    # 自适应悬浮提示内容
+                                                                    tooltip_content = div(cls='tooltip-content')
+                                                                    with tooltip_content:
+                                                                        # 提示标题
+                                                                        #div('📄 文件信息', cls='tooltip-header')
+                                                                        
+                                                                        # 文件名信息
+                                                                        file_info = div(cls='filename-item')
+                                                                        with file_info:
+                                                                            #span('文件:', cls='filename-label')
+                                                                            span(file_name, cls='filename-value')
+                                                                        
+                                                                        
+                                                                        # 提示脚注
+                                                                        #div('悬浮查看详细信息', cls='tooltip-footer')
                                                         elif col == 'developer':
                                                             td(str(value), 
                                                             cls=f'{cell_class} text-purple-600 font-medium')
@@ -809,6 +874,103 @@ class ResultExporter:
                                     with div(cls='flex items-center space-x-2'):
                                         span('⚡', cls='text-lg')
                                         span('Powered by Python & Tailwind CSS')
+        
+        # 添加JavaScript代码来动态调整悬浮窗口位置
+        script("""
+            document.addEventListener('DOMContentLoaded', function() {
+                // 为所有悬浮提示添加智能定位
+                const tooltipWrappers = document.querySelectorAll('.tooltip-wrapper');
+                
+                tooltipWrappers.forEach(wrapper => {
+                    const tooltip = wrapper.querySelector('.tooltip-content');
+                    
+                    wrapper.addEventListener('mouseenter', function() {
+                        // 获取视口尺寸
+                        const viewportWidth = window.innerWidth;
+                        const viewportHeight = window.innerHeight;
+                        
+                        // 获取元素位置
+                        const wrapperRect = wrapper.getBoundingClientRect();
+                        const tooltipRect = tooltip.getBoundingClientRect();
+                        
+                        // 默认位置
+                        let left = '50%';
+                        let transform = 'translateX(-50%)';
+                        let bottom = '150%';
+                        
+                        // 检查右侧是否超出边界
+                        const tooltipRight = wrapperRect.left + (tooltipRect.width / 2);
+                        if (tooltipRight > viewportWidth - 20) {
+                            left = 'auto';
+                            right = '0';
+                            transform = 'none';
+                        }
+                        
+                        // 检查左侧是否超出边界
+                        const tooltipLeft = wrapperRect.right - (tooltipRect.width / 2);
+                        if (tooltipLeft < 20) {
+                            left = '0';
+                            right = 'auto';
+                            transform = 'none';
+                        }
+                        
+                        // 检查上方空间是否足够
+                        const spaceAbove = wrapperRect.top;
+                        const spaceBelow = viewportHeight - wrapperRect.bottom;
+                        
+                        // 如果上方空间不足，显示在下方
+                        if (spaceAbove < tooltipRect.height + 20 && spaceBelow > tooltipRect.height + 20) {
+                            bottom = 'auto';
+                            top = '150%';
+                            // 更新箭头位置
+                            tooltip.style.setProperty('--arrow-position', 'bottom');
+                        }
+                        
+                        // 应用计算后的位置
+                        tooltip.style.left = left;
+                        tooltip.style.right = right || 'auto';
+                        tooltip.style.bottom = bottom;
+                        tooltip.style.top = top || 'auto';
+                        tooltip.style.transform = transform;
+                        
+                        // 动态调整最大宽度
+                        const maxTooltipWidth = Math.min(viewportWidth - 40, 500);
+                        tooltip.style.maxWidth = maxTooltipWidth + 'px';
+                    });
+                });
+                
+                // 添加点击复制功能
+                tooltipWrappers.forEach(wrapper => {
+                    wrapper.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const tableName = this.querySelector('span').textContent;
+                        navigator.clipboard.writeText(tableName).then(() => {
+                            // 显示复制成功提示
+                            const originalText = this.querySelector('span').textContent;
+                            this.querySelector('span').textContent = '已复制!';
+                            this.querySelector('span').classList.add('text-green-600');
+                            
+                            setTimeout(() => {
+                                this.querySelector('span').textContent = originalText;
+                                this.querySelector('span').classList.remove('text-green-600');
+                            }, 1500);
+                        });
+                    });
+                });
+            });
+            
+            // 窗口大小变化时重新计算位置
+            window.addEventListener('resize', function() {
+                const tooltips = document.querySelectorAll('.tooltip-content');
+                tooltips.forEach(tooltip => {
+                    tooltip.style.removeProperty('left');
+                    tooltip.style.removeProperty('right');
+                    tooltip.style.removeProperty('top');
+                    tooltip.style.removeProperty('bottom');
+                    tooltip.style.removeProperty('transform');
+                });
+            });
+        """)
         
         # 写入文件
         with open(output_file, 'w', encoding='utf-8') as f:
