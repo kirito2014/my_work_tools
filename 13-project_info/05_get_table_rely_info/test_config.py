@@ -10,7 +10,7 @@ class ConfigFormApp:
         self.config = self.load_config()
         
         self.root.title("SQL依赖关系分析工具 - 配置编辑器")
-        self.root.geometry("900x700")
+        self.root.geometry("800x700")
         
         # 创建主框架
         self.main_frame = ttk.Frame(root, padding="20")
@@ -946,60 +946,105 @@ class ConfigFormApp:
         """保存配置到文件"""
         try:
             # 收集所有表单数据
-            new_config = {
-                'processing': {
-                    'remove_suffix': self.remove_suffix_var.get(),
-                    'suffix_identifier': self.suffix_identifier_var.get(),
-                    'filter_schema': self.filter_schema_var.get()
-                }
-            }
+            new_config = {}
             
-            # 添加项目配置（如果存在）
+            # 添加处理配置
+            if hasattr(self, 'remove_suffix_var'):
+                new_config['processing'] = {
+                    'remove_suffix': self.remove_suffix_var.get(),
+                    'suffix_identifier': self.suffix_identifier_var.get() if hasattr(self, 'suffix_identifier_var') else '',
+                    'filter_schema': self.filter_schema_var.get() if hasattr(self, 'filter_schema_var') else ''
+                }
+            
+            # 添加项目配置（从UI获取最新数据）
             if hasattr(self, 'project_tree'):
-                new_config['projects'] = self.config.get('projects', {})
+                projects_data = {}
+                for item in self.project_tree.get_children():
+                    values = self.project_tree.item(item, 'values')
+                    if values:
+                        project_name = values[0]
+                        projects_data[project_name] = {
+                            'prefix': values[1] if len(values) > 1 else '',
+                            'theme': values[2] if len(values) > 2 else '',
+                            'description': values[3] if len(values) > 3 else ''
+                        }
+                new_config['projects'] = projects_data
             
             # 添加文件模板配置
-            if hasattr(self, 'template_var'):
-                new_config['templates'] = {
-                    'file_template': self.template_var.get()
-                }
+            if hasattr(self, 'template_vars'):
+                new_config['file_templates'] = {}
+                for template_key, template_data in self.template_vars.items():
+                    new_config['file_templates'][template_key] = {
+                        'name': template_data['name'].get(),
+                        'lines': {
+                            'table_name': int(template_data['table_line'].get()) if template_data['table_line'].get().isdigit() else 8,
+                            'developer': int(template_data['dev_line'].get()) if template_data['dev_line'].get().isdigit() else 14
+                        },
+                        'delimiter': template_data['delimiter'].get(),
+                        'file_pattern': template_data['pattern'].get()
+                    }
             
             # 添加正则表达式配置
-            if hasattr(self, 'ref_pattern_vars'):
-                new_config['regex'] = {
-                    'reference_patterns': [var.get() for var in self.ref_pattern_vars if var.get().strip()],
-                    'cleanup_patterns': [var.get() for var in self.cleanup_pattern_vars if var.get().strip()]
+            if hasattr(self, 'ref_regex_vars'):
+                new_config['regex_patterns'] = {
+                    'table_reference': [var.get() for var in self.ref_regex_vars if var.get().strip()],
+                    'table_cleanup': [var.get() for var in self.cleanup_vars if hasattr(self, 'cleanup_vars') and var.get().strip()],
+                    'file_extension': self.file_ext_var.get() if hasattr(self, 'file_ext_var') else '\\.(hql|sql)$'
                 }
             
             # 添加过滤器配置
-            if hasattr(self, 'exclude_pattern_vars'):
-                new_config['filters'] = {
-                    'exclude_patterns': [var.get() for var in self.exclude_pattern_vars if var.get().strip()],
-                    'include_patterns': [var.get() for var in self.include_pattern_vars if var.get().strip()]
-                }
+            new_config['filters'] = {
+                'exclude_self_reference': self.exclude_self_var.get() if hasattr(self, 'exclude_self_var') else True,
+                'exclude_same_layer': self.exclude_same_layer_var.get() if hasattr(self, 'exclude_same_layer_var') else True,
+                'exclude_patterns': [var.get() for var in self.exclude_vars if hasattr(self, 'exclude_vars') and var.get().strip()],
+                'include_patterns': [var.get() for var in self.include_vars if hasattr(self, 'include_vars') and var.get().strip()]
+            }
             
-            # 添加输出配置
-            if hasattr(self, 'output_type_var'):
-                new_config['output'] = {
-                    'output_type': self.output_type_var.get(),
-                    'output_dir': self.output_dir_var.get(),
-                    'include_header': self.include_header_var.get(),
-                    'separator': self.separator_var.get()
-                }
+            # 添加输出配置（从UI获取最新数据）
+            new_config['output'] = {
+                'basic_columns': [],
+                'extended_columns': []
+            }
             
-            # 添加列配置
-            if hasattr(self, 'result_columns'):
-                new_config['columns'] = {
-                    'result_columns': self.result_columns,
-                    'dependency_columns': self.dependency_columns
-                }
+            # 保存输出配置的列信息（从UI界面）
+            if hasattr(self, 'notebook'):
+                # 查找基本列和扩展列的TreeView
+                for child in self.notebook.winfo_children():
+                    tab_text = self.notebook.tab(child, 'text')
+                    if tab_text == '输出配置':
+                        # 找到输出配置选项卡中的notebook
+                        for sub_child in child.winfo_children():
+                            if isinstance(sub_child, ttk.Notebook):
+                                output_notebook = sub_child
+                                # 遍历基本列和扩展列选项卡
+                                for i, tab_name in enumerate(['基础列', '扩展列']):
+                                    # 查找对应的选项卡
+                                    for sub_tab in output_notebook.winfo_children():
+                                        if output_notebook.tab(sub_tab, 'text') == tab_name:
+                                            # 查找TreeView
+                                            for widget in sub_tab.winfo_children():
+                                                if isinstance(widget, ttk.Frame):
+                                                    for tree_widget in widget.winfo_children():
+                                                        if isinstance(tree_widget, ttk.Treeview):
+                                                            # 收集列数据
+                                                            column_type = 'basic_columns' if i == 0 else 'extended_columns'
+                                                            for item in tree_widget.get_children():
+                                                                values = tree_widget.item(item, 'values')
+                                                                if values:
+                                                                    column_data = {
+                                                                        'name': values[0],
+                                                                        'title': values[1] if len(values) > 1 else '',
+                                                                        'width': int(values[2]) if len(values) > 2 and values[2].isdigit() else 100,
+                                                                        'hidden': values[3] == '是' if len(values) > 3 else False
+                                                                    }
+                                                                    new_config['output'][column_type].append(column_data)
             
             # 添加进度条配置
-            if hasattr(self, 'show_progress_var'):
+            if hasattr(self, 'bar_length_var'):
                 new_config['progress'] = {
-                    'show_progress': self.show_progress_var.get(),
-                    'show_percentage': self.show_percentage_var.get(),
-                    'update_frequency': self.update_freq_var.get()
+                    'bar_length': self.bar_length_var.get(),
+                    'show_percentage': self.show_percentage_var.get() if hasattr(self, 'show_percentage_var') else True,
+                    'update_frequency': self.update_freq_var.get() if hasattr(self, 'update_freq_var') else 1
                 }
             
             # 保存到文件
@@ -1007,7 +1052,8 @@ class ConfigFormApp:
                 yaml.dump(new_config, f, default_flow_style=False, allow_unicode=True, indent=2)
             messagebox.showinfo("成功", "配置文件保存成功！")
         except Exception as e:
-            messagebox.showerror("错误", f"保存配置文件时出错: {e}")
+            messagebox.showerror("错误", f"保存配置文件时出错: {str(e)}")
+
     
     def load_config_file(self):
         """从文件加载配置"""
