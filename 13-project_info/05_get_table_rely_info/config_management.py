@@ -2,36 +2,51 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import yaml
 import os
+from tkinter.font import Font
+
+# 尝试导入ttkthemes
+try:
+    from ttkthemes import ThemedTk
+    USE_THEMED_TK = True
+except ImportError:
+    USE_THEMED_TK = False
 
 class ConfigFormApp:
     def __init__(self, root, config_path="config.yaml"):
         self.root = root
         self.config_path = config_path
+        
+        # 统一的字体设置
+        self.default_font = Font(family="微软雅黑", size=10)
+        self.label_font = Font(family="微软雅黑", size=10)
+        self.title_font = Font(family="微软雅黑", size=10, weight="bold")
+        
+        # 设置全局字体
+        root.option_add("*Font", self.default_font)
+        
+        # 为ttk组件单独设置样式
+        style = ttk.Style()
+        style.configure(".", font=("微软雅黑", 10))
+        
+        # 配置标签页的字体
+        style.configure("TNotebook.Tab", font=("微软雅黑", 10))
+        
         self.config = self.load_config()
         
         self.root.title("SQL依赖关系分析工具 - 配置编辑器")
-        self.root.geometry("800x700")
+        self.root.geometry("1000x800")  # 增加窗口尺寸
         
         # 创建主框架
-        self.main_frame = ttk.Frame(root, padding="20")
+        self.main_frame = ttk.Frame(root, padding="10")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # 配置滚动条
-        self.canvas = tk.Canvas(self.main_frame)
-        self.scrollbar = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.canvas.yview)
-        self.scrollable_frame = ttk.Frame(self.canvas)
+        # 创建主容器框架
+        self.container_frame = ttk.Frame(self.main_frame)
+        self.container_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
         
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        )
-        
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-        
-        # 创建标签页
-        self.notebook = ttk.Notebook(self.scrollable_frame)
-        self.notebook.pack(fill="both", expand=True, pady=10)
+        # 创建标签页（不使用Canvas和Scrollbar，调整布局）
+        self.notebook = ttk.Notebook(self.container_frame)
+        self.notebook.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
         
         # 创建各个配置页
         self.create_processing_tab()
@@ -45,16 +60,81 @@ class ConfigFormApp:
         # 控制按钮
         self.create_control_buttons()
         
-        # 布局滚动区域
-        self.canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        self.scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        
+        # 配置权重
+        self.container_frame.columnconfigure(0, weight=1)
+        self.container_frame.rowconfigure(0, weight=1)
         self.main_frame.columnconfigure(0, weight=1)
         self.main_frame.rowconfigure(0, weight=1)
-        
-        # 为根窗口添加权重配置，确保内容能够完全显示
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
+    
+    def create_processing_tab(self):
+        """创建处理配置页"""
+        tab = ttk.Frame(self.notebook)
+        self.notebook.add(tab, text="处理配置")
+        
+        # 配置标签页的网格权重
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(0, weight=1)
+        
+        # 创建Canvas和滚动条
+        canvas = tk.Canvas(tab, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(tab, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        frame = ttk.LabelFrame(scrollable_frame, text="SQL文件处理配置", padding="10")
+        frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # 调整行和列的间距
+        row_padding = 2  # 减小行间距
+        col_padding = 5
+        
+        # 去除后缀配置
+        ttk.Label(frame, text="是否去除后缀:", font=self.label_font).grid(
+            row=0, column=0, sticky=tk.W, pady=row_padding, padx=col_padding
+        )
+        self.remove_suffix_var = tk.StringVar(value=self.config.get('processing', {}).get('remove_suffix', 'Y'))
+        ttk.Combobox(frame, textvariable=self.remove_suffix_var, values=['Y', 'N'], 
+                     width=5, state="readonly", font=self.default_font).grid(
+            row=0, column=1, sticky=tk.W, pady=row_padding, padx=col_padding
+        )
+        
+        ttk.Label(frame, text="后缀标识符:", font=self.label_font).grid(
+            row=1, column=0, sticky=tk.W, pady=row_padding, padx=col_padding
+        )
+        self.suffix_identifier_var = tk.StringVar(value=self.config.get('processing', {}).get('suffix_identifier', '_PC'))
+        ttk.Entry(frame, textvariable=self.suffix_identifier_var, width=20, font=self.default_font).grid(
+            row=1, column=1, sticky=tk.W, pady=row_padding, padx=col_padding
+        )
+        
+        ttk.Label(frame, text="筛选模式（用于筛选来源库和表名）:", font=self.label_font).grid(
+            row=2, column=0, sticky=tk.W, pady=row_padding, padx=col_padding
+        )
+        self.filter_schema_var = tk.StringVar(value=self.config.get('processing', {}).get('filter_schema', 'AGL'))
+        ttk.Entry(frame, textvariable=self.filter_schema_var, width=20, font=self.default_font).grid(
+            row=2, column=1, sticky=tk.W, pady=row_padding, padx=col_padding
+        )
+        
+        # 填充空白
+        for i in range(3):
+            frame.rowconfigure(i, weight=1)
+        frame.columnconfigure(0, weight=0)
+        frame.columnconfigure(1, weight=1)
+        
+        # 布局Canvas和滚动条
+        canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(0, weight=1)
         
     def load_config(self):
         """加载配置文件"""
@@ -99,13 +179,25 @@ class ConfigFormApp:
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="项目配置")
         
+        # 配置标签页的网格权重
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(0, weight=1)
+        tab.rowconfigure(1, weight=0)
+        
         # 创建Treeview显示项目
         columns = ("项目名称", "前缀", "主题", "描述")
-        self.project_tree = ttk.Treeview(tab, columns=columns, show="headings", height=10)
+        self.project_tree = ttk.Treeview(
+            tab, 
+            columns=columns, 
+            show="headings", 
+            height=10,
+            style="Custom.Treeview"
+        )
         
+        # 配置列
         for col in columns:
-            self.project_tree.heading(col, text=col)
-            self.project_tree.column(col, width=100)
+            self.project_tree.heading(col, text=col, anchor="w")
+            self.project_tree.column(col, width=150, anchor="w")
         
         # 填充数据
         projects = self.config.get('projects', {})
@@ -118,28 +210,34 @@ class ConfigFormApp:
             ))
         
         # 创建滚动条
-        scrollbar = ttk.Scrollbar(tab, orient="vertical", command=self.project_tree.yview)
-        self.project_tree.configure(yscrollcommand=scrollbar.set)
+        tree_scrollbar = ttk.Scrollbar(tab, orient="vertical", command=self.project_tree.yview)
+        self.project_tree.configure(yscrollcommand=tree_scrollbar.set)
         
-        # 布局
-        self.project_tree.pack(side=tk.LEFT, fill="both", expand=True, padx=10, pady=10)
-        scrollbar.pack(side=tk.RIGHT, fill="y", pady=10)
+        # 布局Treeview和滚动条
+        self.project_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=10)
+        tree_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S), pady=10)
         
         # 编辑按钮
         btn_frame = ttk.Frame(tab)
-        btn_frame.pack(fill="x", padx=10, pady=5)
+        btn_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), padx=10, pady=5)
         
         ttk.Button(btn_frame, text="添加项目", command=self.add_project).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="编辑项目", command=self.edit_project).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="删除项目", command=self.delete_project).pack(side=tk.LEFT, padx=5)
-    
+        
+        # 配置权重
+        tab.columnconfigure(0, weight=1)
     def create_templates_tab(self):
         """创建文件模板配置页"""
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="文件模板")
         
+        # 配置标签页的网格权重
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(0, weight=1)
+        
         notebook = ttk.Notebook(tab)
-        notebook.pack(fill="both", expand=True, padx=10, pady=10)
+        notebook.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
         
         templates = self.config.get('file_templates', {})
         self.template_vars = {}
@@ -148,38 +246,78 @@ class ConfigFormApp:
             template_tab = ttk.Frame(notebook)
             notebook.add(template_tab, text=template_data.get('name', template_key))
             
-            frame = ttk.LabelFrame(template_tab, text=f"{template_data.get('name')} 配置", padding="15")
+            # 配置子标签页网格
+            template_tab.columnconfigure(0, weight=1)
+            template_tab.rowconfigure(0, weight=1)
+            
+            # 创建Canvas和滚动条
+            canvas = tk.Canvas(template_tab, highlightthickness=0)
+            scrollbar = ttk.Scrollbar(template_tab, orient="vertical", command=canvas.yview)
+            scrollable_frame = ttk.Frame(canvas)
+            
+            scrollable_frame.bind(
+                "<Configure>",
+                lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+            )
+            
+            canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar.set)
+            
+            frame = ttk.LabelFrame(scrollable_frame, text=f"{template_data.get('name')} 配置", padding="10")
             frame.pack(fill="both", expand=True, padx=10, pady=10)
             
             row = 0
+            row_padding = 2
+            col_padding = 5
+            
             # 模板名称
-            ttk.Label(frame, text="模板名称:").grid(row=row, column=0, sticky=tk.W, pady=5)
+            ttk.Label(frame, text="模板名称:", font=self.label_font).grid(
+                row=row, column=0, sticky=tk.W, pady=row_padding, padx=col_padding
+            )
             name_var = tk.StringVar(value=template_data.get('name', ''))
-            ttk.Entry(frame, textvariable=name_var, width=30).grid(row=row, column=1, sticky=tk.W, pady=5)
+            ttk.Entry(frame, textvariable=name_var, width=30, font=self.default_font).grid(
+                row=row, column=1, sticky=(tk.W, tk.E), pady=row_padding, padx=col_padding
+            )
             row += 1
             
             # 表名行号
-            ttk.Label(frame, text="表名所在行号（0-based）:").grid(row=row, column=0, sticky=tk.W, pady=5)
+            ttk.Label(frame, text="表名所在行号（0-based）:", font=self.label_font).grid(
+                row=row, column=0, sticky=tk.W, pady=row_padding, padx=col_padding
+            )
             table_line_var = tk.StringVar(value=str(template_data.get('lines', {}).get('table_name', 8)))
-            ttk.Entry(frame, textvariable=table_line_var, width=10).grid(row=row, column=1, sticky=tk.W, pady=5)
+            ttk.Entry(frame, textvariable=table_line_var, width=10, font=self.default_font).grid(
+                row=row, column=1, sticky=tk.W, pady=row_padding, padx=col_padding
+            )
             row += 1
             
             # 开发人员行号
-            ttk.Label(frame, text="开发人员所在行号:").grid(row=row, column=0, sticky=tk.W, pady=5)
+            ttk.Label(frame, text="开发人员所在行号:", font=self.label_font).grid(
+                row=row, column=0, sticky=tk.W, pady=row_padding, padx=col_padding
+            )
             dev_line_var = tk.StringVar(value=str(template_data.get('lines', {}).get('developer', 14)))
-            ttk.Entry(frame, textvariable=dev_line_var, width=10).grid(row=row, column=1, sticky=tk.W, pady=5)
+            ttk.Entry(frame, textvariable=dev_line_var, width=10, font=self.default_font).grid(
+                row=row, column=1, sticky=tk.W, pady=row_padding, padx=col_padding
+            )
             row += 1
             
             # 分隔符
-            ttk.Label(frame, text="分隔符:").grid(row=row, column=0, sticky=tk.W, pady=5)
+            ttk.Label(frame, text="分隔符:", font=self.label_font).grid(
+                row=row, column=0, sticky=tk.W, pady=row_padding, padx=col_padding
+            )
             delimiter_var = tk.StringVar(value=template_data.get('delimiter', ':'))
-            ttk.Entry(frame, textvariable=delimiter_var, width=10).grid(row=row, column=1, sticky=tk.W, pady=5)
+            ttk.Entry(frame, textvariable=delimiter_var, width=10, font=self.default_font).grid(
+                row=row, column=1, sticky=tk.W, pady=row_padding, padx=col_padding
+            )
             row += 1
             
             # 文件匹配模式
-            ttk.Label(frame, text="文件匹配模式（正则）:").grid(row=row, column=0, sticky=tk.W, pady=5)
+            ttk.Label(frame, text="文件匹配模式（正则）:", font=self.label_font).grid(
+                row=row, column=0, sticky=tk.W, pady=row_padding, padx=col_padding
+            )
             pattern_var = tk.StringVar(value=template_data.get('file_pattern', ''))
-            ttk.Entry(frame, textvariable=pattern_var, width=50).grid(row=row, column=1, sticky=tk.W, pady=5)
+            ttk.Entry(frame, textvariable=pattern_var, width=50, font=self.default_font).grid(
+                row=row, column=1, sticky=(tk.W, tk.E), pady=row_padding, padx=col_padding
+            )
             row += 1
             
             # 保存变量
@@ -193,60 +331,112 @@ class ConfigFormApp:
             
             for i in range(row):
                 frame.rowconfigure(i, weight=1)
+            frame.columnconfigure(0, weight=0)
             frame.columnconfigure(1, weight=1)
+            
+            # 布局Canvas和滚动条
+            canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+            scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+            
+            template_tab.columnconfigure(0, weight=1)
+            template_tab.rowconfigure(0, weight=1)
+        
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(0, weight=1)
     
     def create_regex_tab(self):
-        """创建正则表达式配置页"""
+        """创建正则表达式配置页 - 调整版本"""
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="正则表达式")
         
+        # 配置标签页的网格权重
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(0, weight=1)
+        
+        # 创建Canvas和滚动条
+        canvas = tk.Canvas(tab, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(tab, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
         # 表引用正则
-        ref_frame = ttk.LabelFrame(tab, text="表引用正则表达式", padding="15")
-        ref_frame.pack(fill="both", expand=True, padx=10, pady=5)
+        ref_frame = ttk.LabelFrame(scrollable_frame, text="表引用正则表达式", padding="10")
+        ref_frame.pack(fill="x", padx=10, pady=5)
         
         self.ref_regex_vars = []
         ref_patterns = self.config.get('regex_patterns', {}).get('table_reference', [])
         
-        ttk.Label(ref_frame, text="表引用匹配模式:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Label(ref_frame, text="表引用匹配模式:", font=self.label_font).grid(
+            row=0, column=0, sticky=tk.W, pady=2, padx=5
+        )
         
         for i, pattern in enumerate(ref_patterns):
             var = tk.StringVar(value=pattern)
-            ttk.Entry(ref_frame, textvariable=var, width=80).grid(row=i+1, column=0, sticky=(tk.W, tk.E), pady=2)
+            ttk.Entry(ref_frame, textvariable=var, width=80, font=self.default_font).grid(
+                row=i+1, column=0, sticky=(tk.W, tk.E), pady=1, padx=5
+            )
             self.ref_regex_vars.append(var)
         
         # 添加/删除按钮
         ref_btn_frame = ttk.Frame(ref_frame)
-        ref_btn_frame.grid(row=len(ref_patterns)+1, column=0, sticky=tk.W, pady=10)
-        ttk.Button(ref_btn_frame, text="添加模式", command=self.add_ref_pattern).pack(side=tk.LEFT, padx=5)
-        ttk.Button(ref_btn_frame, text="删除最后一条", command=self.remove_last_ref_pattern).pack(side=tk.LEFT, padx=5)
+        ref_btn_frame.grid(row=len(ref_patterns)+1, column=0, sticky=tk.W, pady=5)
+        ttk.Button(ref_btn_frame, text="添加模式", command=self.add_ref_pattern).pack(side=tk.LEFT, padx=2)
+        ttk.Button(ref_btn_frame, text="删除最后一条", command=self.remove_last_ref_pattern).pack(side=tk.LEFT, padx=2)
         
         # 清理模式
-        cleanup_frame = ttk.LabelFrame(tab, text="表名清理模式", padding="15")
-        cleanup_frame.pack(fill="both", expand=True, padx=10, pady=5)
+        cleanup_frame = ttk.LabelFrame(scrollable_frame, text="表名清理模式", padding="10")
+        cleanup_frame.pack(fill="x", padx=10, pady=5)
         
         self.cleanup_vars = []
         cleanup_patterns = self.config.get('regex_patterns', {}).get('table_cleanup', [])
         
-        ttk.Label(cleanup_frame, text="表名清理后缀模式:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Label(cleanup_frame, text="表名清理后缀模式:", font=self.label_font).grid(
+            row=0, column=0, sticky=tk.W, pady=2, padx=5
+        )
         
         for i, pattern in enumerate(cleanup_patterns):
             var = tk.StringVar(value=pattern)
-            ttk.Entry(cleanup_frame, textvariable=var, width=30).grid(row=i+1, column=0, sticky=tk.W, pady=2)
+            ttk.Entry(cleanup_frame, textvariable=var, width=30, font=self.default_font).grid(
+                row=i+1, column=0, sticky=tk.W, pady=1, padx=5
+            )
             self.cleanup_vars.append(var)
         
         cleanup_btn_frame = ttk.Frame(cleanup_frame)
-        cleanup_btn_frame.grid(row=len(cleanup_patterns)+1, column=0, sticky=tk.W, pady=10)
-        ttk.Button(cleanup_btn_frame, text="添加清理模式", command=self.add_cleanup_pattern).pack(side=tk.LEFT, padx=5)
-        ttk.Button(cleanup_btn_frame, text="删除最后一条", command=self.remove_last_cleanup_pattern).pack(side=tk.LEFT, padx=5)
+        cleanup_btn_frame.grid(row=len(cleanup_patterns)+1, column=0, sticky=tk.W, pady=5)
+        ttk.Button(cleanup_btn_frame, text="添加清理模式", command=self.add_cleanup_pattern).pack(side=tk.LEFT, padx=2)
+        ttk.Button(cleanup_btn_frame, text="删除最后一条", command=self.remove_last_cleanup_pattern).pack(side=tk.LEFT, padx=2)
         
         # 文件扩展名
-        ext_frame = ttk.LabelFrame(tab, text="文件扩展名", padding="15")
-        ext_frame.pack(fill="both", expand=True, padx=10, pady=5)
+        ext_frame = ttk.LabelFrame(scrollable_frame, text="文件扩展名", padding="10")
+        ext_frame.pack(fill="x", padx=10, pady=5)
         
-        ttk.Label(ext_frame, text="SQL文件扩展名正则:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Label(ext_frame, text="SQL文件扩展名正则:", font=self.label_font).grid(
+            row=0, column=0, sticky=tk.W, pady=2, padx=5
+        )
         self.file_ext_var = tk.StringVar(value=self.config.get('regex_patterns', {}).get('file_extension', '\\.(hql|sql)$'))
-        ttk.Entry(ext_frame, textvariable=self.file_ext_var, width=30).grid(row=0, column=1, sticky=tk.W, pady=5)
-    
+        ttk.Entry(ext_frame, textvariable=self.file_ext_var, width=30, font=self.default_font).grid(
+            row=0, column=1, sticky=tk.W, pady=2, padx=5
+        )
+        
+        # 配置权重
+        ref_frame.columnconfigure(0, weight=1)
+        cleanup_frame.columnconfigure(0, weight=1)
+        ext_frame.columnconfigure(0, weight=0)
+        ext_frame.columnconfigure(1, weight=1)
+        
+        # 布局Canvas和滚动条
+        canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(0, weight=1)
     def create_filters_tab(self):
         """创建过滤规则配置页"""
         tab = ttk.Frame(self.notebook)
@@ -385,14 +575,15 @@ class ConfigFormApp:
     
     def create_control_buttons(self):
         """创建控制按钮"""
-        btn_frame = ttk.Frame(self.scrollable_frame)
-        btn_frame.pack(fill="x", pady=20)
+        btn_frame = ttk.Frame(self.container_frame)
+        btn_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=10)
         
-        ttk.Button(btn_frame, text="保存配置", command=self.save_config, width=15).pack(side=tk.LEFT, padx=10)
-        ttk.Button(btn_frame, text="加载配置", command=self.load_config_file, width=15).pack(side=tk.LEFT, padx=10)
-        ttk.Button(btn_frame, text="重置表单", command=self.reset_form, width=15).pack(side=tk.LEFT, padx=10)
-        ttk.Button(btn_frame, text="退出", command=self.root.quit, width=15).pack(side=tk.LEFT, padx=10)
-    
+        ttk.Button(btn_frame, text="保存配置", command=self.save_config, width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="加载配置", command=self.load_config_file, width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="重置表单", command=self.reset_form, width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="退出", command=self.root.quit, width=15).pack(side=tk.LEFT, padx=5)
+        
+        btn_frame.columnconfigure(0, weight=1)
     # 以下是一些辅助方法（按钮命令函数）
     def add_project(self):
         """添加项目对话框"""
@@ -1074,6 +1265,13 @@ class ConfigFormApp:
         self.__init__(self.root, self.config_path)
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    # 创建主窗口，使用ThemedTk如果可用
+    if USE_THEMED_TK:
+        root = ThemedTk(theme="arc")
+    else:
+        root = tk.Tk()
+    
+    # 字体和样式已在ConfigFormApp.__init__中设置
+    
     app = ConfigFormApp(root)
     root.mainloop()

@@ -9,6 +9,7 @@ import os
 import sys
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
+from tkinter.font import Font
 import threading
 import queue
 from pathlib import Path
@@ -18,6 +19,7 @@ from datetime import datetime
 
 # 导入自定义模块
 import sql_dependency_analyzer as analyzer
+import config_management as config_mgr
 
 # 尝试导入ttkthemes
 try:
@@ -195,6 +197,13 @@ class SQLDependencyAnalyzerGUI:
         # 创建底部按钮
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=2, column=0, columnspan=3, pady=(10, 0))
+        
+        ttk.Button(
+            button_frame, 
+            text="配置管理", 
+            command=self.open_config_management,
+            width=15
+        ).pack(side=tk.LEFT, padx=5)
         
         ttk.Button(
             button_frame, 
@@ -733,13 +742,32 @@ class SQLDependencyAnalyzerGUI:
             except Exception as e:
                 messagebox.showerror("错误", f"保存日志失败: {e}")
     
+    def open_config_management(self):
+        """打开配置管理窗口"""
+        # 创建配置管理窗口
+        config_window = tk.Toplevel(self.root)
+        if hasattr(self.root, 'get_theme'):  # 如果使用了ttkthemes
+            config_window.set_theme(self.root.get_theme())
+        config_window.title("配置管理")
+        config_window.geometry("800x700")
+        
+        # 创建配置管理应用
+        config_app = config_mgr.ConfigFormApp(config_window)
+        
+        # 等待窗口关闭后重新加载配置
+        def on_config_window_close():
+            config_window.destroy()
+            self.load_configuration()  # 重新加载配置以获取最新更改
+        
+        config_window.protocol("WM_DELETE_WINDOW", on_config_window_close)
+    
     def on_closing(self):
         """关闭窗口时的处理"""
         if self.is_running:
-            if messagebox.askyesno("确认", "分析任务正在进行中，确定要退出吗？"):
-                self.root.destroy()
-        else:
-            self.root.destroy()
+            messagebox.showwarning("警告", "分析正在进行中，请先停止分析再关闭程序。")
+            return
+        
+        self.root.destroy()
 
 
 def main():

@@ -18,6 +18,7 @@ def build_exe():
     required_files = [
         "sql_dependency_analyzer_gui.py",
         "sql_dependency_analyzer.py",
+        "config_management.py",
         "requirements.txt"
     ]
     
@@ -50,6 +51,7 @@ def build_exe():
         "--onefile",
         "--clean",
         "--add-data", "sql_dependency_analyzer.py;.",
+        "--add-data", "config_management.py;.",
         "--hidden-import", "yaml",
         "--hidden-import", "pandas",
         "--hidden-import", "openpyxl",
