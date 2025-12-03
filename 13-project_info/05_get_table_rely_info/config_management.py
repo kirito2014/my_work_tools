@@ -123,9 +123,7 @@ class ConfigFormApp:
             row=2, column=1, sticky=tk.W, pady=row_padding, padx=col_padding
         )
         
-        # 填充空白
-        for i in range(3):
-            frame.rowconfigure(i, weight=1)
+        # 配置列权重
         frame.columnconfigure(0, weight=0)
         frame.columnconfigure(1, weight=1)
         
