@@ -90,7 +90,12 @@ def build_hierarchy(df_a):
                 # 如果这个source本身也是一个节点，那么当前节点依赖于这个source节点
                 node_dependency_graph[node].add(source)
     
-    print(f"层级关系构建完成：{len(source_to_children)}个source有子节点，{len(node_to_sources)}个节点有关联source")
+    print(f"节点依赖图：")
+    for node in sorted(node_dependency_graph.keys()):
+        if node_dependency_graph[node]:
+            print(f"  {node} -> {node_dependency_graph[node]}")
+    
+    print(f"\n层级关系构建完成：{len(source_to_children)}个source有子节点，{len(node_to_sources)}个节点有关联source")
     return source_to_children, node_to_sources, source_to_nodes, node_to_parents, node_dependency_graph
 
 def iterative_drilling(df_a, source_to_children, whitelist):
@@ -162,7 +167,7 @@ def iterative_drilling(df_a, source_to_children, whitelist):
     terminal_nodes = list(set(terminal_nodes))
     print(f"\n向下迭代结束：共{iter_count}轮，检测到{len(terminal_nodes)}个终止节点")
     if terminal_nodes:
-        print(f"终止节点列表：{', '.join(terminal_nodes[:10])}{'...' if len(terminal_nodes) > 10 else ''}")
+        print(f"终止节点列表：{terminal_nodes}")
     
     df_a['_iter_count'] = iter_count
     return df_a, terminal_nodes
@@ -173,29 +178,39 @@ def propagate_terminal_upwards_complete(df_a, terminal_nodes, node_to_parents, n
         return df_a, set()
     
     print("\n开始向上传播终止节点影响（完整链路）...")
+    print(f"终止节点: {terminal_nodes}")
     
     # 记录受影响的所有节点
     all_affected_nodes = set()
     
     # 步骤1: 对于每个终止节点，找到所有直接和间接依赖它的节点
     for terminal_node in terminal_nodes:
-        print(f"处理终止节点: {terminal_node}")
+        print(f"\n处理终止节点: {terminal_node}")
         
         # 使用BFS找到所有依赖该终止节点的节点
+        # 我们需要逆向查找：找到所有依赖于当前节点的节点
         queue = deque([terminal_node])
         visited = set([terminal_node])
+        affected_by_terminal = set()
         
         while queue:
             current = queue.popleft()
+            print(f"  当前处理: {current}")
             
             # 找到所有直接依赖当前节点的节点
-            for dependent_node in [n for n in node_dependency_graph if current in node_dependency_graph[n]]:
-                if dependent_node not in visited:
-                    visited.add(dependent_node)
-                    queue.append(dependent_node)
-                    all_affected_nodes.add(dependent_node)
+            # node_dependency_graph存储的是 A -> B 表示A依赖于B
+            # 所以我们需要找到所有B包含current的A
+            for node in node_dependency_graph:
+                if current in node_dependency_graph[node] and node not in visited:
+                    print(f"    找到依赖关系: {node} -> {current}")
+                    visited.add(node)
+                    queue.append(node)
+                    affected_by_terminal.add(node)
+        
+        print(f"  受{terminal_node}影响的节点: {affected_by_terminal}")
+        all_affected_nodes.update(affected_by_terminal)
     
-    print(f"受影响的节点链: {all_affected_nodes}")
+    print(f"\n所有受影响节点: {all_affected_nodes}")
     
     # 步骤2: 标记所有受影响节点的所有source行为空
     affected_rows_count = 0
@@ -208,10 +223,22 @@ def propagate_terminal_upwards_complete(df_a, terminal_nodes, node_to_parents, n
             # 只处理未标记为1的行
             to_update_mask = node_mask & (df_a['SOURCE_FINAL'] != 1)
             if to_update_mask.any():
+                before_count = df_a.loc[to_update_mask, 'SOURCE_FINAL'].isna().sum()
                 df_a.loc[to_update_mask, 'SOURCE_FINAL'] = np.nan
                 df_a.loc[to_update_mask, 'BLOCK_REASON'] = f'上游终止节点影响'
+                after_count = df_a.loc[to_update_mask, 'SOURCE_FINAL'].isna().sum()
                 affected_rows_count += to_update_mask.sum()
-                print(f"  影响节点 {affected_node}: {to_update_mask.sum()} 行被标记为空")
+                print(f"  影响节点 {affected_node}: {to_update_mask.sum()} 行被标记为空 (之前{before_count}行为空，现在{after_count}行为空)")
+    
+    # 步骤3: 还需要处理终止节点本身作为source的行
+    for terminal_node in terminal_nodes:
+        # 找到所有使用终止节点作为source的行
+        terminal_as_source_mask = df_a['SOURCE_TABLE_NAME'] == terminal_node
+        if terminal_as_source_mask.any():
+            df_a.loc[terminal_as_source_mask, 'SOURCE_FINAL'] = np.nan
+            df_a.loc[terminal_as_source_mask, 'BLOCK_REASON'] = '终止节点'
+            affected_rows_count += terminal_as_source_mask.sum()
+            print(f"  终止节点 {terminal_node} 作为source的行被标记为空")
     
     print(f"向上传播完成：影响了 {len(all_affected_nodes)} 个节点，共 {affected_rows_count} 行数据")
     return df_a, all_affected_nodes
@@ -272,19 +299,11 @@ def mark_node_level(df_a):
     print(f"节点标记完成：{node_1_count}个节点标记为1")
     return df_a
 
-def post_process_affected_statements(df_a):
-    """后处理：确保受影响的节点中的所有代码块都被正确标记"""
-    print("\n后处理：检查受影响的代码块标记...")
-    
-    # 找出所有SOURCE_FINAL为空的节点
-    nodes_with_null_source = df_a[df_a['SOURCE_FINAL'].isna()]['NODE_NAME'].unique()
-    
-    for node in nodes_with_null_source:
-        # 对于该节点的所有代码块，确保STATEMENT_FINAL为空
-        node_mask = df_a['NODE_NAME'] == node
-        df_a.loc[node_mask, 'STATEMENT_FINAL'] = np.nan
-    
-    return df_a
+def debug_current_state(df_a, node_name):
+    """调试：查看特定节点的当前状态"""
+    print(f"\n调试：节点 {node_name} 的当前状态")
+    node_rows = df_a[df_a['NODE_NAME'] == node_name]
+    print(node_rows[['SOURCE_TABLE_NAME', 'SOURCE_FINAL', 'BLOCK_REASON']].to_string())
 
 def generate_report(df_a, whitelist, terminal_nodes, affected_nodes=None):
     """生成分析报告"""
@@ -310,7 +329,7 @@ def generate_report(df_a, whitelist, terminal_nodes, affected_nodes=None):
     
     # 构建报告
     report = f"""================================================================================
-数据标记处理分析报告（最终修复版-完整链路传播）
+数据标记处理分析报告（完整链路传播）
 ================================================================================
 一、基本统计信息
 ----------------------------------------
@@ -393,7 +412,7 @@ def main():
     # 配置文件路径
     FILE_A = "复杂测试数据_A.xlsx"
     FILE_B = "复杂测试数据_B.xlsx"
-    OUTPUT_REPORT = "数据标记处理分析报告（最终修复版-完整链路传播）.txt"
+    OUTPUT_REPORT = "数据标记处理分析报告（完整链路传播）.txt"
     
     try:
         # 1. 加载数据
@@ -401,33 +420,41 @@ def main():
         
         # 2. 初始标记
         df_a = init_marking(df_a, whitelist)
+        print("\n初始标记后状态:")
+        print(df_a[['NODE_NAME', 'SOURCE_TABLE_NAME', 'SOURCE_FINAL']].to_string())
         
         # 3. 构建层级关系（包含完整依赖链）
         source_to_children, node_to_sources, source_to_nodes, node_to_parents, node_dependency_graph = build_hierarchy(df_a)
         
         # 4. 向下迭代标记
         df_a, terminal_nodes = iterative_drilling(df_a, source_to_children, whitelist)
+        print("\n向下迭代后状态:")
+        print(df_a[['NODE_NAME', 'SOURCE_TABLE_NAME', 'SOURCE_FINAL', 'IS_TERMINAL', 'BLOCK_REASON']].to_string())
+        
+        # 调试关键节点
+        debug_current_state(df_a, 'STG_ZSRUN_ZZTEST_1')
+        debug_current_state(df_a, 'STG_ZSRUN_ZZTEST')
+        debug_current_state(df_a, 'STG_ZSRUN_ZZRBB')
         
         # 5. 向上传播终止节点影响（完整链路）
         df_a, affected_nodes = propagate_terminal_upwards_complete(df_a, terminal_nodes, node_to_parents, node_dependency_graph)
+        print("\n向上传播后状态:")
+        print(df_a[['NODE_NAME', 'SOURCE_TABLE_NAME', 'SOURCE_FINAL', 'BLOCK_REASON']].to_string())
         
         # 6. 代码块标记
         df_a = mark_statement_level(df_a)
         
-        # 7. 后处理：确保受影响的代码块被正确标记
-        df_a = post_process_affected_statements(df_a)
-        
-        # 8. 节点标记
+        # 7. 节点标记
         df_a = mark_node_level(df_a)
         
-        # 9. 生成报告和保存结果
+        # 8. 生成报告和保存结果
         report, df_a = generate_report(df_a, whitelist, terminal_nodes, affected_nodes)
         save_results(df_a, report, OUTPUT_REPORT)
         
         print("\n" + "="*50)
-        print("报告预览（前500字符）：")
+        print("最终结果预览:")
         print("="*50)
-        print(report[:500] + "...")
+        print(df_a[['NODE_NAME', 'SOURCE_TABLE_NAME', 'SOURCE_FINAL', 'STATEMENT_FINAL', 'NODE_FINAL', 'BLOCK_REASON']].to_string())
     
     except Exception as e:
         print(f"处理过程出错：{str(e)}")
