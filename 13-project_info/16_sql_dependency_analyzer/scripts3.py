@@ -2,253 +2,317 @@ import pandas as pd
 import numpy as np
 from collections import defaultdict, deque
 
-def load_data(file_a_path, file_b_path):
-    """加载Excel数据"""
+def load_and_validate_data(file_a_path, file_b_path):
+    """加载并验证表A、表B数据"""
     df_a = pd.read_excel(file_a_path)
     df_b = pd.read_excel(file_b_path)
     
-    # 清理列名并验证必要列
+    # 清理列名空格
     df_a.columns = df_a.columns.str.strip()
     df_b.columns = df_b.columns.str.strip()
     
-    required_cols = ['NODE_NAME', 'BLOCK_NUM', 'STATMENT_NUM', 'SOURCE_TABLE_NAME']
-    for col in required_cols:
-        if col not in df_a.columns:
-            raise ValueError(f"表A缺少必要列: {col}")
+    # 验证必要列
+    required_a = ['NODE_NAME', 'FILE_ID', 'BLOCK_NUM', 'STATMENT_NUM', 
+                  'SOURCE_TABLE_NAME', 'TARGET_DB_NAME', 'TARGET_TABLE_NAME']
+    required_b = ['TBL_NM']
     
+    for col in required_a:
+        if col not in df_a.columns:
+            raise ValueError(f"表A缺失必要列：{col}")
     if 'TBL_NM' not in df_b.columns:
-        raise ValueError("表B缺少必要列: TBL_NM")
+        raise ValueError("表B缺失必要列：TBL_NM")
     
     # 处理空值
-    df_a['SOURCE_TABLE_NAME'] = df_a['SOURCE_TABLE_NAME'].fillna('')
-    df_a['NODE_NAME'] = df_a['NODE_NAME'].fillna('')
+    df_a['SOURCE_TABLE_NAME'] = df_a['SOURCE_TABLE_NAME'].fillna('UNDEFINED_SOURCE')
+    df_a['NODE_NAME'] = df_a['NODE_NAME'].fillna('UNDEFINED_NODE')
+    df_b['TBL_NM'] = df_b['TBL_NM'].fillna('')
     
-    return df_a, df_b
-
-def initial_marking(df_a, df_b):
-    """初始标记：基于表B的直接匹配"""
-    # 获取表B的白名单
-    whitelist = set(df_b['TBL_NM'].dropna().astype(str).tolist())
+    # 生成白名单集合
+    whitelist = set(df_b[df_b['TBL_NM'] != '']['TBL_NM'].unique())
     
-    # 初始化标记列
-    df_a['SOURCE_FLAG'] = ''
-    df_a['NODE_FLAG'] = ''
-    df_a['TERMINAL_NODE'] = False
-    df_a['BLOCKED_BY'] = ''  # 记录被哪个终止节点阻塞
-    df_a['IS_OVERRIDDEN'] = False  # 是否被强制置空
-    
-    # 条件1：NODE_NAME在白名单中，整行标记为1
-    node_match = df_a['NODE_NAME'].isin(whitelist)
-    df_a.loc[node_match, 'NODE_FLAG'] = 1
-    df_a.loc[node_match, 'SOURCE_FLAG'] = 1
-    
-    # 条件2：SOURCE_TABLE_NAME在白名单中，标记为1
-    source_match = df_a['SOURCE_TABLE_NAME'].isin(whitelist)
-    df_a.loc[source_match & (df_a['SOURCE_FLAG'] == ''), 'SOURCE_FLAG'] = 1
-    
+    print(f"数据加载完成：表A{len(df_a)}行，表B白名单{len(whitelist)}个")
     return df_a, whitelist
 
-def build_hierarchy_graph(df_a):
-    """构建完整的层级关系图"""
-    # 节点到源表的映射：node -> {sources}
-    node_children = defaultdict(set)
+def init_marking(df_a, whitelist):
+    """初始化标记列"""
+    df_a['SOURCE_FINAL'] = np.nan
+    df_a['STATEMENT_FINAL'] = np.nan
+    df_a['NODE_FINAL'] = np.nan
+    df_a['IS_TERMINAL'] = False
+    df_a['BLOCK_REASON'] = ''
     
-    # 源表到父节点的映射：source -> {parents}
-    node_parents = defaultdict(set)
+    # 初始标记：SOURCE_TABLE_NAME在白名单中标记为1
+    source_match_mask = df_a['SOURCE_TABLE_NAME'].isin(whitelist)
+    df_a.loc[source_match_mask, 'SOURCE_FINAL'] = 1
     
-    # 所有表名集合
-    all_tables = set()
-    
-    for _, row in df_a.iterrows():
-        parent = row['NODE_NAME']
-        child = row['SOURCE_TABLE_NAME']
-        
-        if parent and child:
-            node_children[parent].add(child)
-            node_parents[child].add(parent)
-            all_tables.add(parent)
-            all_tables.add(child)
-    
-    return node_children, node_parents, all_tables
-
-def find_terminal_nodes(node_children, all_tables, whitelist):
-    """查找终止节点（无子节点且不在白名单）"""
-    terminal_nodes = []
-    terminal_details = []
-    
-    for table in all_tables:
-        if table == '':
-            continue
-            
-        # 终止节点条件：不在白名单 + 没有子节点
-        if table not in whitelist and len(node_children.get(table, set())) == 0:
-            terminal_nodes.append(table)
-            terminal_details.append({
-                '终止节点': table,
-                '所在层级': '叶子节点',
-                '原因': '不在白名单且无下游节点'
-            })
-    
-    return terminal_nodes, terminal_details
-
-def trace_upstream_nodes(target_node, node_parents):
-    """追踪目标节点的所有上游节点"""
-    upstream_nodes = set()
-    visited = set()
-    queue = deque([target_node])
-    
-    while queue:
-        current = queue.popleft()
-        if current in visited:
-            continue
-            
-        visited.add(current)
-        parents = node_parents.get(current, set())
-        
-        for parent in parents:
-            upstream_nodes.add(parent)
-            queue.append(parent)
-    
-    return sorted(list(upstream_nodes))
-
-def propagate_blocking(df_a, terminal_nodes, node_parents, node_children):
-    """传播阻塞标记：终止节点导致所有上游节点置空"""
-    blocking_map = {}  # 记录每个节点被哪个终止节点阻塞
-    all_blocked_nodes = set()
-    
-    # 对每个终止节点，追踪所有上游节点
-    for terminal in terminal_nodes:
-        upstream_nodes = trace_upstream_nodes(terminal, node_parents)
-        blocking_map[terminal] = upstream_nodes
-        all_blocked_nodes.update(upstream_nodes)
-        all_blocked_nodes.add(terminal)
-        
-        # 标记被该终止节点影响的记录
-        df_a.loc[df_a['SOURCE_TABLE_NAME'].isin(upstream_nodes + [terminal]), 'BLOCKED_BY'] += terminal + ';'
-        df_a.loc[df_a['NODE_NAME'].isin(upstream_nodes + [terminal]), 'BLOCKED_BY'] += terminal + ';'
-    
-    # 强制置空所有被阻塞的节点
-    df_a.loc[df_a['SOURCE_TABLE_NAME'].isin(all_blocked_nodes), 'SOURCE_FLAG'] = ''
-    df_a.loc[df_a['NODE_NAME'].isin(all_blocked_nodes), 'NODE_FLAG'] = ''
-    df_a.loc[df_a['SOURCE_TABLE_NAME'].isin(terminal_nodes), 'TERMINAL_NODE'] = True
-    df_a.loc[df_a['SOURCE_TABLE_NAME'].isin(all_blocked_nodes), 'IS_OVERRIDDEN'] = True
-    df_a.loc[df_a['NODE_NAME'].isin(all_blocked_nodes), 'IS_OVERRIDDEN'] = True
-    
-    return df_a, blocking_map, all_blocked_nodes
-
-def generate_terminal_report(terminal_nodes, blocking_map):
-    """生成终止节点详细报告"""
-    report_data = []
-    
-    for terminal in terminal_nodes:
-        upstream_nodes = blocking_map.get(terminal, [])
-        report_data.append({
-            '终止节点名称': terminal,
-            '影响的上游节点数量': len(upstream_nodes),
-            '上游节点列表': ', '.join(upstream_nodes) if upstream_nodes else '无',
-            '阻断链路长度': len(upstream_nodes) + 1,
-            '状态': '已阻断所有上游节点'
-        })
-    
-    return pd.DataFrame(report_data)
-
-def generate_node_summary(df_a):
-    """生成节点汇总报告"""
-    summary = df_a.groupby('NODE_NAME').agg({
-        'SOURCE_FLAG': [
-            ('总行数', 'count'),
-            ('标记1数量', lambda x: (x == 1).sum()),
-            ('空标记数量', lambda x: (x == '').sum()),
-            ('被否决数量', lambda x: sum((x == '') & (df_a.loc[x.index, 'IS_OVERRIDDEN'])))
-        ],
-        'NODE_FLAG': [('最终节点标记', lambda x: x.iloc[0] if len(x) > 0 else '')],
-        'TERMINAL_NODE': [('包含终止节点', 'any')],
-        'IS_OVERRIDDEN': [('被强制置空', 'any')]
-    }).round(2)
-    
-    # 展平列名
-    summary.columns = ['总行数', '标记1数量', '空标记数量', '被否决数量', 
-                       '最终节点标记', '包含终止节点', '被强制置空']
-    
-    # 计算标记率
-    summary['有效标记率'] = (summary['标记1数量'] / summary['总行数'] * 100).round(2)
-    summary['否决率'] = (summary['被否决数量'] / summary['总行数'] * 100).round(2)
-    
-    return summary
-
-def final_processing(df_a):
-    """最终处理：生成最终标记列"""
-    df_a['SOURCE_FINAL'] = df_a['SOURCE_FLAG'].replace('', np.nan)
-    df_a['NODE_FINAL'] = df_a['NODE_FLAG'].replace('', np.nan)
-    
-    # 清理BLOCKED_BY字段
-    df_a['BLOCKED_BY'] = df_a['BLOCKED_BY'].str.strip(';').str.replace(';;', ';')
-    
+    print(f"初始标记完成：{source_match_mask.sum()}行原表标记为1")
     return df_a
 
+def build_hierarchy(df_a):
+    """构建层级关系：source -> 子节点列表、node -> 关联source列表"""
+    source_to_children = defaultdict(set)  # source的子source
+    node_to_sources = defaultdict(set)     # node下的所有source
+    source_to_nodes = defaultdict(set)     # source所属的node
+    
+    # 1. 构建node与source的关联
+    for _, row in df_a.iterrows():
+        node = row['NODE_NAME']
+        source = row['SOURCE_TABLE_NAME']
+        node_to_sources[node].add(source)
+        source_to_nodes[source].add(node)
+    
+    # 2. 构建source的子节点关系（source作为NODE_NAME时的子source）
+    all_nodes = df_a['NODE_NAME'].unique()
+    for source in df_a['SOURCE_TABLE_NAME'].unique():
+        if source in all_nodes:
+            # 该source作为node时的所有子source
+            child_sources = df_a[df_a['NODE_NAME'] == source]['SOURCE_TABLE_NAME'].unique()
+            for child in child_sources:
+                source_to_children[source].add(child)
+    
+    print(f"层级关系构建完成：{len(source_to_children)}个source有子节点，{len(node_to_sources)}个节点有关联source")
+    return source_to_children, node_to_sources, source_to_nodes
+
+def iterative_drilling(df_a, source_to_children, whitelist):
+    """迭代下钻标记（严格校验子节点状态）"""
+    max_iter = 20
+    iter_count = 0
+    changed = True
+    terminal_nodes = []
+    
+    while changed and iter_count < max_iter:
+        iter_count += 1
+        changed = False
+        prev_source_final = df_a['SOURCE_FINAL'].copy()
+        
+        # 定位空标记source（排除已标记1和终止节点）
+        empty_source_mask = (df_a['SOURCE_FINAL'].isna()) & (~df_a['IS_TERMINAL'])
+        empty_sources = df_a[empty_source_mask]['SOURCE_TABLE_NAME'].unique()
+        
+        if len(empty_sources) == 0:
+            print(f"迭代{iter_count}轮：无空标记source，停止迭代")
+            break
+        
+        print(f"迭代{iter_count}轮：处理{len(empty_sources)}个空标记source")
+        
+        for source in empty_sources:
+            child_sources = source_to_children.get(source, set())
+            
+            # 场景1：无子节点 → 标记为终止节点，SOURCE_FINAL保持空
+            if len(child_sources) == 0:
+                df_a.loc[df_a['SOURCE_TABLE_NAME'] == source, 'IS_TERMINAL'] = True
+                df_a.loc[df_a['SOURCE_TABLE_NAME'] == source, 'BLOCK_REASON'] = '无子节点且未匹配白名单'
+                terminal_nodes.append(source)
+                changed = True
+                continue
+            
+            # 场景2：有子节点 → 检查所有子节点的标记状态
+            child_marks = []
+            has_unmarked_child = False
+            for child in child_sources:
+                # 获取子节点的标记值（去重）
+                child_mark_vals = df_a[df_a['SOURCE_TABLE_NAME'] == child]['SOURCE_FINAL'].dropna().unique()
+                if len(child_mark_vals) == 0:
+                    # 子节点未标记 → 无法推导
+                    has_unmarked_child = True
+                    break
+                child_marks.append(child_mark_vals[0])
+            
+            # 子节点存在未标记 → 当前source保持空
+            if has_unmarked_child:
+                df_a.loc[df_a['SOURCE_TABLE_NAME'] == source, 'BLOCK_REASON'] = '子节点未全部标记'
+                continue
+            
+            # 子节点全为1 → 当前source标记为1
+            if all(mark == 1 for mark in child_marks):
+                df_a.loc[df_a['SOURCE_TABLE_NAME'] == source, 'SOURCE_FINAL'] = 1
+                changed = True
+            # 子节点存在非1 → 当前source保持空
+            else:
+                df_a.loc[df_a['SOURCE_TABLE_NAME'] == source, 'BLOCK_REASON'] = '子节点存在非1标记'
+                changed = True
+        
+        # 检查是否有更新
+        if (df_a['SOURCE_FINAL'] == prev_source_final).all():
+            changed = False
+            print(f"迭代{iter_count}轮：无标记更新，停止迭代")
+    
+    # 去重终止节点
+    terminal_nodes = list(set(terminal_nodes))
+    print(f"\n迭代结束：共{iter_count}轮，检测到{len(terminal_nodes)}个终止节点")
+    if terminal_nodes:
+        print(f"终止节点列表：{', '.join(terminal_nodes[:10])}{'...' if len(terminal_nodes) > 10 else ''}")
+    
+    df_a['_iter_count'] = iter_count
+    return df_a, terminal_nodes
+
+def mark_statement_level(df_a):
+    """代码块标记：严格校验分组内所有SOURCE_FINAL均为1"""
+    group_key = ['NODE_NAME', 'BLOCK_NUM', 'STATMENT_NUM']
+    
+    # 按代码块分组，逐组判断
+    statement_results = []
+    for group_vals, group_df in df_a.groupby(group_key):
+        node, block, stmt = group_vals
+        # 分组内所有SOURCE_FINAL必须为1（无NaN、无非1）
+        all_source_1 = (group_df['SOURCE_FINAL'].notna()).all() and (group_df['SOURCE_FINAL'] == 1).all()
+        stmt_final = 1 if all_source_1 else np.nan
+        statement_results.append({
+            'NODE_NAME': node,
+            'BLOCK_NUM': block,
+            'STATMENT_NUM': stmt,
+            'STATEMENT_FINAL': stmt_final
+        })
+    
+    # 合并回原表
+    stmt_df = pd.DataFrame(statement_results)
+    df_a = df_a.merge(stmt_df, on=group_key, how='left', suffixes=('', '_new'))
+    if 'STATEMENT_FINAL_new' in df_a.columns:
+        df_a['STATEMENT_FINAL'] = df_a['STATEMENT_FINAL_new']
+        df_a.drop('STATEMENT_FINAL_new', axis=1, inplace=True)
+    
+    # 统计标记数量
+    stmt_1_count = len(stmt_df[stmt_df['STATEMENT_FINAL'] == 1])
+    print(f"代码块标记完成：{stmt_1_count}个代码块标记为1")
+    return df_a
+
+def mark_node_level(df_a):
+    """节点标记：严格校验节点下所有代码块的STATEMENT_FINAL均为1"""
+    node_results = []
+    for node, node_df in df_a.groupby('NODE_NAME'):
+        # 获取节点下所有唯一代码块的STATEMENT_FINAL
+        unique_stmt = node_df[['BLOCK_NUM', 'STATMENT_NUM', 'STATEMENT_FINAL']].drop_duplicates()
+        # 所有代码块必须标记为1（无NaN、无非1）
+        all_stmt_1 = (unique_stmt['STATEMENT_FINAL'].notna()).all() and (unique_stmt['STATEMENT_FINAL'] == 1).all()
+        node_final = 1 if all_stmt_1 else np.nan
+        node_results.append({
+            'NODE_NAME': node,
+            'NODE_FINAL': node_final
+        })
+    
+    # 合并回原表
+    node_df = pd.DataFrame(node_results)
+    df_a = df_a.merge(node_df, on='NODE_NAME', how='left', suffixes=('', '_new'))
+    if 'NODE_FINAL_new' in df_a.columns:
+        df_a['NODE_FINAL'] = df_a['NODE_FINAL_new']
+        df_a.drop('NODE_FINAL_new', axis=1, inplace=True)
+    
+    # 统计标记数量
+    node_1_count = len(node_df[node_df['NODE_FINAL'] == 1])
+    print(f"节点标记完成：{node_1_count}个节点标记为1")
+    return df_a
+
+def generate_report(df_a, whitelist, terminal_nodes):
+    """生成分析报告"""
+    total_rows = len(df_a)
+    source_1_count = int((df_a['SOURCE_FINAL'] == 1).sum())
+    source_null_count = int(df_a['SOURCE_FINAL'].isna().sum())
+    
+    # 代码块统计
+    stmt_total = len(df_a[['NODE_NAME', 'BLOCK_NUM', 'STATMENT_NUM']].drop_duplicates())
+    stmt_1_count = len(df_a[df_a['STATEMENT_FINAL'] == 1][['NODE_NAME', 'BLOCK_NUM', 'STATMENT_NUM']].drop_duplicates())
+    
+    # 节点统计
+    node_total = len(df_a['NODE_NAME'].unique())
+    node_1_count = len(df_a[df_a['NODE_FINAL'] == 1]['NODE_NAME'].unique())
+    
+    # 百分比计算
+    source_1_pct = source_1_count / total_rows * 100 if total_rows > 0 else 0.0
+    source_null_pct = source_null_count / total_rows * 100 if total_rows > 0 else 0.0
+    stmt_1_pct = stmt_1_count / stmt_total * 100 if stmt_total > 0 else 0.0
+    stmt_null_pct = (stmt_total - stmt_1_count) / stmt_total * 100 if stmt_total > 0 else 0.0
+    node_1_pct = node_1_count / node_total * 100 if node_total > 0 else 0.0
+    node_null_pct = (node_total - node_1_count) / node_total * 100 if node_total > 0 else 0.0
+    
+    # 构建报告
+    report = f"""================================================================================
+数据标记处理分析报告（最终修复版）
+================================================================================
+一、基本统计信息
+----------------------------------------
+总数据行数: {total_rows}
+白名单表数量: {len(whitelist)}
+终止节点数量: {len(terminal_nodes)}
+迭代匹配轮次: {int(df_a['_iter_count'].iloc[0])}
+
+二、三级标记结果统计
+----------------------------------------
+1. 原表标记（SOURCE_FINAL）:
+  标记为1: {source_1_count} 行 ({source_1_pct:.1f}%)
+  未标记: {source_null_count} 行 ({source_null_pct:.1f}%)
+
+2. 代码块标记（STATEMENT_FINAL）:
+  标记为1: {stmt_1_count} 个 ({stmt_1_pct:.1f}%)
+  未标记: {stmt_total - stmt_1_count} 个 ({stmt_null_pct:.1f}%)
+
+3. 节点标记（NODE_FINAL）:
+  标记为1: {node_1_count} 个 ({node_1_pct:.1f}%)
+  未标记: {node_total - node_1_count} 个 ({node_null_pct:.1f}%)
+
+"""
+    
+    # 终止节点详情
+    report += "三、终止节点详情\n"
+    report += "----------------------------------------\n"
+    if terminal_nodes:
+        for i, node in enumerate(terminal_nodes, 1):
+            related_rows = df_a[df_a['SOURCE_TABLE_NAME'] == node]
+            related_nodes = related_rows['NODE_NAME'].unique()
+            reason = related_rows['BLOCK_REASON'].iloc[0] if len(related_rows) > 0 else '未知'
+            report += f"{i}. {node}:\n"
+            report += f"   关联行数: {len(related_rows)} 行\n"
+            report += f"   关联节点: {', '.join(related_nodes)}\n"
+            report += f"   未标记原因: {reason}\n"
+    else:
+        report += "  无终止节点\n"
+    
+    # 未标记SOURCE列表
+    report += "\n四、未标记的SOURCE_TABLE_NAME列表\n"
+    report += "----------------------------------------\n"
+    null_sources = df_a[df_a['SOURCE_FINAL'].isna()]['SOURCE_TABLE_NAME'].unique()
+    for i, source in enumerate(sorted(null_sources), 1):
+        report += f" {i:2d}. {source}\n"
+    
+    return report, df_a
+
+def save_results(df_a, report, output_path):
+    """保存结果"""
+    excel_path = output_path.replace('.txt', '.xlsx')
+    with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+        df_a.to_excel(writer, sheet_name='详细标记数据', index=False)
+    
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(report)
+    
+    print(f"\n结果保存完成：")
+    print(f"  - Excel文件：{excel_path}")
+    print(f"  - 报告文件：{output_path}")
+
 def main():
-    """主函数"""
-    FILE_A = "复杂测试数据_A.xlsx"  
-    FILE_B = "复杂测试数据_B.xlsx"       
-    OUTPUT = '终止节点追踪结果.xlsx'
+    # 配置文件路径
+    FILE_A = "复杂测试数据_A.xlsx"
+    FILE_B = "复杂测试数据_B.xlsx"
+    OUTPUT_REPORT = "数据标记处理分析报告（最终修复版）.txt"
     
     try:
-        print("=== 数据加载阶段 ===")
-        df_a, df_b = load_data(FILE_A, FILE_B)
-        print(f"表A数据行数: {len(df_a)}")
-        print(f"表B白名单数量: {len(df_b)}")
+        df_a, whitelist = load_and_validate_data(FILE_A, FILE_B)
+        df_a = init_marking(df_a, whitelist)
+        source_to_children, node_to_sources, source_to_nodes = build_hierarchy(df_a)
+        df_a, terminal_nodes = iterative_drilling(df_a, source_to_children, whitelist)
+        df_a = mark_statement_level(df_a)
+        df_a = mark_node_level(df_a)
+        report, df_a = generate_report(df_a, whitelist, terminal_nodes)
+        save_results(df_a, report, OUTPUT_REPORT)
         
-        print("\n=== 初始标记阶段 ===")
-        df_a, whitelist = initial_marking(df_a, df_b)
-        initial_1_count = (df_a['SOURCE_FLAG'] == 1).sum()
-        print(f"初始标记为1的行数: {initial_1_count}")
-        
-        print("\n=== 构建层级关系 ===")
-        node_children, node_parents, all_tables = build_hierarchy_graph(df_a)
-        print(f"总表数量: {len(all_tables)}")
-        print(f"层级关系数: {sum(len(v) for v in node_children.values())}")
-        
-        print("\n=== 查找终止节点 ===")
-        terminal_nodes, terminal_details = find_terminal_nodes(node_children, all_tables, whitelist)
-        print(f"发现终止节点数量: {len(terminal_nodes)}")
-        for node in terminal_nodes:
-            print(f"  - {node}")
-        
-        print("\n=== 传播阻塞标记 ===")
-        df_a, blocking_map, all_blocked_nodes = propagate_blocking(df_a, terminal_nodes, node_parents, node_children)
-        print(f"被阻断的节点总数: {len(all_blocked_nodes)}")
-        
-        print("\n=== 生成报告 ===")
-        terminal_report = generate_terminal_report(terminal_nodes, blocking_map)
-        node_summary = generate_node_summary(df_a)
-        df_a = final_processing(df_a)
-        
-        # 保存结果
-        with pd.ExcelWriter(OUTPUT, engine='openpyxl') as writer:
-            df_a.to_excel(writer, sheet_name='详细标记数据', index=False)
-            terminal_report.to_excel(writer, sheet_name='终止节点报告', index=False)
-            node_summary.to_excel(writer, sheet_name='节点汇总分析', index=True)
-        
-        print(f"\n=== 处理完成 ===")
-        print(f"结果已保存至: {OUTPUT}")
-        
-        print("\n=== 关键统计信息 ===")
-        print(f"终止节点数量: {len(terminal_nodes)}")
-        print(f"被阻断的上游节点数量: {len(all_blocked_nodes) - len(terminal_nodes)}")
-        print(f"最终标记为1的行数: {(df_a['SOURCE_FLAG'] == 1).sum()}")
-        print(f"被强制置空的行数: {(df_a['IS_OVERRIDDEN'] == True).sum()}")
-        
-        print("\n=== 终止节点影响详情 ===")
-        for terminal, upstream in blocking_map.items():
-            print(f"\n终止节点 '{terminal}' 影响的上游节点:")
-            if upstream:
-                print(f"  {', '.join(upstream)}")
-            else:
-                print("  无上游节点")
-        
+        print("\n" + "="*50)
+        print("报告预览（前500字符）：")
+        print("="*50)
+        print(report[:500] + "...")
+    
     except Exception as e:
-        print(f"\n处理过程中出错: {str(e)}")
-        raise
+        print(f"处理过程出错：{str(e)}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
