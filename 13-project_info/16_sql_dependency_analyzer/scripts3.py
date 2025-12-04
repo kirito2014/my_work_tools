@@ -33,7 +33,9 @@ def initial_marking(df_a, df_b):
     # 初始化标记列
     df_a['SOURCE_FLAG'] = ''
     df_a['NODE_FLAG'] = ''
-    df_a['TERMINAL_NODE'] = False  # 标记是否为终止节点
+    df_a['TERMINAL_NODE'] = False
+    df_a['BLOCKED_BY'] = ''  # 记录被哪个终止节点阻塞
+    df_a['IS_OVERRIDDEN'] = False  # 是否被强制置空
     
     # 条件1：NODE_NAME在白名单中，整行标记为1
     node_match = df_a['NODE_NAME'].isin(whitelist)
@@ -46,159 +48,149 @@ def initial_marking(df_a, df_b):
     
     return df_a, whitelist
 
-def build_table_relations(df_a):
-    """构建表之间的层级关系映射"""
+def build_hierarchy_graph(df_a):
+    """构建完整的层级关系图"""
     # 节点到源表的映射：node -> {sources}
-    node_to_sources = defaultdict(set)
+    node_children = defaultdict(set)
     
-    # 源表到节点的反向映射：source -> {nodes}
-    source_to_nodes = defaultdict(set)
+    # 源表到父节点的映射：source -> {parents}
+    node_parents = defaultdict(set)
     
-    # 所有存在的节点名称
-    all_nodes = set(df_a['NODE_NAME'].unique())
+    # 所有表名集合
+    all_tables = set()
     
     for _, row in df_a.iterrows():
-        node = row['NODE_NAME']
-        source = row['SOURCE_TABLE_NAME']
+        parent = row['NODE_NAME']
+        child = row['SOURCE_TABLE_NAME']
         
-        if node and source:
-            node_to_sources[node].add(source)
-            source_to_nodes[source].add(node)
+        if parent and child:
+            node_children[parent].add(child)
+            node_parents[child].add(parent)
+            all_tables.add(parent)
+            all_tables.add(child)
     
-    return node_to_sources, source_to_nodes, all_nodes
+    return node_children, node_parents, all_tables
 
-def detect_terminal_nodes(df_a, node_to_sources, all_nodes, whitelist):
-    """检测终止节点（B表无数据且无子节点的节点）"""
-    terminal_nodes = set()
+def find_terminal_nodes(node_children, all_tables, whitelist):
+    """查找终止节点（无子节点且不在白名单）"""
+    terminal_nodes = []
+    terminal_details = []
     
-    for node in all_nodes:
-        # 条件：不在白名单中，且没有子节点
-        if node not in whitelist and len(node_to_sources.get(node, set())) == 0:
-            terminal_nodes.add(node)
+    for table in all_tables:
+        if table == '':
+            continue
+            
+        # 终止节点条件：不在白名单 + 没有子节点
+        if table not in whitelist and len(node_children.get(table, set())) == 0:
+            terminal_nodes.append(table)
+            terminal_details.append({
+                '终止节点': table,
+                '所在层级': '叶子节点',
+                '原因': '不在白名单且无下游节点'
+            })
     
-    # 标记终止节点
-    df_a.loc[df_a['SOURCE_TABLE_NAME'].isin(terminal_nodes), 'TERMINAL_NODE'] = True
-    
-    print(f"\n检测到终止节点: {terminal_nodes}")
-    return df_a, terminal_nodes
+    return terminal_nodes, terminal_details
 
-def propagate_empty_marking(df_a, source_to_nodes, terminal_nodes):
-    """将终止节点的空标记向上传播"""
-    affected_nodes = set(terminal_nodes)
-    queue = deque(terminal_nodes)
+def trace_upstream_nodes(target_node, node_parents):
+    """追踪目标节点的所有上游节点"""
+    upstream_nodes = set()
+    visited = set()
+    queue = deque([target_node])
     
-    # 使用BFS向上传播
     while queue:
-        current_node = queue.popleft()
+        current = queue.popleft()
+        if current in visited:
+            continue
+            
+        visited.add(current)
+        parents = node_parents.get(current, set())
         
-        # 找到当前节点的所有父节点
-        parent_nodes = source_to_nodes.get(current_node, set())
-        
-        for parent in parent_nodes:
-            if parent not in affected_nodes:
-                affected_nodes.add(parent)
-                queue.append(parent)
+        for parent in parents:
+            upstream_nodes.add(parent)
+            queue.append(parent)
     
-    # 标记受影响的节点
-    df_a.loc[df_a['NODE_NAME'].isin(affected_nodes), 'NODE_FLAG'] = ''
-    df_a.loc[df_a['SOURCE_TABLE_NAME'].isin(affected_nodes), 'SOURCE_FLAG'] = ''
-    
-    print(f"受影响的父节点: {affected_nodes - terminal_nodes}")
-    return df_a, affected_nodes
+    return sorted(list(upstream_nodes))
 
-def iterative_marking(df_a, node_to_sources, source_to_nodes, whitelist):
-    """迭代标记：基于层级关系的补充标记"""
-    max_iterations = 20
-    iteration = 0
-    changed = True
+def propagate_blocking(df_a, terminal_nodes, node_parents, node_children):
+    """传播阻塞标记：终止节点导致所有上游节点置空"""
+    blocking_map = {}  # 记录每个节点被哪个终止节点阻塞
+    all_blocked_nodes = set()
     
-    while changed and iteration < max_iterations:
-        changed = False
-        iteration += 1
-        print(f"\n迭代轮次 {iteration}...")
+    # 对每个终止节点，追踪所有上游节点
+    for terminal in terminal_nodes:
+        upstream_nodes = trace_upstream_nodes(terminal, node_parents)
+        blocking_map[terminal] = upstream_nodes
+        all_blocked_nodes.update(upstream_nodes)
+        all_blocked_nodes.add(terminal)
         
-        prev_flags = df_a['SOURCE_FLAG'].copy()
-        
-        # 按BLOCK_NUM分组处理
-        for block_num in df_a['BLOCK_NUM'].unique():
-            block_data = df_a[df_a['BLOCK_NUM'] == block_num]
-            
-            # 找出当前块中空标记且非终止节点的SOURCE_TABLE_NAME
-            empty_sources = block_data[
-                (block_data['SOURCE_FLAG'] == '') & 
-                (block_data['TERMINAL_NODE'] == False)
-            ]['SOURCE_TABLE_NAME'].unique()
-            
-            for source in empty_sources:
-                if not source or source in whitelist:
-                    continue
-                
-                child_sources = node_to_sources.get(source, set())
-                
-                if child_sources:
-                    # 获取子节点的标记状态
-                    child_flags = []
-                    for child in child_sources:
-                        child_flag = df_a[
-                            (df_a['BLOCK_NUM'] == block_num) & 
-                            (df_a['SOURCE_TABLE_NAME'] == child)
-                        ]['SOURCE_FLAG'].unique()
-                        child_flags.extend(child_flag)
-                    
-                    # 子节点全部标记为1，则当前source标记为1
-                    if child_flags and '' not in child_flags and all(flag == 1 for flag in child_flags):
-                        update_mask = (
-                            (df_a['BLOCK_NUM'] == block_num) & 
-                            (df_a['SOURCE_TABLE_NAME'] == source) & 
-                            (df_a['SOURCE_FLAG'] == '') &
-                            (df_a['TERMINAL_NODE'] == False)
-                        )
-                        
-                        if update_mask.any():
-                            df_a.loc[update_mask, 'SOURCE_FLAG'] = 1
-                            changed = True
-        
-        # 更新NODE_FLAG
-        for node in df_a['NODE_NAME'].unique():
-            if not node:
-                continue
-                
-            node_mask = df_a['NODE_NAME'] == node
-            node_sources = df_a[node_mask]['SOURCE_FLAG'].unique()
-            
-            # 如果所有子节点都是1，则标记为1；否则保持为空
-            if '' not in node_sources and all(flag == 1 for flag in node_sources):
-                df_a.loc[node_mask & (df_a['NODE_FLAG'] == ''), 'NODE_FLAG'] = 1
+        # 标记被该终止节点影响的记录
+        df_a.loc[df_a['SOURCE_TABLE_NAME'].isin(upstream_nodes + [terminal]), 'BLOCKED_BY'] += terminal + ';'
+        df_a.loc[df_a['NODE_NAME'].isin(upstream_nodes + [terminal]), 'BLOCKED_BY'] += terminal + ';'
     
-    return df_a
+    # 强制置空所有被阻塞的节点
+    df_a.loc[df_a['SOURCE_TABLE_NAME'].isin(all_blocked_nodes), 'SOURCE_FLAG'] = ''
+    df_a.loc[df_a['NODE_NAME'].isin(all_blocked_nodes), 'NODE_FLAG'] = ''
+    df_a.loc[df_a['SOURCE_TABLE_NAME'].isin(terminal_nodes), 'TERMINAL_NODE'] = True
+    df_a.loc[df_a['SOURCE_TABLE_NAME'].isin(all_blocked_nodes), 'IS_OVERRIDDEN'] = True
+    df_a.loc[df_a['NODE_NAME'].isin(all_blocked_nodes), 'IS_OVERRIDDEN'] = True
+    
+    return df_a, blocking_map, all_blocked_nodes
 
-def final_summary(df_a, terminal_nodes, affected_nodes):
-    """生成最终汇总报告"""
-    # 创建最终标记列
+def generate_terminal_report(terminal_nodes, blocking_map):
+    """生成终止节点详细报告"""
+    report_data = []
+    
+    for terminal in terminal_nodes:
+        upstream_nodes = blocking_map.get(terminal, [])
+        report_data.append({
+            '终止节点名称': terminal,
+            '影响的上游节点数量': len(upstream_nodes),
+            '上游节点列表': ', '.join(upstream_nodes) if upstream_nodes else '无',
+            '阻断链路长度': len(upstream_nodes) + 1,
+            '状态': '已阻断所有上游节点'
+        })
+    
+    return pd.DataFrame(report_data)
+
+def generate_node_summary(df_a):
+    """生成节点汇总报告"""
+    summary = df_a.groupby('NODE_NAME').agg({
+        'SOURCE_FLAG': [
+            ('总行数', 'count'),
+            ('标记1数量', lambda x: (x == 1).sum()),
+            ('空标记数量', lambda x: (x == '').sum()),
+            ('被否决数量', lambda x: sum((x == '') & (df_a.loc[x.index, 'IS_OVERRIDDEN'])))
+        ],
+        'NODE_FLAG': [('最终节点标记', lambda x: x.iloc[0] if len(x) > 0 else '')],
+        'TERMINAL_NODE': [('包含终止节点', 'any')],
+        'IS_OVERRIDDEN': [('被强制置空', 'any')]
+    }).round(2)
+    
+    # 展平列名
+    summary.columns = ['总行数', '标记1数量', '空标记数量', '被否决数量', 
+                       '最终节点标记', '包含终止节点', '被强制置空']
+    
+    # 计算标记率
+    summary['有效标记率'] = (summary['标记1数量'] / summary['总行数'] * 100).round(2)
+    summary['否决率'] = (summary['被否决数量'] / summary['总行数'] * 100).round(2)
+    
+    return summary
+
+def final_processing(df_a):
+    """最终处理：生成最终标记列"""
     df_a['SOURCE_FINAL'] = df_a['SOURCE_FLAG'].replace('', np.nan)
     df_a['NODE_FINAL'] = df_a['NODE_FLAG'].replace('', np.nan)
     
-    # 统计汇总
-    summary = df_a.groupby('NODE_NAME').agg({
-        'SOURCE_FINAL': ['count', lambda x: (x == 1).sum(), lambda x: x.isna().sum()],
-        'NODE_FINAL': 'first',
-        'TERMINAL_NODE': 'any'
-    }).round(2)
+    # 清理BLOCKED_BY字段
+    df_a['BLOCKED_BY'] = df_a['BLOCKED_BY'].str.strip(';').str.replace(';;', ';')
     
-    summary.columns = ['总行数', '标记1数量', '空标记数量', '节点最终标记', '包含终止节点']
-    summary['标记覆盖率'] = (summary['标记1数量'] / summary['总行数'] * 100).round(2)
-    
-    # 突出显示受影响的节点
-    summary['受终止节点影响'] = summary.index.isin(affected_nodes)
-    
-    return df_a, summary
+    return df_a
 
 def main():
     """主函数"""
-    # 文件路径配置
-    FILE_A = '复杂测试数据_A.xlsx'
-    FILE_B = '复杂测试数据_B.xlsx'
-    OUTPUT = '最终标记结果.xlsx'
+    FILE_A = "复杂测试数据_A.xlsx"  
+    FILE_B = "复杂测试数据_B.xlsx"       
+    OUTPUT = '终止节点追踪结果.xlsx'
     
     try:
         print("=== 数据加载阶段 ===")
@@ -211,43 +203,52 @@ def main():
         initial_1_count = (df_a['SOURCE_FLAG'] == 1).sum()
         print(f"初始标记为1的行数: {initial_1_count}")
         
-        print("\n=== 构建关系映射 ===")
-        node_to_sources, source_to_nodes, all_nodes = build_table_relations(df_a)
-        print(f"节点数量: {len(node_to_sources)}")
+        print("\n=== 构建层级关系 ===")
+        node_children, node_parents, all_tables = build_hierarchy_graph(df_a)
+        print(f"总表数量: {len(all_tables)}")
+        print(f"层级关系数: {sum(len(v) for v in node_children.values())}")
         
-        print("\n=== 检测终止节点 ===")
-        df_a, terminal_nodes = detect_terminal_nodes(df_a, node_to_sources, all_nodes, whitelist)
+        print("\n=== 查找终止节点 ===")
+        terminal_nodes, terminal_details = find_terminal_nodes(node_children, all_tables, whitelist)
+        print(f"发现终止节点数量: {len(terminal_nodes)}")
+        for node in terminal_nodes:
+            print(f"  - {node}")
         
-        print("\n=== 迭代标记阶段 ===")
-        df_a = iterative_marking(df_a, node_to_sources, source_to_nodes, whitelist)
+        print("\n=== 传播阻塞标记 ===")
+        df_a, blocking_map, all_blocked_nodes = propagate_blocking(df_a, terminal_nodes, node_parents, node_children)
+        print(f"被阻断的节点总数: {len(all_blocked_nodes)}")
         
-        print("\n=== 传播空标记 ===")
-        df_a, affected_nodes = propagate_empty_marking(df_a, source_to_nodes, terminal_nodes)
-        
-        print("\n=== 结果汇总 ===")
-        df_a, summary = final_summary(df_a, terminal_nodes, affected_nodes)
+        print("\n=== 生成报告 ===")
+        terminal_report = generate_terminal_report(terminal_nodes, blocking_map)
+        node_summary = generate_node_summary(df_a)
+        df_a = final_processing(df_a)
         
         # 保存结果
         with pd.ExcelWriter(OUTPUT, engine='openpyxl') as writer:
-            df_a.to_excel(writer, sheet_name='详细标记', index=False)
-            summary.to_excel(writer, sheet_name='节点汇总', index=True)
+            df_a.to_excel(writer, sheet_name='详细标记数据', index=False)
+            terminal_report.to_excel(writer, sheet_name='终止节点报告', index=False)
+            node_summary.to_excel(writer, sheet_name='节点汇总分析', index=True)
         
         print(f"\n=== 处理完成 ===")
         print(f"结果已保存至: {OUTPUT}")
         
-        print("\n=== 关键统计 ===")
+        print("\n=== 关键统计信息 ===")
         print(f"终止节点数量: {len(terminal_nodes)}")
-        print(f"受影响节点数量: {len(affected_nodes) - len(terminal_nodes)}")
+        print(f"被阻断的上游节点数量: {len(all_blocked_nodes) - len(terminal_nodes)}")
         print(f"最终标记为1的行数: {(df_a['SOURCE_FLAG'] == 1).sum()}")
-        print(f"空标记行数: {(df_a['SOURCE_FLAG'] == '').sum()}")
+        print(f"被强制置空的行数: {(df_a['IS_OVERRIDDEN'] == True).sum()}")
         
-        print("\n节点汇总结果预览:")
-        print(summary.head(10))
+        print("\n=== 终止节点影响详情 ===")
+        for terminal, upstream in blocking_map.items():
+            print(f"\n终止节点 '{terminal}' 影响的上游节点:")
+            if upstream:
+                print(f"  {', '.join(upstream)}")
+            else:
+                print("  无上游节点")
         
     except Exception as e:
         print(f"\n处理过程中出错: {str(e)}")
         raise
 
 if __name__ == "__main__":
-    # 安装依赖：pip install pandas openpyxl numpy
     main()
