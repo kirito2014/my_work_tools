@@ -52,13 +52,13 @@
 
         <!-- 控制按钮 -->
         <div class="flex flex-wrap justify-center gap-4 mb-6">
-            <button id="save-btn" class="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg shadow-md flex items-center gap-2 transition-all duration-300 hover:shadow-lg">
+            <button id="save-btn" class="bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white px-6 py-3 rounded-lg shadow-md flex items-center gap-2 transition-all duration-300 hover:shadow-lg font-medium">
                 <i class="fa fa-save"></i> 保存配置
             </button>
-            <button id="load-btn" class="bg-secondary hover:bg-secondary/90 text-white px-6 py-3 rounded-lg shadow-md flex items-center gap-2 transition-all duration-300 hover:shadow-lg">
+            <button id="load-btn" class="bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white px-6 py-3 rounded-lg shadow-md flex items-center gap-2 transition-all duration-300 hover:shadow-lg font-medium">
                 <i class="fa fa-upload"></i> 上传配置
             </button>
-            <a href="/api/config/download" class="bg-secondary hover:bg-secondary/90 text-white px-6 py-3 rounded-lg shadow-md flex items-center gap-2 transition-all duration-300 hover:shadow-lg">
+            <a href="/api/config/download" class="bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800 text-white px-6 py-3 rounded-lg shadow-md flex items-center gap-2 transition-all duration-300 hover:shadow-lg font-medium">
                 <i class="fa fa-download"></i> 下载配置
             </a>
             <input type="file" id="config-file" accept=".yaml" class="hidden">
@@ -69,26 +69,26 @@
 
         <!-- 标签页导航 -->
         <div class="bg-white rounded-2xl shadow-md mb-6 overflow-hidden">
-            <nav class="flex overflow-x-auto space-x-8" aria-label="Tabs">
-                <button data-tab="processing" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-primary font-medium text-sm text-primary hover:bg-blue-50 transition-colors duration-150">
+            <nav class="flex overflow-x-auto justify-center space-x-8 bg-gradient-to-r from-blue-500 to-blue-700 p-2 rounded-lg shadow-md" aria-label="Tabs">
+                <button data-tab="processing" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-white font-bold text-sm text-white hover:bg-blue-600 transition-colors duration-150">
                     处理配置
                 </button>
-                <button data-tab="projects" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-blue-50 transition-colors duration-150">
+                <button data-tab="projects" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-transparent font-bold text-sm text-white/80 hover:text-white hover:border-white hover:bg-blue-600 transition-colors duration-150">
                     项目配置
                 </button>
-                <button data-tab="templates" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-blue-50 transition-colors duration-150">
+                <button data-tab="templates" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-transparent font-bold text-sm text-white/80 hover:text-white hover:border-white hover:bg-blue-600 transition-colors duration-150">
                     文件模板
                 </button>
-                <button data-tab="regex" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-blue-50 transition-colors duration-150">
+                <button data-tab="regex" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-transparent font-bold text-sm text-white/80 hover:text-white hover:border-white hover:bg-blue-600 transition-colors duration-150">
                     正则表达式
                 </button>
-                <button data-tab="filters" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-blue-50 transition-colors duration-150">
+                <button data-tab="filters" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-transparent font-bold text-sm text-white/80 hover:text-white hover:border-white hover:bg-blue-600 transition-colors duration-150">
                     过滤规则
                 </button>
-                <button data-tab="output" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-blue-50 transition-colors duration-150">
+                <button data-tab="output" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-transparent font-bold text-sm text-white/80 hover:text-white hover:border-white hover:bg-blue-600 transition-colors duration-150">
                     输出配置
                 </button>
-                <button data-tab="progress" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-blue-50 transition-colors duration-150">
+                <button data-tab="progress" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 border-transparent font-bold text-sm text-white/80 hover:text-white hover:border-white hover:bg-blue-600 transition-colors duration-150">
                     进度条配置
                 </button>
             </nav>
@@ -101,19 +101,19 @@
                 <h2 class="text-xl font-semibold text-gray-800 mb-6">SQL文件处理配置</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">是否去除后缀</label>
-                        <select id="remove_suffix" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300">
-                            <option value="Y">是</option>
-                            <option value="N">否</option>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">是否去除后缀</label>
+                        <select id="remove_suffix" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300 text-xs">
+                            <option value="Y" class="text-xs">是</option>
+                            <option value="N" class="text-xs">否</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">后缀标识符</label>
-                        <input type="text" id="suffix_identifier" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300">
+                        <label class="block text-xs font-medium text-gray-700 mb-1">后缀标识符</label>
+                        <input type="text" id="suffix_identifier" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300 text-xs">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">筛选模式</label>
-                        <input type="text" id="filter_schema" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300">
+                        <label class="block text-xs font-medium text-gray-700 mb-1">筛选模式</label>
+                        <input type="text" id="filter_schema" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300 text-xs">
                     </div>
                 </div>
             </div>
@@ -163,10 +163,10 @@
                         <!-- 引用模式将通过 JavaScript 动态生成 -->
                     </div>
                     <div class="mt-4">
-                        <button id="add-ref-pattern" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg shadow-sm text-sm flex items-center gap-2 transition-all duration-300 hover:shadow">
+                        <button id="add-ref-pattern" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg shadow-sm text-xs flex items-center gap-2 transition-all duration-300 hover:shadow">
                             <i class="fa fa-plus"></i> 添加模式
                         </button>
-                        <button id="remove-ref-pattern" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-sm text-sm flex items-center gap-2 ml-2 transition-all duration-300 hover:shadow">
+                        <button id="remove-ref-pattern" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-sm text-xs flex items-center gap-2 ml-2 transition-all duration-300 hover:shadow">
                             <i class="fa fa-trash"></i> 删除最后一条
                         </button>
                     </div>
@@ -179,10 +179,10 @@
                         <!-- 清理模式将通过 JavaScript 动态生成 -->
                     </div>
                     <div class="mt-4">
-                        <button id="add-cleanup-pattern" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg shadow-sm text-sm flex items-center gap-2 transition-all duration-300 hover:shadow">
+                        <button id="add-cleanup-pattern" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg shadow-sm text-xs flex items-center gap-2 transition-all duration-300 hover:shadow">
                             <i class="fa fa-plus"></i> 添加清理模式
                         </button>
-                        <button id="remove-cleanup-pattern" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-sm text-sm flex items-center gap-2 ml-2 transition-all duration-300 hover:shadow">
+                        <button id="remove-cleanup-pattern" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-sm text-xs flex items-center gap-2 ml-2 transition-all duration-300 hover:shadow">
                             <i class="fa fa-trash"></i> 删除最后一条
                         </button>
                     </div>
@@ -192,8 +192,8 @@
                 <div class="p-6 bg-purple-50 rounded-xl border border-purple-200">
                     <h3 class="text-lg font-medium mb-3 text-purple-700">文件扩展名</h3>
                     <div class="flex flex-col md:flex-row items-start md:items-center gap-3">
-                        <label class="block text-sm font-medium text-gray-700 w-full md:w-40">SQL文件扩展名正则:</label>
-                        <input type="text" id="file_extension" class="flex-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300">
+                        <label class="block text-xs font-medium text-gray-700 w-full md:w-40">SQL文件扩展名正则:</label>
+                        <input type="text" id="file_extension" class="flex-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300 text-xs">
                     </div>
                 </div>
             </div>
@@ -208,11 +208,11 @@
                     <div class="space-y-4">
                         <div class="flex items-center gap-3">
                             <input type="checkbox" id="exclude_self_reference" class="w-4 h-4 text-primary rounded focus:ring-primary">
-                            <label for="exclude_self_reference" class="text-sm font-medium text-gray-700">排除自引用</label>
+                            <label for="exclude_self_reference" class="text-xs font-medium text-gray-700">排除自引用</label>
                         </div>
                         <div class="flex items-center gap-3">
                             <input type="checkbox" id="exclude_same_layer" class="w-4 h-4 text-primary rounded focus:ring-primary">
-                            <label for="exclude_same_layer" class="text-sm font-medium text-gray-700">排除同层依赖</label>
+                            <label for="exclude_same_layer" class="text-xs font-medium text-gray-700">排除同层依赖</label>
                         </div>
                     </div>
                 </div>
@@ -224,10 +224,10 @@
                         <!-- 排除模式将通过 JavaScript 动态生成 -->
                     </div>
                     <div class="mt-4">
-                        <button id="add-exclude-pattern" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg shadow-sm text-sm flex items-center gap-2 transition-all duration-300 hover:shadow">
+                        <button id="add-exclude-pattern" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg shadow-sm text-xs flex items-center gap-2 transition-all duration-300 hover:shadow">
                             <i class="fa fa-plus"></i> 添加排除模式
                         </button>
-                        <button id="remove-exclude-pattern" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-sm text-sm flex items-center gap-2 ml-2 transition-all duration-300 hover:shadow">
+                        <button id="remove-exclude-pattern" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-sm text-xs flex items-center gap-2 ml-2 transition-all duration-300 hover:shadow">
                             <i class="fa fa-trash"></i> 删除最后一条
                         </button>
                     </div>
@@ -240,10 +240,10 @@
                         <!-- 包含模式将通过 JavaScript 动态生成 -->
                     </div>
                     <div class="mt-4">
-                        <button id="add-include-pattern" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg shadow-sm text-sm flex items-center gap-2 transition-all duration-300 hover:shadow">
+                        <button id="add-include-pattern" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg shadow-sm text-xs flex items-center gap-2 transition-all duration-300 hover:shadow">
                             <i class="fa fa-plus"></i> 添加包含模式
                         </button>
-                        <button id="remove-include-pattern" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-sm text-sm flex items-center gap-2 ml-2 transition-all duration-300 hover:shadow">
+                        <button id="remove-include-pattern" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-sm text-xs flex items-center gap-2 ml-2 transition-all duration-300 hover:shadow">
                             <i class="fa fa-trash"></i> 删除最后一条
                         </button>
                     </div>
@@ -301,18 +301,18 @@
                 <h2 class="text-xl font-semibold text-gray-800 mb-6">进度条显示配置</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">进度条长度</label>
-                        <input type="number" id="bar_length" min="10" max="100" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300">
+                        <label class="block text-xs font-medium text-gray-700 mb-2">进度条长度</label>
+                        <input type="number" id="bar_length" min="10" max="100" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300 text-xs">
                     </div>
                     <div class="flex flex-col items-start gap-3">
                         <div class="flex items-center gap-3">
                             <input type="checkbox" id="show_percentage" class="w-4 h-4 text-primary rounded focus:ring-primary">
-                            <label for="show_percentage" class="block text-sm font-medium text-gray-700">显示百分比</label>
+                            <label for="show_percentage" class="block text-xs font-medium text-gray-700">显示百分比</label>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">更新频率</label>
-                        <input type="number" id="update_frequency" min="1" max="100" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300">
+                        <label class="block text-xs font-medium text-gray-700 mb-2">更新频率</label>
+                        <input type="number" id="update_frequency" min="1" max="100" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300 text-xs">
                     </div>
                 </div>
             </div>
@@ -325,20 +325,20 @@
             <h3 id="modal-title" class="text-xl font-semibold text-gray-800 mb-6">添加项目</h3>
             <form id="project-form">
                 <div class="mb-5">
-                    <label for="modal-name" class="block text-sm font-medium text-gray-700 mb-2">项目名称</label>
-                    <input type="text" id="modal-name" name="name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300" required>
+                    <label for="modal-name" class="block text-xs font-medium text-gray-700 mb-2">项目名称</label>
+                    <input type="text" id="modal-name" name="name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300 text-xs" required>
                 </div>
                 <div class="mb-5">
-                    <label for="modal-prefix" class="block text-sm font-medium text-gray-700 mb-2">前缀</label>
-                    <input type="text" id="modal-prefix" name="prefix" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300">
+                    <label for="modal-prefix" class="block text-xs font-medium text-gray-700 mb-2">前缀</label>
+                    <input type="text" id="modal-prefix" name="prefix" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300 text-xs">
                 </div>
                 <div class="mb-5">
-                    <label for="modal-theme" class="block text-sm font-medium text-gray-700 mb-2">主题</label>
-                    <input type="text" id="modal-theme" name="theme" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300">
+                    <label for="modal-theme" class="block text-xs font-medium text-gray-700 mb-2">主题</label>
+                    <input type="text" id="modal-theme" name="theme" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300 text-xs">
                 </div>
                 <div class="mb-7">
-                    <label for="modal-description" class="block text-sm font-medium text-gray-700 mb-2">描述</label>
-                    <textarea id="modal-description" name="description" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300"></textarea>
+                    <label for="modal-description" class="block text-xs font-medium text-gray-700 mb-2">描述</label>
+                    <textarea id="modal-description" name="description" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-300 text-xs"></textarea>
                 </div>
                 <div class="flex justify-end gap-3">
                     <button type="button" id="cancel-modal" class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all duration-300">取消</button>
