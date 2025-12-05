@@ -4,7 +4,17 @@ import json
 import os
 import re
 from docx import Document
-from typing import Dict, List, Any  
+from typing import Dict, List, Any 
+from datetime import datetime
+from dateutil.relativedelta import relativedelta 
+
+DATE_FORMATS = [
+    '%Y/%m',
+    '%Y-%m',
+    '%Y年%m月',
+    '%Y.%m',
+    '%Y'
+]
 
 # 处理PyInstaller打包后的路径问题
 if getattr(sys, 'frozen', False):
@@ -283,6 +293,46 @@ def extract_emp_no_from_filename(file_path: str) -> str:
     # 如果文件名格式不符合预期，返回空字符串或默认值
     return ""
 
+def _parse_date(date_str: str) -> datetime:
+    """尝试多种格式解析日期"""
+    if date_str.lower() in ['至今', 'current', 'now', 'present']:
+        return datetime.now()
+    
+    for fmt in DATE_FORMATS:
+        try:
+            # 如果只有年份，添加月份
+            if fmt == '%Y':
+                date_str = f"{date_str}/01"
+                fmt = '%Y/%m'
+            
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    
+    # 如果无法解析，返回当前时间
+    print(f"无法解析日期格式: {date_str}，使用当前时间替代")
+    return datetime.now()
+
+def calculate_months(start_str, end_str):
+    """计算月份差"""
+    # 处理空字符串的情况
+    if not start_str:
+        return 0
+    
+    try:
+        # 处理"至今"的情况
+        end = _parse_date(end_str) 
+        start = _parse_date(start_str)
+        
+        # 如果两个都是"至今"，返回0
+        if start_str == '至今' and end_str == '至今':
+            return 0
+        
+        delta = relativedelta(end, start)
+        return max(delta.years * 12 + delta.months, 0)
+    except Exception as e:
+        print(f"计算月份差时出错: {e}")
+        return 0
 def convert_to_template_format(raw_data: Dict, emp_no: str = "") -> Dict:
     """
     将原始提取的数据转换为模板JSON格式
@@ -334,7 +384,8 @@ def convert_to_template_format(raw_data: Dict, emp_no: str = "") -> Dict:
             "EndTime": work.get("结束时间", work.get("截止时间", "至今")),
             "CompanyName": work.get("公司名称", work.get("公司", "")),
             "Position": work.get("担任职务", work.get("职位", work.get("职务", ""))),
-            "JobDescription": work.get("工作职责说明", work.get("工作内容", work.get("职责", "")))
+            "JobDescription": work.get("工作职责说明", work.get("工作内容", work.get("职责", ""))),
+            "Duration": calculate_months(work.get("开始时间", work.get("起始时间", "")), work.get("结束时间", work.get("截止时间", "至今")))            
         })
     
     # 处理项目经历
@@ -345,7 +396,8 @@ def convert_to_template_format(raw_data: Dict, emp_no: str = "") -> Dict:
             "EndTime": project.get("结束时间", project.get("截止时间", "")),
             "ProjectName": project.get("项目名称", project.get("项目", "")),
             "ProjectRole": project.get("项目角色", project.get("角色", project.get("职位", ""))),
-            "JobDescription": project.get("项目职责说明", project.get("项目描述", project.get("职责", project.get("项目职责", ""))))
+            "JobDescription": project.get("项目职责说明", project.get("项目描述", project.get("职责", project.get("项目职责", "")))),
+            "Duration": calculate_months(project.get("开始时间", project.get("起始时间", "")), project.get("结束时间", project.get("截止时间", "至今")))
         })
     
     # 处理None值

@@ -36,6 +36,7 @@ KEY_MAPPINGS = {
     'CompanyName': 'comp',
     'Position': 'pos',
     'JobDescription': 'desc',
+    'Duration': 'dur',
     
     # ProjectExperience (pe) 部分映射
     'ProjectName': 'proj',

@@ -11,6 +11,8 @@ import logging
 import sys
 from docx import Document
 import re
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 # 配置日志
 logging.basicConfig(
@@ -18,6 +20,14 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+DATE_FORMATS = [
+    '%Y/%m',
+    '%Y-%m',
+    '%Y年%m月',
+    '%Y.%m',
+    '%Y'
+]
 
 # 处理PyInstaller打包后的路径问题
 if getattr(sys, 'frozen', False):
@@ -320,6 +330,47 @@ def extract_basic_info(doc, filename):
     return basic_info
 
 
+def _parse_date(date_str: str) -> datetime:
+    """尝试多种格式解析日期"""
+    if date_str.lower() in ['至今', 'current', 'now', 'present']:
+        return datetime.now()
+    
+    for fmt in DATE_FORMATS:
+        try:
+            # 如果只有年份，添加月份
+            if fmt == '%Y':
+                date_str = f"{date_str}/01"
+                fmt = '%Y/%m'
+            
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    
+    # 如果无法解析，返回当前时间
+    logger.warning(f"无法解析日期格式: {date_str}，使用当前时间替代")
+    return datetime.now()
+
+def calculate_months(start_str, end_str):
+    """计算月份差"""
+    # 处理空字符串的情况
+    if not start_str:
+        return 0
+    
+    try:
+        # 处理"至今"的情况
+        end = _parse_date(end_str) 
+        start = _parse_date(start_str)
+        
+        # 如果两个都是"至今"，返回0
+        if start_str == '至今' and end_str == '至今':
+            return 0
+        
+        delta = relativedelta(end, start)
+        return max(delta.years * 12 + delta.months, 0)
+    except Exception as e:
+        logger.warning(f"计算月份差时出错: {e}")
+        return 0
+
 def convert_to_template_format(raw_resume_data, emp_no):
     """
     将原始简历数据转换为模板格式，符合参考文件结构
@@ -474,12 +525,15 @@ def extract_work_experience(doc):
                     if not col_mapping:
                         continue
                     if len(row_data) >= max(col_mapping.values()) + 1 if col_mapping else False:
+                        start_time = row_data[col_mapping.get('StartTime', 0)].text.strip() if 'StartTime' in col_mapping else ''
+                        end_time = row_data[col_mapping.get('EndTime', 1)].text.strip() if 'EndTime' in col_mapping else ''
                         exp = {
-                            'StartTime': row_data[col_mapping.get('StartTime', 0)].text.strip() if 'StartTime' in col_mapping else '',
-                            'EndTime': row_data[col_mapping.get('EndTime', 1)].text.strip() if 'EndTime' in col_mapping else '',
+                            'StartTime': start_time,
+                            'EndTime': end_time,
                             'CompanyName': row_data[col_mapping.get('CompanyName', 0)].text.strip() if 'CompanyName' in col_mapping else '',
                             'Position': row_data[col_mapping.get('Position', 1)].text.strip() if 'Position' in col_mapping else '',
-                            'JobDescription': row_data[col_mapping.get('JobDescription', 2)].text.strip() if 'JobDescription' in col_mapping else ''
+                            'JobDescription': row_data[col_mapping.get('JobDescription', 2)].text.strip() if 'JobDescription' in col_mapping else '',
+                            'Duration': calculate_months(start_time, end_time)
                         }
                         # 只添加有效数据
                         if any(exp.values()):
@@ -571,12 +625,15 @@ def extract_project_experience(doc):
                     if not col_mapping:
                         continue
                     if len(row_data) >= max(col_mapping.values()) + 1 if col_mapping else False:
+                        start_time = row_data[col_mapping.get('StartTime', 0)].text.strip() if 'StartTime' in col_mapping else ''
+                        end_time = row_data[col_mapping.get('EndTime', 1)].text.strip() if 'EndTime' in col_mapping else ''
                         exp = {
-                            'StartTime': row_data[col_mapping.get('StartTime', 0)].text.strip() if 'StartTime' in col_mapping else '',
-                            'EndTime': row_data[col_mapping.get('EndTime', 1)].text.strip() if 'EndTime' in col_mapping else '',
+                            'StartTime': start_time,
+                            'EndTime': end_time,
                             'ProjectName': row_data[col_mapping.get('ProjectName', 0)].text.strip() if 'ProjectName' in col_mapping else '',
                             'ProjectRole': row_data[col_mapping.get('ProjectRole', 1)].text.strip() if 'ProjectRole' in col_mapping else '',
-                            'JobDescription': row_data[col_mapping.get('JobDescription', 2)].text.strip() if 'JobDescription' in col_mapping else ''
+                            'JobDescription': row_data[col_mapping.get('JobDescription', 2)].text.strip() if 'JobDescription' in col_mapping else '',
+                            'Duration': calculate_months(start_time, end_time)
                         }
                         # 只添加有效数据，并且过滤掉明显不是项目经历的数据（比如包含"能力与资质"等关键词的行）
                         if any(exp.values()):
