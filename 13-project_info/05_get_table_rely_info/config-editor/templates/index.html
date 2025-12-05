@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL依赖关系分析工具 - 配置编辑器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#6b7280',
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .tab-content {
+                display: none;
+            }
+            .tab-content.active {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 标题 -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">SQL依赖关系分析工具</h1>
+            <p class="text-gray-600">配置编辑器</p>
+        </div>
+
+        <!-- 控制按钮 -->
+        <div class="flex flex-wrap gap-4 mb-6">
+            <button id="save-btn" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md flex items-center gap-2">
+                <i class="fa fa-save"></i> 保存配置
+            </button>
+            <button id="load-btn" class="bg-secondary hover:bg-secondary/90 text-white px-4 py-2 rounded-md flex items-center gap-2">
+                <i class="fa fa-upload"></i> 上传配置
+            </button>
+            <a href="/api/config/download" class="bg-secondary hover:bg-secondary/90 text-white px-4 py-2 rounded-md flex items-center gap-2">
+                <i class="fa fa-download"></i> 下载配置
+            </a>
+            <input type="file" id="config-file" accept=".yaml" class="hidden">
+        </div>
+
+        <!-- 消息提示 -->
+        <div id="message" class="mb-6 p-4 rounded-md hidden"></div>
+
+        <!-- 标签页导航 -->
+        <div class="border-b border-gray-200 mb-6">
+            <nav class="flex space-x-8" aria-label="Tabs">
+                <button data-tab="processing" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 border-primary font-medium text-sm text-primary">
+                    处理配置
+                </button>
+                <button data-tab="projects" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    项目配置
+                </button>
+                <button data-tab="templates" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    文件模板
+                </button>
+                <button data-tab="regex" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    正则表达式
+                </button>
+                <button data-tab="filters" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    过滤规则
+                </button>
+                <button data-tab="output" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    输出配置
+                </button>
+                <button data-tab="progress" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    进度条配置
+                </button>
+            </nav>
+        </div>
+
+        <!-- 标签页内容 -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <!-- 处理配置 -->
+            <div id="processing" class="tab-content active">
+                <h2 class="text-xl font-semibold mb-4">SQL文件处理配置</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">是否去除后缀</label>
+                        <select id="remove_suffix" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                            <option value="Y">是</option>
+                            <option value="N">否</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">后缀标识符</label>
+                        <input type="text" id="suffix_identifier" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">筛选模式</label>
+                        <input type="text" id="filter_schema" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 项目配置 -->
+            <div id="projects" class="tab-content">
+                <h2 class="text-xl font-semibold mb-4">项目配置</h2>
+                <div class="mb-4">
+                    <button id="add-project" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md flex items-center gap-2">
+                        <i class="fa fa-plus"></i> 添加项目
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table id="projects-table" class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">项目名称</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">前缀</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">主题</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">描述</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="projects-body" class="bg-white divide-y divide-gray-200">
+                            <!-- 项目数据将通过 JavaScript 动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 文件模板 -->
+            <div id="templates" class="tab-content">
+                <h2 class="text-xl font-semibold mb-4">文件模板配置</h2>
+                <div id="templates-container" class="space-y-6">
+                    <!-- 模板数据将通过 JavaScript 动态生成 -->
+                </div>
+            </div>
+
+            <!-- 正则表达式 -->
+            <div id="regex" class="tab-content">
+                <h2 class="text-xl font-semibold mb-4">正则表达式配置</h2>
+                
+                <!-- 表引用正则 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-3">表引用正则表达式</h3>
+                    <div id="ref-patterns" class="space-y-2">
+                        <!-- 引用模式将通过 JavaScript 动态生成 -->
+                    </div>
+                    <div class="mt-3">
+                        <button id="add-ref-pattern" class="bg-primary hover:bg-primary/90 text-white px-3 py-1 rounded-md text-sm">
+                            <i class="fa fa-plus"></i> 添加模式
+                        </button>
+                        <button id="remove-ref-pattern" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm ml-2">
+                            <i class="fa fa-trash"></i> 删除最后一条
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 表名清理模式 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-3">表名清理模式</h3>
+                    <div id="cleanup-patterns" class="space-y-2">
+                        <!-- 清理模式将通过 JavaScript 动态生成 -->
+                    </div>
+                    <div class="mt-3">
+                        <button id="add-cleanup-pattern" class="bg-primary hover:bg-primary/90 text-white px-3 py-1 rounded-md text-sm">
+                            <i class="fa fa-plus"></i> 添加清理模式
+                        </button>
+                        <button id="remove-cleanup-pattern" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm ml-2">
+                            <i class="fa fa-trash"></i> 删除最后一条
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 文件扩展名 -->
+                <div>
+                    <h3 class="text-lg font-medium mb-3">文件扩展名</h3>
+                    <div class="flex items-center gap-3">
+                        <label class="block text-sm font-medium text-gray-700">SQL文件扩展名正则:</label>
+                        <input type="text" id="file_extension" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 过滤规则 -->
+            <div id="filters" class="tab-content">
+                <h2 class="text-xl font-semibold mb-4">过滤规则配置</h2>
+                
+                <!-- 基础过滤选项 -->
+                <div class="mb-6 p-4 bg-gray-50 rounded-md">
+                    <h3 class="text-lg font-medium mb-3">基础过滤选项</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="exclude_self_reference" class="w-4 h-4 text-primary rounded focus:ring-primary">
+                            <label for="exclude_self_reference" class="text-sm font-medium text-gray-700">排除自引用</label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="exclude_same_layer" class="w-4 h-4 text-primary rounded focus:ring-primary">
+                            <label for="exclude_same_layer" class="text-sm font-medium text-gray-700">排除同层依赖</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 排除模式 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-3">排除模式（正则表达式）</h3>
+                    <div id="exclude-patterns" class="space-y-2">
+                        <!-- 排除模式将通过 JavaScript 动态生成 -->
+                    </div>
+                    <div class="mt-3">
+                        <button id="add-exclude-pattern" class="bg-primary hover:bg-primary/90 text-white px-3 py-1 rounded-md text-sm">
+                            <i class="fa fa-plus"></i> 添加排除模式
+                        </button>
+                        <button id="remove-exclude-pattern" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm ml-2">
+                            <i class="fa fa-trash"></i> 删除最后一条
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 包含模式 -->
+                <div>
+                    <h3 class="text-lg font-medium mb-3">包含模式（正则表达式）</h3>
+                    <div id="include-patterns" class="space-y-2">
+                        <!-- 包含模式将通过 JavaScript 动态生成 -->
+                    </div>
+                    <div class="mt-3">
+                        <button id="add-include-pattern" class="bg-primary hover:bg-primary/90 text-white px-3 py-1 rounded-md text-sm">
+                            <i class="fa fa-plus"></i> 添加包含模式
+                        </button>
+                        <button id="remove-include-pattern" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm ml-2">
+                            <i class="fa fa-trash"></i> 删除最后一条
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 输出配置 -->
+            <div id="output" class="tab-content">
+                <h2 class="text-xl font-semibold mb-4">输出配置</h2>
+                <div class="space-y-6">
+                    <!-- 基础列 -->
+                    <div>
+                        <h3 class="text-lg font-medium mb-3">基础列</h3>
+                        <div id="basic-columns" class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">列名</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">显示标题</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">宽度</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">隐藏</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="basic-columns-body" class="bg-white divide-y divide-gray-200">
+                                    <!-- 基础列数据将通过 JavaScript 动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 扩展列 -->
+                    <div>
+                        <h3 class="text-lg font-medium mb-3">扩展列</h3>
+                        <div id="extended-columns" class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">列名</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">显示标题</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">宽度</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">隐藏</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="extended-columns-body" class="bg-white divide-y divide-gray-200">
+                                    <!-- 扩展列数据将通过 JavaScript 动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 进度条配置 -->
+            <div id="progress" class="tab-content">
+                <h2 class="text-xl font-semibold mb-4">进度条显示配置</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">进度条长度</label>
+                        <input type="number" id="bar_length" min="10" max="100" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="show_percentage" class="w-4 h-4 text-primary rounded focus:ring-primary">
+                        <label for="show_percentage" class="block text-sm font-medium text-gray-700">显示百分比</label>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">更新频率</label>
+                        <input type="number" id="update_frequency" min="1" max="100" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 项目编辑模态框 -->
+    <div id="project-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 id="modal-title" class="text-xl font-semibold mb-4">添加项目</h3>
+            <form id="project-form">
+                <div class="mb-4">
+                    <label for="modal-name" class="block text-sm font-medium text-gray-700 mb-1">项目名称</label>
+                    <input type="text" id="modal-name" name="name" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" required>
+                </div>
+                <div class="mb-4">
+                    <label for="modal-prefix" class="block text-sm font-medium text-gray-700 mb-1">前缀</label>
+                    <input type="text" id="modal-prefix" name="prefix" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                </div>
+                <div class="mb-4">
+                    <label for="modal-theme" class="block text-sm font-medium text-gray-700 mb-1">主题</label>
+                    <input type="text" id="modal-theme" name="theme" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+                </div>
+                <div class="mb-6">
+                    <label for="modal-description" class="block text-sm font-medium text-gray-700 mb-1">描述</label>
+                    <textarea id="modal-description" name="description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" id="cancel-modal" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">取消</button>
+                    <button type="submit" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
