@@ -49,16 +49,16 @@ function setupEventListeners() {
 function switchTab(tabId) {
     // 移除所有激活状态
     document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('border-primary', 'text-primary');
-        btn.classList.add('border-transparent', 'text-gray-500');
+        btn.classList.remove('border-primary');
+        btn.classList.add('border-transparent');
     });
     document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.remove('active');
     });
 
     // 添加当前标签页激活状态
-    document.querySelector(`[data-tab="${tabId}"]`).classList.remove('border-transparent', 'text-gray-500');
-    document.querySelector(`[data-tab="${tabId}"]`).classList.add('border-primary', 'text-primary');
+    document.querySelector(`[data-tab="${tabId}"]`).classList.remove('border-transparent');
+    document.querySelector(`[data-tab="${tabId}"]`).classList.add('border-primary');
     document.getElementById(tabId).classList.add('active');
 }
 
@@ -116,10 +116,10 @@ function renderProjects() {
     for (const [name, project] of Object.entries(projects)) {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap">${name}</td>
-            <td class="px-6 py-4 whitespace-nowrap">${project.prefix || ''}</td>
-            <td class="px-6 py-4 whitespace-nowrap">${project.theme || ''}</td>
-            <td class="px-6 py-4">${project.description || ''}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-xs">${name}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-xs">${project.prefix || ''}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-xs">${project.theme || ''}</td>
+            <td class="px-6 py-4 text-xs">${project.description || ''}</td>
             <td class="px-6 py-4 whitespace-nowrap">
                 <button onclick="editProject('${name}')" class="text-primary hover:text-primary/80 mr-3">
                     <i class="fa fa-edit"></i>
@@ -141,35 +141,53 @@ function renderTemplates() {
     
     for (const [key, template] of Object.entries(templates)) {
         const templateDiv = document.createElement('div');
-        templateDiv.className = 'border rounded-md p-4';
+        // 为不同模板分配不同背景色
+        let bgColor = '';
+        switch(key) {
+            case 'default':
+                bgColor = 'bg-blue-50 border-blue-200';
+                break;
+            case 'ta_pc':
+                bgColor = 'bg-green-50 border-green-200';
+                break;
+            case 'tf_pc':
+                bgColor = 'bg-yellow-50 border-yellow-200';
+                break;
+            case 'tg_pc':
+                bgColor = 'bg-purple-50 border-purple-200';
+                break;
+            default:
+                bgColor = 'bg-gray-50 border-gray-200';
+        }
+        templateDiv.className = `border rounded-xl p-4 ${bgColor}`;
         templateDiv.innerHTML = `
             <h3 class="text-lg font-medium mb-3">${template.name || key}</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">模板名称</label>
-                    <input type="text" data-key="${key}" data-field="name" value="${template.name || ''}" 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">表名所在行号</label>
-                    <input type="number" data-key="${key}" data-field="table_name" value="${template.lines?.table_name || 8}" 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">开发人员行号</label>
-                    <input type="number" data-key="${key}" data-field="developer" value="${template.lines?.developer || 14}" 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">分隔符</label>
-                    <input type="text" data-key="${key}" data-field="delimiter" value="${template.delimiter || ':'}" 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">文件匹配模式</label>
-                    <input type="text" data-key="${key}" data-field="pattern" value="${template.file_pattern || ''}" 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
-                </div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">模板名称</label>
+                        <input type="text" data-key="${key}" data-field="name" value="${template.name || ''}" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">表名所在行号</label>
+                        <input type="number" data-key="${key}" data-field="table_name" value="${template.lines?.table_name || 8}" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">开发人员行号</label>
+                        <input type="number" data-key="${key}" data-field="developer" value="${template.lines?.developer || 14}" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">分隔符</label>
+                        <input type="text" data-key="${key}" data-field="delimiter" value="${template.delimiter || ':'}" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-xs">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-medium text-gray-700 mb-1">文件匹配模式</label>
+                        <input type="text" data-key="${key}" data-field="pattern" value="${template.file_pattern || ''}" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-xs">
+                    </div>
             </div>
         `;
         container.appendChild(templateDiv);
@@ -198,7 +216,7 @@ function renderPatternList(containerId, patterns) {
     patterns.forEach((pattern, index) => {
         const input = document.createElement('input');
         input.type = 'text';
-        input.className = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary';
+        input.className = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-xs';
         input.value = pattern;
         input.dataset.index = index;
         container.appendChild(input);
