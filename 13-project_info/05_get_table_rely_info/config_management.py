@@ -493,17 +493,6 @@ class ConfigFormApp:
         
         tree.pack(side=tk.LEFT, fill="both", expand=True)
         scrollbar.pack(side=tk.RIGHT, fill="y")
-        
-        # 按钮
-        btn_frame = ttk.Frame(parent)
-        btn_frame.pack(fill="x", padx=5, pady=3)
-        
-        ttk.Button(btn_frame, text="添加列", 
-                  command=lambda: self.add_column(tree, column_type)).pack(side=tk.LEFT, padx=3)
-        ttk.Button(btn_frame, text="编辑列", 
-                  command=lambda: self.edit_column(tree, column_type)).pack(side=tk.LEFT, padx=3)
-        ttk.Button(btn_frame, text="删除列", 
-                  command=lambda: self.delete_column(tree)).pack(side=tk.LEFT, padx=3)
     
     def create_progress_tab(self):
         """创建进度条配置页"""
@@ -797,91 +786,40 @@ class ConfigFormApp:
     def save_config(self):
         """保存配置到文件"""
         try:
-            # 先将表单数据同步到self.config
-            self.update_processing_config()
-            self.update_projects_config()
-            self.update_templates_config()
-            self.update_regex_config()
-            self.update_filters_config()
-            self.update_output_config()
-            self.update_progress_config()
+            # 处理排除模式，只保存非空值
+            if hasattr(self, 'exclude_vars'):
+                exclude_patterns = [var.get().strip() for var in self.exclude_vars if var.get().strip()]
+                if 'filters' not in self.config:
+                    self.config['filters'] = {}
+                self.config['filters']['exclude_patterns'] = exclude_patterns
             
-            # 然后保存到文件
+            # 处理包含模式，只保存非空值
+            if hasattr(self, 'include_vars'):
+                include_patterns = [var.get().strip() for var in self.include_vars if var.get().strip()]
+                if 'filters' not in self.config:
+                    self.config['filters'] = {}
+                self.config['filters']['include_patterns'] = include_patterns
+            
+            # 处理表引用正则，只保存非空值
+            if hasattr(self, 'ref_regex_vars'):
+                ref_patterns = [var.get().strip() for var in self.ref_regex_vars if var.get().strip()]
+                if 'regex_patterns' not in self.config:
+                    self.config['regex_patterns'] = {}
+                self.config['regex_patterns']['table_reference'] = ref_patterns
+            
+            # 处理表名清理模式，只保存非空值
+            if hasattr(self, 'cleanup_vars'):
+                cleanup_patterns = [var.get().strip() for var in self.cleanup_vars if var.get().strip()]
+                if 'regex_patterns' not in self.config:
+                    self.config['regex_patterns'] = {}
+                self.config['regex_patterns']['table_cleanup'] = cleanup_patterns
+            
+            # 保存配置文件
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 yaml.dump(self.config, f, default_flow_style=False, allow_unicode=True)
             messagebox.showinfo("成功", "配置已保存！")
         except Exception as e:
             messagebox.showerror("错误", f"保存配置失败: {e}")
-    
-    def update_processing_config(self):
-        """更新处理配置"""
-        if 'processing' not in self.config:
-            self.config['processing'] = {}
-        
-        self.config['processing']['remove_suffix'] = self.remove_suffix_var.get()
-        self.config['processing']['suffix_identifier'] = self.suffix_identifier_var.get()
-        self.config['processing']['filter_schema'] = self.filter_schema_var.get()
-    
-    def update_projects_config(self):
-        """更新项目配置 - 实际上项目配置在添加/编辑/删除时已经直接更新了self.config"""
-        # 项目配置在add_project/edit_project/delete_project方法中已经直接更新了self.config
-        # 所以这里不需要额外处理
-        pass
-    
-    def update_templates_config(self):
-        """更新模板配置"""
-        if 'file_templates' not in self.config:
-            self.config['file_templates'] = {}
-        
-        for template_key, vars_dict in self.template_vars.items():
-            if template_key not in self.config['file_templates']:
-                self.config['file_templates'][template_key] = {}
-            
-            self.config['file_templates'][template_key]['name'] = vars_dict['name'].get()
-            self.config['file_templates'][template_key]['lines'] = {
-                'table_name': int(vars_dict['table_line'].get()),
-                'developer': int(vars_dict['dev_line'].get())
-            }
-            self.config['file_templates'][template_key]['delimiter'] = vars_dict['delimiter'].get()
-            self.config['file_templates'][template_key]['file_pattern'] = vars_dict['pattern'].get()
-    
-    def update_regex_config(self):
-        """更新正则表达式配置"""
-        if 'regex_patterns' not in self.config:
-            self.config['regex_patterns'] = {}
-        
-        # 更新表引用正则
-        self.config['regex_patterns']['table_reference'] = [var.get() for var in self.ref_regex_vars]
-        
-        # 更新表名清理模式
-        self.config['regex_patterns']['table_cleanup'] = [var.get() for var in self.cleanup_vars]
-        
-        # 更新文件扩展名
-        self.config['regex_patterns']['file_extension'] = self.file_ext_var.get()
-    
-    def update_filters_config(self):
-        """更新过滤规则配置"""
-        if 'filters' not in self.config:
-            self.config['filters'] = {}
-        
-        self.config['filters']['exclude_self_reference'] = self.exclude_self_var.get()
-        self.config['filters']['exclude_same_layer'] = self.exclude_same_layer_var.get()
-        self.config['filters']['exclude_patterns'] = [var.get() for var in self.exclude_vars]
-        self.config['filters']['include_patterns'] = [var.get() for var in self.include_vars]
-    
-    def update_output_config(self):
-        """更新输出配置 - 目前列配置功能未实现，所以暂时不处理"""
-        # 列配置功能目前只是占位，实际功能未实现，所以暂时不处理
-        pass
-    
-    def update_progress_config(self):
-        """更新进度条配置"""
-        if 'progress' not in self.config:
-            self.config['progress'] = {}
-        
-        self.config['progress']['bar_length'] = self.bar_length_var.get()
-        self.config['progress']['show_percentage'] = self.show_percentage_var.get()
-        self.config['progress']['update_frequency'] = self.update_freq_var.get()
     
     def load_config_file(self):
         """加载配置文件"""
@@ -892,51 +830,14 @@ class ConfigFormApp:
         if file_path:
             self.config_path = file_path
             self.config = self.load_config()
-            # 更新表单控件的值
-            self.update_form_from_config()
+            # 这里可以添加重新加载界面的逻辑
             messagebox.showinfo("成功", "配置已加载！")
     
     def reset_form(self):
         """重置表单"""
         self.config = self.load_config()
-        # 更新表单控件的值
-        self.update_form_from_config()
+        # 这里可以添加重置界面的逻辑
         messagebox.showinfo("成功", "表单已重置！")
-    
-    def update_form_from_config(self):
-        """从配置更新表单"""
-        # 更新处理配置
-        self.remove_suffix_var.set(self.config.get('processing', {}).get('remove_suffix', 'Y'))
-        self.suffix_identifier_var.set(self.config.get('processing', {}).get('suffix_identifier', '_PC'))
-        self.filter_schema_var.set(self.config.get('processing', {}).get('filter_schema', 'AGL'))
-        
-        # 更新项目配置 - 需要重新加载Treeview
-        self.reload_project_tree()
-        
-        # 更新过滤规则配置
-        self.exclude_self_var.set(self.config.get('filters', {}).get('exclude_self_reference', True))
-        self.exclude_same_layer_var.set(self.config.get('filters', {}).get('exclude_same_layer', True))
-        
-        # 更新进度条配置
-        self.bar_length_var.set(self.config.get('progress', {}).get('bar_length', 30))
-        self.show_percentage_var.set(self.config.get('progress', {}).get('show_percentage', True))
-        self.update_freq_var.set(self.config.get('progress', {}).get('update_frequency', 1))
-    
-    def reload_project_tree(self):
-        """重新加载项目Treeview"""
-        # 清空现有数据
-        for item in self.project_tree.get_children():
-            self.project_tree.delete(item)
-        
-        # 重新填充数据
-        projects = self.config.get('projects', {})
-        for proj_name, proj_data in projects.items():
-            self.project_tree.insert("", "end", values=(
-                proj_name,
-                proj_data.get('prefix', ''),
-                proj_data.get('theme', ''),
-                proj_data.get('description', '')
-            ))
     
     def add_cleanup_pattern(self):
         """添加清理模式"""
@@ -1019,7 +920,7 @@ class ConfigFormApp:
         if not hasattr(self, 'exclude_vars'):
             self.exclude_vars = []
         
-        # 创建新的排除模式变量
+        # 创建新的排除模式变量，初始值为空
         new_var = tk.StringVar()
         self.exclude_vars.append(new_var)
         
@@ -1039,12 +940,20 @@ class ConfigFormApp:
         else:
             return
         
-        # 创建新的输入行
-        row_count = len(exclude_frame.grid_slaves()) // 2  # 每行有两个控件
+        # 获取当前所有输入框
+        entries = [widget for widget in exclude_frame.winfo_children() if isinstance(widget, ttk.Entry)]
+        # 新行号 = 当前输入框数量 + 1（因为第一行是标签）
+        new_row = len(entries) + 1
         
         ttk.Entry(exclude_frame, textvariable=new_var, width=30).grid(
-            row=row_count, column=0, sticky=tk.W, pady=1
+            row=new_row, column=0, sticky=tk.W, pady=1
         )
+        
+        # 重新定位按钮框架
+        for widget in exclude_frame.winfo_children():
+            if isinstance(widget, ttk.Frame):
+                widget.grid(row=new_row + 1, column=0, sticky=tk.W, pady=5)
+                break
     
     def remove_last_exclude_pattern(self):
         """删除最后一条排除模式"""
@@ -1073,13 +982,20 @@ class ConfigFormApp:
             if entries:
                 # 删除最后一个输入框
                 entries[-1].destroy()
+            
+            # 重新定位按钮框架
+            new_row = len([widget for widget in exclude_frame.winfo_children() if isinstance(widget, ttk.Entry)]) + 1
+            for widget in exclude_frame.winfo_children():
+                if isinstance(widget, ttk.Frame):
+                    widget.grid(row=new_row + 1, column=0, sticky=tk.W, pady=5)
+                    break
     
     def add_include_pattern(self):
         """添加包含模式"""
         if not hasattr(self, 'include_vars'):
             self.include_vars = []
         
-        # 创建新的包含模式变量
+        # 创建新的包含模式变量，初始值为空
         new_var = tk.StringVar()
         self.include_vars.append(new_var)
         
@@ -1099,12 +1015,20 @@ class ConfigFormApp:
         else:
             return
         
-        # 创建新的输入行
-        row_count = len(include_frame.grid_slaves()) // 2  # 每行有两个控件
+        # 获取当前所有输入框
+        entries = [widget for widget in include_frame.winfo_children() if isinstance(widget, ttk.Entry)]
+        # 新行号 = 当前输入框数量 + 1（因为第一行是标签）
+        new_row = len(entries) + 1
         
         ttk.Entry(include_frame, textvariable=new_var, width=30).grid(
-            row=row_count, column=0, sticky=tk.W, pady=1
+            row=new_row, column=0, sticky=tk.W, pady=1
         )
+        
+        # 重新定位按钮框架
+        for widget in include_frame.winfo_children():
+            if isinstance(widget, ttk.Frame):
+                widget.grid(row=new_row + 1, column=0, sticky=tk.W, pady=5)
+                break
     
     def remove_last_include_pattern(self):
         """删除最后一条包含模式"""
@@ -1133,21 +1057,13 @@ class ConfigFormApp:
             if entries:
                 # 删除最后一个输入框
                 entries[-1].destroy()
-    
-    def add_column(self, tree, column_type):
-        """添加列"""
-        # 这里可以添加添加列的逻辑
-        messagebox.showinfo("提示", "添加列功能待实现")
-    
-    def edit_column(self, tree, column_type):
-        """编辑列"""
-        # 这里可以添加编辑列的逻辑
-        messagebox.showinfo("提示", "编辑列功能待实现")
-    
-    def delete_column(self, tree):
-        """删除列"""
-        # 这里可以添加删除列的逻辑
-        messagebox.showinfo("提示", "删除列功能待实现")
+            
+            # 重新定位按钮框架
+            new_row = len([widget for widget in include_frame.winfo_children() if isinstance(widget, ttk.Entry)]) + 1
+            for widget in include_frame.winfo_children():
+                if isinstance(widget, ttk.Frame):
+                    widget.grid(row=new_row + 1, column=0, sticky=tk.W, pady=5)
+                    break
 
 # 添加主函数，用于启动应用程序
 def main():
