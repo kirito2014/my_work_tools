@@ -2,8 +2,8 @@
 #
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 6, 1, 1),
-    prodvers=(1, 6, 1, 1),
+    filevers=(1, 6, 2, 1),
+    prodvers=(1, 6, 2, 1),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -18,19 +18,19 @@ VSVersionInfo(
         u'040904B0',  # 英文
         [StringStruct(u'CompanyName', u'Sunline Technology'),
         StringStruct(u'FileDescription', u'Resume Generator Tool'),
-        StringStruct(u'FileVersion', u'1.6.1.1'),
+        StringStruct(u'FileVersion', u'1.6.2.1'),
         StringStruct(u'InternalName', u'ResumeGenerator'),
-        StringStruct(u'LegalCopyright', u'Copyright © 2025 Sunline Technology Co.,Ltd. All rights reserved.'),
+        StringStruct(u'LegalCopyright', u'Copyright © 2026 Sunline Technology Co.,Ltd. All rights reserved.'),
         StringStruct(u'OriginalFilename', u'ResumeGenerator.exe'),
         StringStruct(u'ProductName', u'Resume Generator'),
-        StringStruct(u'ProductVersion', u'1.6.1.1')]),
+        StringStruct(u'ProductVersion', u'1.6.2.1')]),
       StringTable(
         u'080404B0',  # 中文
         [StringStruct(u'CompanyName', u'长亮科技'),
         StringStruct(u'FileDescription', u'简历生成工具'),
-        StringStruct(u'FileVersion', u'1.6.1.1'),
+        StringStruct(u'FileVersion', u'1.6.2.1'),
         StringStruct(u'InternalName', u'ResumeGenerator'),
-        StringStruct(u'LegalCopyright', u'Copyright © 2025 Sunline Technology Co.,Ltd. 保留所有权利。'),
+        StringStruct(u'LegalCopyright', u'Copyright © 2026 长亮科技 Co.,Ltd. 保留所有权利。'),
         StringStruct(u'OriginalFilename', u'简历生成工具.exe'),
         StringStruct(u'ProductName', u'简历生成工具'),
         StringStruct(u'ProductVersion', u'1.6.1.1')])

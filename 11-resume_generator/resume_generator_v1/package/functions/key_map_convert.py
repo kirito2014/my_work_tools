@@ -54,6 +54,7 @@ KEY_MAPPINGS = {
     'Position': 'pos',
     'JobCategory': 'job',
     'ProfessionalLevel': 'level',
+    'CompanyEmail': 'email',
     'EmploymentStatus': 'status',
     'EntryDate': 'entry',
     'FirstEntryDate': 'first',
