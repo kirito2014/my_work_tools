@@ -83,7 +83,6 @@ class JsonExtractorApp(ThemedTk):
         style = ttk.Style()
         style.configure("Bold.TCheckbutton", font=("", 10, "bold"))
         
-        # 使用 Canvas + Scrollbar 以防字段过多超出屏幕
         canvas = tk.Canvas(filter_frame, highlightthickness=0)
         scrollbar = ttk.Scrollbar(filter_frame, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas)
@@ -114,7 +113,6 @@ class JsonExtractorApp(ThemedTk):
             )
             cb_cat.pack(anchor="w")
             
-            # 使用 grid 布局子项，方便多字段自动换行
             sub_frame = ttk.Frame(cat_frame)
             sub_frame.pack(fill="x", padx=35, pady=5)
             
@@ -128,7 +126,7 @@ class JsonExtractorApp(ThemedTk):
                 )
                 cb_item.grid(row=row, column=col, sticky="w", padx=(0, 15), pady=3)
                 col += 1
-                if col > 4:  # 每行显示 5 个选项
+                if col > 4:
                     col = 0
                     row += 1
 
@@ -201,7 +199,6 @@ class JsonExtractorApp(ThemedTk):
                 print(f"读取文件失败 {file_path}: {e}")
                 continue
 
-            # 遍历最外层的动态人员名称字典
             for root_key, person_data in raw_content.items():
                 if not isinstance(person_data, dict):
                     continue
@@ -209,32 +206,27 @@ class JsonExtractorApp(ThemedTk):
                 basic_info = person_data.get("BasicInfo", {})
                 add_info = person_data.get("AdditionInfo", {})
                 
-                # 获取主键（保留原数据，不脱敏）
                 raw_name = basic_info.get("Name", add_info.get("Name", root_key))
                 raw_emp_no = basic_info.get("EmpNo", add_info.get("EmpNo", ""))
                 
+                # 默认固定字段
                 row_data = {
                     "人员名称": raw_name,
                     "员工号": raw_emp_no
                 }
                 
-                # 提取用户选中的字段
                 for chinese_field in fields_to_extract:
-                    # 获取该中文选项对应的英文 JSON 键名
                     en_key = self.key_mapping.get(chinese_field, chinese_field)
                     
                     if en_key == "EducationList":
-                        # 特殊信息处理
                         edu_list = person_data.get("SpecialInfo", {}).get("EducationList", [])
                         if isinstance(edu_list, list):
                             for idx, edu_item in enumerate(edu_list, 1):
                                 if isinstance(edu_item, dict):
                                     for k, val in edu_item.items():
-                                        # 将子字典中的键也进行中文化
                                         cn_k = self.edu_inner_mapping.get(k, k)
                                         row_data[f"教育经历{idx}_{cn_k}"] = val
                     else:
-                        # 递归查找数据并保留原值
                         val = self._find_value_in_dict(person_data, en_key)
                         row_data[chinese_field] = val if val is not None else ""
                         
@@ -244,6 +236,7 @@ class JsonExtractorApp(ThemedTk):
             messagebox.showwarning("提示", "未能成功提取到任何有效数据。")
             return
 
+        # 转换为 DataFrame，这时的列名本身就是用户选择的二级菜单键
         df = pd.DataFrame(parsed_data)
         
         save_dir = os.path.join(self.base_dir, "数据下载")
@@ -254,14 +247,14 @@ class JsonExtractorApp(ThemedTk):
         save_path = os.path.join(save_dir, filename)
 
         try:
+            # 去除多级表头的逻辑，恢复最基础的 to_excel 导出
+            # index=False 表示不写入最左侧的序号，直接写入表头(第1行)和数据(第2行起)
             with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False, startrow=1)
+                df.to_excel(writer, index=False)
             messagebox.showinfo("保存成功", f"数据已成功保存至:\n{save_path}")
         except Exception as e:
             messagebox.showerror("保存失败", f"导出 Excel 时发生错误:\n{e}")
-
     def _find_value_in_dict(self, data_dict, target_key):
-        """递归在字典中寻找键值"""
         if target_key in data_dict:
             return data_dict[target_key]
         
