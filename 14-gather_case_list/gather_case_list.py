@@ -1,3 +1,33 @@
+# -*- coding: utf-8 -*-
+
+"""
+==============================================================================
+Script Name  : gather_case_list.py
+Description  : 映射测试案例数据统计自动化脚本
+               
+               本脚本用于自动化处理“SIT2阶段-明细进度”的测试结果统计。
+               通过读取 config.ini 配置文件，脚本会自动遍历并预加载源数据目录
+               下的测试案例文件（如 01stg_xxx.xlsx, 02dwd_xxx.xlsx），根据层级
+               和表名精准提取测试用例状态，并计算不通过数、待分析数等关键指标，
+               最终将统计结果和整体测试状态（通过/不通过）回写至目标结果表中。
+
+Key Features :
+    1. 全局预加载缓存机制，彻底规避高频磁盘 I/O，提升处理性能。
+    2. 智能前缀模糊匹配（支持 01stg, 04dm 等变体前缀的动态识别）。
+    3. 严格的防漏测机制：源文件缺失、Sheet 缺失或用例缺失均触发一票否决（不通过）。
+    4. 自动双向日志记录系统，生成按时间戳命名的 log 文件便于追溯与排查。
+    5. 安全无损的文件保存机制（基于 openpyxl，不破坏目标表格原生格式与宏）。
+
+Dependencies : pip install pandas openpyxl
+Usage        : python data_analyzer.py -s <源数据目录> -t <目标文件路径> [-c <配置文件>]
+Example      : python data_analyzer.py -s ./source_data -t ./result.xlsx -c config.ini
+
+Author       : [wangmujun / Sunline.Ltd]
+Date         : 2026-04-10
+Version      : 1.0.0
+==============================================================================
+"""
+
 import os
 import sys
 import argparse
@@ -6,6 +36,7 @@ import datetime
 import configparser
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.styles import Font, Border, Side, Alignment
 
 # ==========================================
 # 1. 初始化日志系统 (双向输出：控制台 + 文件)
@@ -309,7 +340,7 @@ class DataAnalyzer:
             wb.save(self.target_file)
             
             logger.info("==================================================")
-            logger.info("✅ 处理完成总结报告：")
+            logger.info("√  处理完成总结报告：")
             logger.info(f"▶ 结果已成功保存至: {self.target_file}")
             logger.info(f"▶ 详细日志已保存至: {current_log_path}")
             
