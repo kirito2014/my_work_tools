@@ -15,11 +15,9 @@ def setup_logger():
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     
-    # 生成日志文件名
     log_filename = datetime.datetime.now().strftime("logs_%Y%m%d%H%M%S.log")
     log_path = os.path.join(log_dir, log_filename)
 
-    # 配置 logging
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -73,7 +71,7 @@ class DataAnalyzer:
         self.config = {}
         self.source_data_cache = {}  
         self.level_mapping = {} 
-        self.skipped_tasks = []  # 新增：用于记录被忽略的检核任务
+        self.skipped_tasks = [] 
         
     def load_config(self):
         """读取 INI 配置文件并建立层级名称映射"""
@@ -112,20 +110,31 @@ class DataAnalyzer:
             if not f.endswith('.xlsx') or f.startswith('~'):
                 continue
                 
-            prefix = f[:5].lower() 
-            if prefix in target_prefixes:
+            f_lower = f.lower()
+            matched_prefix = None
+            
+            # ==========================================
+            # 【逻辑优化】：改用 startswith 动态匹配前缀
+            # 不再局限于固定 5 位，完美兼容 "04dm" 这种 4 位的情况
+            # ==========================================
+            for tp in target_prefixes:
+                if f_lower.startswith(tp):
+                    matched_prefix = tp
+                    break
+            
+            if matched_prefix:
                 file_path = os.path.join(self.source_dir, f)
-                logger.info(f"正在加载源文件到内存: {f}")
+                logger.info(f"正在加载源文件到内存: {f} (识别前缀: {matched_prefix})")
                 try:
                     sheets_dict = pd.read_excel(file_path, sheet_name=None, header=self.get_header_row_index())
-                    self.source_data_cache[prefix] = sheets_dict
+                    self.source_data_cache[matched_prefix] = sheets_dict
                     loaded_count += 1
                 except Exception as e:
                     logger.error(f"读取文件失败 {f}: {str(e)}")
                     sys.exit(1) 
                     
         if loaded_count == 0:
-            logger.error("未在指定文件夹中找到任何匹配前缀 (01stg, 02dwd...) 的源文件！")
+            logger.error("未在指定文件夹中找到任何匹配前缀 (01stg, 02dwd, 03dws, 04dm) 的源文件！")
             sys.exit(1)
 
     def get_header_row_index(self):
@@ -158,18 +167,27 @@ class DataAnalyzer:
 
                 target_prefix = self.level_mapping.get(level_short)
                 
-                # ==========================================
-                # 【逻辑优化】：未配置或无源文件时，忽略该行并记录，不再抛出异常
-                # ==========================================
                 if not target_prefix or target_prefix not in self.config or target_prefix not in self.source_data_cache:
-                    logger.warning(f"  [跳过] 无法处理层级 '{level_short}'。原因：不在配置文件中或未找到对应源文件。")
+                    logger.warning(f"  [异常] 无法处理层级 '{level_short}'。已全项标记为'无原数据'，状态置为'不通过'。")
                     self.skipped_tasks.append({
                         "row": row,
                         "level": level_short,
                         "table": table_name,
                         "reason": f"层级 '{level_short}' 缺少配置或对应源文件"
                     })
-                    continue  # 直接跳过，不写入任何数据
+                    
+                    for col_idx in CHECK_COLUMN_MAPPING.values():
+                        ws.cell(row=row, column=col_idx).value = "无原数据"
+                        
+                    ws.cell(row=row, column=STATS_COLUMNS["用例总数"]).value = 0
+                    ws.cell(row=row, column=STATS_COLUMNS["不通过问题总数"]).value = 0
+                    ws.cell(row=row, column=STATS_COLUMNS["待分析条数"]).value = 0
+                    ws.cell(row=row, column=STATS_COLUMNS["核心问题总数"]).value = 0
+                    ws.cell(row=row, column=STATS_COLUMNS["平台问题总数"]).value = 0
+                    
+                    ws.cell(row=row, column=STATS_COLUMNS["测试状态"]).value = "不通过"
+                    
+                    continue 
                     
                 required_sheets = self.config[target_prefix]
                 file_data = self.source_data_cache[target_prefix]
@@ -290,20 +308,17 @@ class DataAnalyzer:
             logger.info("所有数据处理完毕，正在保存目标结果文件...")
             wb.save(self.target_file)
             
-            # ==========================================
-            # 【总结报告】：在最后打印并写入日志
-            # ==========================================
             logger.info("==================================================")
             logger.info("✅ 处理完成总结报告：")
             logger.info(f"▶ 结果已成功保存至: {self.target_file}")
             logger.info(f"▶ 详细日志已保存至: {current_log_path}")
             
             if self.skipped_tasks:
-                logger.warning(f"▶ 注意：共有 {len(self.skipped_tasks)} 条任务被整体忽略，详情如下：")
+                logger.warning(f"▶ 注意：共有 {len(self.skipped_tasks)} 条任务由于原数据缺失被标记为'不通过'，详情如下：")
                 for task in self.skipped_tasks:
                     logger.warning(f"    - Excel第 {task['row']} 行 | 表名: {task['table']} | 层级: {task['level']} | 原因: {task['reason']}")
             else:
-                logger.info("▶ 完美：所有目标表任务均有对应的配置和源文件，无被忽略任务。")
+                logger.info("▶ 完美：所有目标表任务均有对应的配置和源文件，无缺失任务。")
 
         except SystemExit:
             pass
