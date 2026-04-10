@@ -56,7 +56,7 @@ class DataAnalyzer:
         self.config_file = config_file
         self.config = {}
         self.source_data_cache = {}  
-        self.level_mapping = {}  # 新增：用于建立 stg -> 01stg 的映射
+        self.level_mapping = {} 
         
     def load_config(self):
         """读取 INI 配置文件并建立层级名称映射"""
@@ -76,9 +76,8 @@ class DataAnalyzer:
             self.config[clean_key] = [s.strip() for s in parser['SHEET_MAPPING'][key].split(',')]
             
             # 建立短层级名到长层级名的映射 (例如截取 '01stg' 的后三位变为 'stg')
-            # 这里假设配置文件中的 key 总是以两位数字开头
             if len(clean_key) > 2:
-                short_level = clean_key[2:]  # 提取 'stg', 'dwd' 等
+                short_level = clean_key[2:] 
                 self.level_mapping[short_level] = clean_key
                 
         logger.info(f"配置文件加载成功，生成的层级映射为: {self.level_mapping}")
@@ -97,7 +96,7 @@ class DataAnalyzer:
             if not f.endswith('.xlsx') or f.startswith('~'):
                 continue
                 
-            prefix = f[:5].lower() # 例如提取 "01stg"
+            prefix = f[:5].lower() 
             if prefix in target_prefixes:
                 file_path = os.path.join(self.source_dir, f)
                 logger.info(f"正在加载源文件到内存: {f}")
@@ -107,7 +106,7 @@ class DataAnalyzer:
                     loaded_count += 1
                 except Exception as e:
                     logger.error(f"读取文件失败 {f}: {str(e)}")
-                    sys.exit(1) # 如果源文件损坏导致读取失败，同样退出
+                    sys.exit(1) 
                     
         if loaded_count == 0:
             logger.error("未在指定文件夹中找到任何匹配前缀 (01stg, 02dwd...) 的源文件！")
@@ -129,23 +128,20 @@ class DataAnalyzer:
             max_row = ws.max_row
             
             for row in range(2, max_row + 1):
-                level_val = ws.cell(row=row, column=2).value # B列：层级 (如 'stg')
+                level_val = ws.cell(row=row, column=2).value # B列：层级 
                 table_name_val = ws.cell(row=row, column=4).value # D列：表名
                 
                 if not level_val or not table_name_val:
                     continue
                     
-                # 将结果表中的层级名转小写，如 "stg"
                 level_short = str(level_val).strip().lower()
                 table_name = str(table_name_val).strip().upper()
                 
                 logger.info(f"--------------------------------------------------")
                 logger.info(f"当前处理 -> 目标表层级: {level_short}, 表名: {table_name}")
 
-                # 优化点 1: 根据 stg 获取 01stg
                 target_prefix = self.level_mapping.get(level_short)
                 
-                # 优化点 2: 找不到映射、或者在缓存/配置中找不到对应数据时，报错并直接退出
                 if not target_prefix or target_prefix not in self.config or target_prefix not in self.source_data_cache:
                     logger.error(f"【阻断错误】无法处理目标表层级 '{level_short}'！")
                     logger.error(f"原因：在源文件夹或配置文件中未找到对应的 '{target_prefix or '未知前缀'}' 文件或配置。")
@@ -154,6 +150,14 @@ class DataAnalyzer:
                     
                 required_sheets = self.config[target_prefix]
                 file_data = self.source_data_cache[target_prefix]
+                
+                # ==========================================
+                # 【新增逻辑】：处理非必填检查项
+                # 遍历所有的已知检查项，如果该检查项不在当前层级的 ini 配置中，默认填入 "/"
+                # ==========================================
+                for check_name, col_idx in CHECK_COLUMN_MAPPING.items():
+                    if check_name not in required_sheets:
+                        ws.cell(row=row, column=col_idx).value = "/"
                 
                 stats = {
                     "total_cases": 0,
@@ -176,7 +180,6 @@ class DataAnalyzer:
                         continue
 
                     df = file_data[sheet_name]
-                    #print(df.head())
                     
                     required_cols = [COL_TARGET_TABLE, COL_TEST_RESULT, COL_ISSUE_TYPE, COL_ISSUE_DESC]
                     missing_cols = [c for c in required_cols if c not in df.columns]
@@ -251,7 +254,6 @@ class DataAnalyzer:
             logger.info("处理完成报告：成功生成统计结果！")
 
         except SystemExit:
-            # 捕获我们自己触发的退出，不再额外打印错误栈
             pass
         except Exception as e:
             logger.error(f"处理过程中发生严重错误: {str(e)}", exc_info=True)
