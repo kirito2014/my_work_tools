@@ -337,6 +337,32 @@ class DataAnalyzer:
                     
             logger.info("==================================================")
             logger.info("所有数据处理完毕，正在保存目标结果文件...")
+            logger.info("==================================================")
+            logger.info("正在渲染 Excel 样式 (宋体9号, 边框, I-Z居中)...")
+            
+            # ==========================================
+            # 【新增逻辑】：添加边框、字体、对齐方式
+            # ==========================================
+            simsun_9 = Font(name='宋体', size=9)
+            thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                                 top=Side(style='thin'), bottom=Side(style='thin'))
+            center_align = Alignment(horizontal='center', vertical='center')
+
+            # 遍历有数据的区域 (从第2行到最大行)
+            for r in range(2, max_row + 1):
+                # 假设数据写到Z列(第26列)，可以根据实际情况扩大
+                for c in range(1, STATS_COLUMNS["测试状态"] + 1): 
+                    cell = ws.cell(row=r, column=c)
+                    
+                    # 只有当单元格本身有值，或者我们需要给他加上边框时
+                    cell.font = simsun_9
+                    cell.border = thin_border
+                    
+                    # I列 (9) 到 Z列 (26) 垂直水平居中
+                    if 9 <= c <= 26:
+                        cell.alignment = center_align
+
+            logger.info("所有数据及样式处理完毕，正在保存目标结果文件...")
             wb.save(self.target_file)
             
             logger.info("==================================================")
