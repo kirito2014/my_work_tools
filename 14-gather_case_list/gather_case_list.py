@@ -163,6 +163,11 @@ class DataAnalyzer:
                     "platform_issues": 0
                 }
                 
+                # ==========================================
+                # 【新增标志位】：标记该表是否存在确实案例数据
+                # ==========================================
+                has_missing_case = False
+                
                 for sheet_name in required_sheets:
                     col_idx = CHECK_COLUMN_MAPPING.get(sheet_name)
                     if not col_idx:
@@ -173,6 +178,7 @@ class DataAnalyzer:
                     if sheet_name not in file_data:
                         logger.warning(f"  缺失 Sheet 页: {sheet_name}。标记为：检查来源数据是否存在")
                         ws.cell(row=row, column=col_idx).value = "检查来源数据是否存在"
+                        has_missing_case = True  # 如果连Sheet都丢了，也属于无对应案例的严重错误
                         continue
 
                     df = file_data[sheet_name]
@@ -193,16 +199,15 @@ class DataAnalyzer:
                     
                     logger.info(f"  匹配条数: {records_count} 条记录")
 
+                    # 如果在该项检查中完全找不到对应的表名数据
                     if records_count == 0:
-                        ws.cell(row=row, column=col_idx).value = "/"
+                        ws.cell(row=row, column=col_idx).value = "无对应检查案例"
+                        has_missing_case = True  # 【置为True】，触发一票否决
                         continue
                         
                     check_result = "Y"
                     all_issue_types = []
                     
-                    # ==========================================
-                    # 【逻辑优化】：剥离未分析与不通过的判定关系
-                    # ==========================================
                     if records_count > 1:
                         for _, record in target_data.iterrows():
                             res = str(record[COL_TEST_RESULT]).strip()
@@ -214,12 +219,10 @@ class DataAnalyzer:
                                 if itype:
                                     all_issue_types.append(itype)
                             elif res == "":
-                                check_result = "N" # 只要有异常，此列对应检查项即为N
+                                check_result = "N" 
                                 if not itype:
-                                    # 纯空值：只计入待分析，不计入问题总数
                                     stats["un_analyzed"] += 1
                                 else:
-                                    # 有问题类型但没填结果：按不通过兜底
                                     stats["fail_issues"] += 1
                                     all_issue_types.append(itype)
                             
@@ -239,7 +242,6 @@ class DataAnalyzer:
                         elif res == "":
                             if not itype:
                                 check_result = "未分析"
-                                # 纯空值：只计入待分析，不计入问题总数
                                 stats["un_analyzed"] += 1
                             else:
                                 check_result = "N"
@@ -258,9 +260,13 @@ class DataAnalyzer:
                 ws.cell(row=row, column=STATS_COLUMNS["平台问题总数"]).value = stats["platform_issues"]
                 
                 # ==========================================
-                # 【逻辑优化】：Z列状态的严格判定
+                # 【逻辑优化】：加入 "无对应检查案例" 一票否决机制
                 # ==========================================
-                if stats["total_cases"] > 0:
+                if has_missing_case:
+                    # 只要任何一个必检项缺失数据（包含Sheet缺失或表名无数据），直接不通过
+                    ws.cell(row=row, column=STATS_COLUMNS["测试状态"]).value = "不通过"
+                elif stats["total_cases"] > 0:
+                    # 否则，再看问题数和未分析数
                     if stats["fail_issues"] == 0 and stats["un_analyzed"] == 0:
                         ws.cell(row=row, column=STATS_COLUMNS["测试状态"]).value = "通过"
                     elif stats["fail_issues"] > 0 or stats["un_analyzed"] > 0:
@@ -278,7 +284,6 @@ class DataAnalyzer:
 
 
 if __name__ == "__main__":
-    # 命令行参数解析
     # parser = argparse.ArgumentParser(description="映射测试案例数据统计脚本")
     # parser.add_argument("-s", "--source", required=True, help="待处理文件夹路径（内含多个XLSX文件）")
     # parser.add_argument("-t", "--target", required=True, help="目标结果XLSX文件路径")
