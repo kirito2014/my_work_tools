@@ -75,7 +75,6 @@ class DataAnalyzer:
             clean_key = key.lower()
             self.config[clean_key] = [s.strip() for s in parser['SHEET_MAPPING'][key].split(',')]
             
-            # 建立短层级名到长层级名的映射 (例如截取 '01stg' 的后三位变为 'stg')
             if len(clean_key) > 2:
                 short_level = clean_key[2:] 
                 self.level_mapping[short_level] = clean_key
@@ -128,8 +127,8 @@ class DataAnalyzer:
             max_row = ws.max_row
             
             for row in range(2, max_row + 1):
-                level_val = ws.cell(row=row, column=2).value # B列：层级 
-                table_name_val = ws.cell(row=row, column=4).value # D列：表名
+                level_val = ws.cell(row=row, column=2).value 
+                table_name_val = ws.cell(row=row, column=4).value 
                 
                 if not level_val or not table_name_val:
                     continue
@@ -151,10 +150,7 @@ class DataAnalyzer:
                 required_sheets = self.config[target_prefix]
                 file_data = self.source_data_cache[target_prefix]
                 
-                # ==========================================
-                # 【新增逻辑】：处理非必填检查项
                 # 遍历所有的已知检查项，如果该检查项不在当前层级的 ini 配置中，默认填入 "/"
-                # ==========================================
                 for check_name, col_idx in CHECK_COLUMN_MAPPING.items():
                     if check_name not in required_sheets:
                         ws.cell(row=row, column=col_idx).value = "/"
@@ -204,18 +200,28 @@ class DataAnalyzer:
                     check_result = "Y"
                     all_issue_types = []
                     
+                    # ==========================================
+                    # 【逻辑优化】：剥离未分析与不通过的判定关系
+                    # ==========================================
                     if records_count > 1:
                         for _, record in target_data.iterrows():
                             res = str(record[COL_TEST_RESULT]).strip()
                             itype = str(record[COL_ISSUE_TYPE]).strip()
                             
-                            if res == "不通过" or res == "":
+                            if res == "不通过":
                                 check_result = "N"
                                 stats["fail_issues"] += 1
                                 if itype:
                                     all_issue_types.append(itype)
-                                if res == "" and not itype:
+                            elif res == "":
+                                check_result = "N" # 只要有异常，此列对应检查项即为N
+                                if not itype:
+                                    # 纯空值：只计入待分析，不计入问题总数
                                     stats["un_analyzed"] += 1
+                                else:
+                                    # 有问题类型但没填结果：按不通过兜底
+                                    stats["fail_issues"] += 1
+                                    all_issue_types.append(itype)
                             
                             if itype == "核心问题": stats["core_issues"] += 1
                             elif itype == "平台问题": stats["platform_issues"] += 1
@@ -225,14 +231,20 @@ class DataAnalyzer:
                         res = str(record[COL_TEST_RESULT]).strip()
                         itype = str(record[COL_ISSUE_TYPE]).strip()
                         
-                        if res == "不通过" or res == "":
+                        if res == "不通过":
                             check_result = "N"
                             stats["fail_issues"] += 1
                             if itype:
                                 all_issue_types.append(itype)
-                            if res == "" and not itype:
+                        elif res == "":
+                            if not itype:
                                 check_result = "未分析"
+                                # 纯空值：只计入待分析，不计入问题总数
                                 stats["un_analyzed"] += 1
+                            else:
+                                check_result = "N"
+                                stats["fail_issues"] += 1
+                                all_issue_types.append(itype)
                                 
                         if itype == "核心问题": stats["core_issues"] += 1
                         elif itype == "平台问题": stats["platform_issues"] += 1
@@ -245,8 +257,14 @@ class DataAnalyzer:
                 ws.cell(row=row, column=STATS_COLUMNS["核心问题总数"]).value = stats["core_issues"]
                 ws.cell(row=row, column=STATS_COLUMNS["平台问题总数"]).value = stats["platform_issues"]
                 
-                if stats["fail_issues"] == 0 and stats["total_cases"] > 0:
-                    ws.cell(row=row, column=STATS_COLUMNS["测试状态"]).value = "通过"
+                # ==========================================
+                # 【逻辑优化】：Z列状态的严格判定
+                # ==========================================
+                if stats["total_cases"] > 0:
+                    if stats["fail_issues"] == 0 and stats["un_analyzed"] == 0:
+                        ws.cell(row=row, column=STATS_COLUMNS["测试状态"]).value = "通过"
+                    elif stats["fail_issues"] > 0 or stats["un_analyzed"] > 0:
+                        ws.cell(row=row, column=STATS_COLUMNS["测试状态"]).value = "不通过"
                     
             logger.info("==================================================")
             logger.info("所有数据处理完毕，正在保存目标结果文件...")
