@@ -2,19 +2,35 @@ import os
 import sys
 import argparse
 import logging
+import datetime
 import configparser
 import pandas as pd
 from openpyxl import load_workbook
 
 # ==========================================
-# 1. 初始化日志系统
+# 1. 初始化日志系统 (双向输出：控制台 + 文件)
 # ==========================================
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-logger = logging.getLogger(__name__)
+def setup_logger():
+    log_dir = "logs"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    
+    # 生成日志文件名
+    log_filename = datetime.datetime.now().strftime("logs_%Y%m%d%H%M%S.log")
+    log_path = os.path.join(log_dir, log_filename)
+
+    # 配置 logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler(log_path, encoding='utf-8')
+        ]
+    )
+    return logging.getLogger(__name__), log_path
+
+logger, current_log_path = setup_logger()
 
 # ==========================================
 # 2. 全局配置与映射字典
@@ -57,6 +73,7 @@ class DataAnalyzer:
         self.config = {}
         self.source_data_cache = {}  
         self.level_mapping = {} 
+        self.skipped_tasks = []  # 新增：用于记录被忽略的检核任务
         
     def load_config(self):
         """读取 INI 配置文件并建立层级名称映射"""
@@ -141,16 +158,22 @@ class DataAnalyzer:
 
                 target_prefix = self.level_mapping.get(level_short)
                 
+                # ==========================================
+                # 【逻辑优化】：未配置或无源文件时，忽略该行并记录，不再抛出异常
+                # ==========================================
                 if not target_prefix or target_prefix not in self.config or target_prefix not in self.source_data_cache:
-                    logger.error(f"【阻断错误】无法处理目标表层级 '{level_short}'！")
-                    logger.error(f"原因：在源文件夹或配置文件中未找到对应的 '{target_prefix or '未知前缀'}' 文件或配置。")
-                    logger.error("程序已强行中止，请检查输入文件及配置文件。")
-                    sys.exit(1)
+                    logger.warning(f"  [跳过] 无法处理层级 '{level_short}'。原因：不在配置文件中或未找到对应源文件。")
+                    self.skipped_tasks.append({
+                        "row": row,
+                        "level": level_short,
+                        "table": table_name,
+                        "reason": f"层级 '{level_short}' 缺少配置或对应源文件"
+                    })
+                    continue  # 直接跳过，不写入任何数据
                     
                 required_sheets = self.config[target_prefix]
                 file_data = self.source_data_cache[target_prefix]
                 
-                # 遍历所有的已知检查项，如果该检查项不在当前层级的 ini 配置中，默认填入 "/"
                 for check_name, col_idx in CHECK_COLUMN_MAPPING.items():
                     if check_name not in required_sheets:
                         ws.cell(row=row, column=col_idx).value = "/"
@@ -163,9 +186,6 @@ class DataAnalyzer:
                     "platform_issues": 0
                 }
                 
-                # ==========================================
-                # 【新增标志位】：标记该表是否存在确实案例数据
-                # ==========================================
                 has_missing_case = False
                 
                 for sheet_name in required_sheets:
@@ -178,7 +198,7 @@ class DataAnalyzer:
                     if sheet_name not in file_data:
                         logger.warning(f"  缺失 Sheet 页: {sheet_name}。标记为：检查来源数据是否存在")
                         ws.cell(row=row, column=col_idx).value = "检查来源数据是否存在"
-                        has_missing_case = True  # 如果连Sheet都丢了，也属于无对应案例的严重错误
+                        has_missing_case = True  
                         continue
 
                     df = file_data[sheet_name]
@@ -199,10 +219,9 @@ class DataAnalyzer:
                     
                     logger.info(f"  匹配条数: {records_count} 条记录")
 
-                    # 如果在该项检查中完全找不到对应的表名数据
                     if records_count == 0:
                         ws.cell(row=row, column=col_idx).value = "无对应检查案例"
-                        has_missing_case = True  # 【置为True】，触发一票否决
+                        has_missing_case = True  
                         continue
                         
                     check_result = "Y"
@@ -259,14 +278,9 @@ class DataAnalyzer:
                 ws.cell(row=row, column=STATS_COLUMNS["核心问题总数"]).value = stats["core_issues"]
                 ws.cell(row=row, column=STATS_COLUMNS["平台问题总数"]).value = stats["platform_issues"]
                 
-                # ==========================================
-                # 【逻辑优化】：加入 "无对应检查案例" 一票否决机制
-                # ==========================================
                 if has_missing_case:
-                    # 只要任何一个必检项缺失数据（包含Sheet缺失或表名无数据），直接不通过
                     ws.cell(row=row, column=STATS_COLUMNS["测试状态"]).value = "不通过"
                 elif stats["total_cases"] > 0:
-                    # 否则，再看问题数和未分析数
                     if stats["fail_issues"] == 0 and stats["un_analyzed"] == 0:
                         ws.cell(row=row, column=STATS_COLUMNS["测试状态"]).value = "通过"
                     elif stats["fail_issues"] > 0 or stats["un_analyzed"] > 0:
@@ -275,7 +289,21 @@ class DataAnalyzer:
             logger.info("==================================================")
             logger.info("所有数据处理完毕，正在保存目标结果文件...")
             wb.save(self.target_file)
-            logger.info("处理完成报告：成功生成统计结果！")
+            
+            # ==========================================
+            # 【总结报告】：在最后打印并写入日志
+            # ==========================================
+            logger.info("==================================================")
+            logger.info("✅ 处理完成总结报告：")
+            logger.info(f"▶ 结果已成功保存至: {self.target_file}")
+            logger.info(f"▶ 详细日志已保存至: {current_log_path}")
+            
+            if self.skipped_tasks:
+                logger.warning(f"▶ 注意：共有 {len(self.skipped_tasks)} 条任务被整体忽略，详情如下：")
+                for task in self.skipped_tasks:
+                    logger.warning(f"    - Excel第 {task['row']} 行 | 表名: {task['table']} | 层级: {task['level']} | 原因: {task['reason']}")
+            else:
+                logger.info("▶ 完美：所有目标表任务均有对应的配置和源文件，无被忽略任务。")
 
         except SystemExit:
             pass
@@ -284,6 +312,7 @@ class DataAnalyzer:
 
 
 if __name__ == "__main__":
+    logger.info("脚本开始运行...")
     # parser = argparse.ArgumentParser(description="映射测试案例数据统计脚本")
     # parser.add_argument("-s", "--source", required=True, help="待处理文件夹路径（内含多个XLSX文件）")
     # parser.add_argument("-t", "--target", required=True, help="目标结果XLSX文件路径")
@@ -300,7 +329,6 @@ if __name__ == "__main__":
     # analyzer.load_config()
     # analyzer.load_source_files()
     # analyzer.process_data()
-
     #手动指定输入输出文件用于测试
 
     source_dir = "e:/github/my_work_tools/14-gather_case_list/single_file"
