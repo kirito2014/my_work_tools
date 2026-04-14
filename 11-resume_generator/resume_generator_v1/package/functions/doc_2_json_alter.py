@@ -216,11 +216,11 @@ def extract_basic_info(doc, filename):
         'HighestEducation': ['最高学历', '学历'],
         'Department': ['所在部门', '部门'],
         'Title': ['职称','职    称'],
-        'PersonalProfile': ['个人简介', '个人概述', '自我介绍'],
-        'BusinessAbility': ['业务与技术能力', '业务与技术能力详述', '技术能力', '技能'],
-        'Certification': ['资质认证', '证书', '认证'],
-        'Training': ['参与培训', '培训经历'],
-        'SkillTag': ['技能标签', '技术栈']
+        'PersonalProfile': ['个人简介'],
+        'BusinessAbility': ['业务与技术能力详述'],
+        'Certification': ['资质认证'],
+        'Training': ['参与培训'],
+        'SkillTag': ['技能标签']
     }
     
     # 遍历所有表格查找信息
@@ -745,7 +745,15 @@ def extract_resume_alt(file_path):
         
         # 获取原始文件名（去掉扩展名）
         original_filename = os.path.splitext(os.path.basename(file_path))[0]
-        
+        # 从文件名提取工号和姓名
+        parts = original_filename.split('+')
+        if len(parts) >= 2:
+            emp_no = parts[0]
+            name = parts[1]
+            json_filename = f"{emp_no}_{name}_人员简历.json"
+        else:
+            json_filename = f"{base_name}.json"
+            emp_no = "unknown"
         # 保存原始提取结果（文件名格式：工号_姓名_人员简历.json）
         # raw_output_filename = os.path.join(original_dir, f"{emp_no}_{person_name}_人员简历.json")
         # with open(raw_output_filename, "w", encoding="utf-8") as f:
@@ -753,7 +761,7 @@ def extract_resume_alt(file_path):
         # print(f"[OK] 已保存{person_name}的简历原始提取数据到：{raw_output_filename}")
         
         # 保存模板格式数据（文件名格式：工号_姓名_人员简历.json）
-        modify_output_filename = os.path.join(modify_dir, f"{emp_no}_{person_name}_人员简历.json")
+        modify_output_filename = os.path.join(modify_dir, json_filename)
         with open(modify_output_filename, "w", encoding="utf-8") as f:
             f.write(template_json)
         print(f"[OK] 已保存{person_name}的简历模板格式数据到：{modify_output_filename}")
