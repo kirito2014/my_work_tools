@@ -17,7 +17,7 @@ from datetime import datetime
 class IDCardProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("身份证图片处理工具")
+        self.root.title("身份证图片智能处理中枢 (精准命名版)")
         self.root.geometry("950x700")
         self.root.minsize(900, 650)
 
@@ -118,13 +118,15 @@ class IDCardProcessorApp:
         self.all_persons.clear()
         if not os.path.exists(self.folder_path): return
 
-        pattern = re.compile(r'^(\d{5})\s*(.*?)\s*(?:身份证|合并).*?\.([a-zA-Z0-9]+)$', re.IGNORECASE)
+        # 兼容读取带空格或加号的输入文件
+        pattern = re.compile(r'^(\d{5})[\s\+]*(.*?)[\s\+]*(?:身份证|合并).*?\.([a-zA-Z0-9]+)$', re.IGNORECASE)
 
         for filename in os.listdir(self.folder_path):
             match = pattern.match(filename)
             if match:
                 person_id = match.group(1)
-                name = match.group(2).strip()
+                # 【严格过滤】：提取名称时，去除左右两边和中间的所有空格、加号，确保名字本身纯净
+                name = match.group(2).strip().replace(" ", "").replace("+", "")
                 full_path = os.path.join(self.folder_path, filename)
 
                 if person_id not in self.all_persons:
@@ -156,10 +158,9 @@ class IDCardProcessorApp:
         except Exception as e:
             self.write_log(f"名单解析失败: {str(e)}", "error")
 
-    # ------------------- ★ 终极视觉提取中枢 ★ -------------------
+    # ------------------- 二次深度矫正视觉中枢 -------------------
 
     def order_points(self, pts):
-        """点阵排序：左上, 右上, 右下, 左下"""
         rect = np.zeros((4, 2), dtype="float32")
         s = pts.sum(axis=1)
         rect[0] = pts[np.argmin(s)]
@@ -170,11 +171,10 @@ class IDCardProcessorApp:
         return rect
 
     def strict_four_point_transform(self, image, pts):
-        """严格抠图拉伸算法：将任意倾斜的矩形强制矫正并输出为无背景的标准卡片尺寸"""
+        """严格抠图拉伸算法"""
         rect = self.order_points(pts)
         (tl, tr, br, bl) = rect
         
-        # 计算原包围盒长宽
         widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
         widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
         maxWidth = max(int(widthA), int(widthB))
@@ -185,18 +185,65 @@ class IDCardProcessorApp:
         
         if maxWidth <= 0 or maxHeight <= 0: return None 
 
-        # 先抠出它的原始矫正状态
         dst = np.array([[0, 0], [maxWidth - 1, 0], [maxWidth - 1, maxHeight - 1], [0, maxHeight - 1]], dtype="float32")
         M = cv2.getPerspectiveTransform(rect, dst)
         warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
         
-        # 强制横向化（如果检测出来是竖直放置的）
         if maxHeight > maxWidth:
             warped = cv2.rotate(warped, cv2.ROTATE_90_CLOCKWISE)
             
-        # ★ 强制严格拉伸为身份证标准物理像素尺寸 1011x638，抛弃所有背景
         warped = cv2.resize(warped, (1011, 638), interpolation=cv2.INTER_CUBIC)
         return warped
+
+    def perspective_correction(self, img):
+        """二次深度矫正引擎"""
+        h, w = img.shape[:2]
+        if h < 50 or w < 50: return img
+
+        try:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            blur = cv2.bilateralFilter(gray, 9, 75, 75)
+            edged = cv2.Canny(blur, 30, 150)
+            
+            thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 21, 10)
+            combined = cv2.bitwise_or(thresh, edged)
+
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+            closed = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, kernel)
+
+            cnts, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if not cnts: return img
+
+            cnts = sorted(cnts, key=cv2.contourArea, reverse=True)
+            img_area = h * w
+
+            for c in cnts:
+                area = cv2.contourArea(c)
+                if area > img_area * 0.92: continue
+                if area < img_area * 0.10: continue
+
+                rect = cv2.minAreaRect(c)
+                box = cv2.boxPoints(rect)
+                box = np.int32(box)
+
+                rw, rh = rect[1]
+                if min(rw, rh) == 0: continue
+                ratio = max(rw, rh) / min(rw, rh)
+
+                if 1.3 <= ratio <= 2.2:
+                    warped = self.strict_four_point_transform(img, box)
+                    if warped is not None:
+                        return warped 
+        except Exception:
+            pass
+            
+        return img 
+
+    def _force_standard_image(self, img_cv):
+        h, w = img_cv.shape[:2]
+        if h > w: img_cv = cv2.rotate(img_cv, cv2.ROTATE_90_CLOCKWISE)
+        img_cv = cv2.resize(img_cv, (1011, 638), interpolation=cv2.INTER_CUBIC)
+        return Image.fromarray(cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB))
 
     def classify_front_back(self, img1, img2):
         if self.face_cascade.empty(): return img1, img2
@@ -212,7 +259,6 @@ class IDCardProcessorApp:
         return img1, img2
 
     def extract_cards_from_image(self, img_array):
-        """【全新算法】智能剥离背景，针对性突破扫描件白底与复杂拍照背景"""
         img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
         if img is None: return None, None
         
@@ -221,18 +267,11 @@ class IDCardProcessorApp:
 
         try:
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            
-            # 策略A：自适应二值化 (针对A4纸扫描件，直接把白底变黑，证件变白)
             thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 21, 10)
-            
-            # 策略B：双边滤波降噪 + Canny (针对手机拍照的复杂背景)
             blur = cv2.bilateralFilter(gray, 9, 75, 75)
             edged = cv2.Canny(blur, 30, 150)
-            
-            # 混合双打：把两种边缘结合起来
             combined = cv2.bitwise_or(thresh, edged)
             
-            # 形态学膨胀闭运算：把证件内部的文字、头像、国徽连成一整块实心砖，彻底杜绝碎片化
             kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
             closed = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, kernel)
             
@@ -244,21 +283,16 @@ class IDCardProcessorApp:
             
             for c in cnts:
                 area = cv2.contourArea(c)
-                # 过滤条件：太小的噪点不要，大到撑满整张图的外框不要
-                if area < img_area * 0.06 or area > img_area * 0.90: 
-                    continue
+                if area < img_area * 0.06 or area > img_area * 0.90: continue
                     
-                # ★ 核心改动：不再求多边形(圆角容易失败)，直接用最小外接矩形包裹主体
                 rect = cv2.minAreaRect(c)
                 box = cv2.boxPoints(rect)
                 box = np.int32(box)
                 
-                # 校验提取出的矩形比例是否接近身份证 (约1.58)
                 rw, rh = rect[1]
                 if min(rw, rh) == 0: continue
                 ratio = max(rw, rh) / min(rw, rh)
                 
-                # 比例容错：1.3 ~ 2.2 之间认为是证件
                 if 1.3 <= ratio <= 2.2:
                     warped = self.strict_four_point_transform(img, box)
                     if warped is not None:
@@ -266,9 +300,7 @@ class IDCardProcessorApp:
                         
                 if len(cards_cv) == 2: break
                 
-            # 兜底策略：如果上面的算法没找到2张卡 (例如完全无缝连在一起的拼图)
             if len(cards_cv) < 2:
-                # 智能去白底：找到所有非白色的有效像素边界
                 _, binary = cv2.threshold(gray, 245, 255, cv2.THRESH_BINARY_INV)
                 coords = cv2.findNonZero(binary)
                 if coords is not None:
@@ -277,7 +309,6 @@ class IDCardProcessorApp:
                 else:
                     roi = img
                 
-                # 在去除了所有背景留白后，再进行居中劈开
                 rh, rw = roi.shape[:2]
                 if rh > rw: 
                     c1 = roi[0:rh//2, 0:rw].copy()
@@ -288,16 +319,13 @@ class IDCardProcessorApp:
                 
                 cards_cv = []
                 for c in [c1, c2]:
-                    ch_i, cw_i = c.shape[:2]
-                    if ch_i > cw_i: c = cv2.rotate(c, cv2.ROTATE_90_CLOCKWISE)
-                    # 强制拉伸为 1011x638
-                    cards_cv.append(cv2.resize(c, (1011, 638), interpolation=cv2.INTER_CUBIC))
+                    corrected_c = self.perspective_correction(c)
+                    cards_cv.append(corrected_c)
 
             if len(cards_cv) < 2: return None, None
             
             front_cv, back_cv = self.classify_front_back(cards_cv[0], cards_cv[1])
-            return (Image.fromarray(cv2.cvtColor(front_cv, cv2.COLOR_BGR2RGB)), 
-                    Image.fromarray(cv2.cvtColor(back_cv, cv2.COLOR_BGR2RGB)))
+            return (self._force_standard_image(front_cv), self._force_standard_image(back_cv))
 
         except Exception as e:
             raise ValueError(f"视觉处理崩溃拦截: {str(e)}")
@@ -323,27 +351,23 @@ class IDCardProcessorApp:
             img1 = cv2.imdecode(images[0], cv2.IMREAD_COLOR)
             img2 = cv2.imdecode(images[1], cv2.IMREAD_COLOR)
             if img1 is None or img2 is None: return None, None
-            front_cv, back_cv = self.classify_front_back(img1, img2)
             
-            # 如果是分两页的PDF，同样要过一遍无背景拉伸
+            img1_corrected = self.perspective_correction(img1)
+            img2_corrected = self.perspective_correction(img2)
+            
+            front_cv, back_cv = self.classify_front_back(img1_corrected, img2_corrected)
             return (self._force_standard_image(front_cv), self._force_standard_image(back_cv))
 
-    def _force_standard_image(self, img_cv):
-        """强制转为标准卡片图像"""
-        h, w = img_cv.shape[:2]
-        if h > w: img_cv = cv2.rotate(img_cv, cv2.ROTATE_90_CLOCKWISE)
-        img_cv = cv2.resize(img_cv, (1011, 638), interpolation=cv2.INTER_CUBIC)
-        return Image.fromarray(cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB))
+    # ================= 业务线 A：执行合并操作 =================
 
-    def get_standard_card_canvas(self, img_pil):
-        """确保画布底图一致性"""
-        target_w, target_h = 1011, 638
-        img_resized = ImageOps.contain(img_pil, (target_w, target_h), Image.Resampling.LANCZOS)
-        bg = Image.new('RGB', (target_w, target_h), (255, 255, 255))
-        offset_x = (target_w - img_resized.width) // 2
-        offset_y = (target_h - img_resized.height) // 2
-        bg.paste(img_resized, (offset_x, offset_y))
-        return bg
+    def load_and_correct_single_file(self, file_path):
+        with open(file_path, 'rb') as f:
+            img_array = np.frombuffer(f.read(), dtype=np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        if img is None: return None
+        
+        corrected_img = self.perspective_correction(img)
+        return self._force_standard_image(corrected_img)
 
     def process_merge_single_person(self, person_id, output_dir):
         if person_id not in self.all_persons: return False
@@ -351,30 +375,34 @@ class IDCardProcessorApp:
         name = person_info['name']
 
         if 'front' not in person_info or 'back' not in person_info:
-            self.write_log(f"[{person_id} {name}] 略过合并：缺失标准的单面图片", "warning")
+            self.write_log(f"[{person_id}+{name}] 略过合并：缺失标准的单面图片", "warning")
             return False
 
         try:
-            front_pil = Image.open(person_info['front']).convert('RGB')
-            back_pil = Image.open(person_info['back']).convert('RGB')
-
-            bg_front = self.get_standard_card_canvas(front_pil)
-            bg_back = self.get_standard_card_canvas(back_pil)
+            front_pil = self.load_and_correct_single_file(person_info['front'])
+            back_pil = self.load_and_correct_single_file(person_info['back'])
+            
+            if not front_pil or not back_pil:
+                raise ValueError("图片数据读取或提取损坏")
 
             a4_canvas = Image.new('RGB', (2480, 3508), color='white')
             target_w, target_h, vertical_gap = 1011, 638, 150
             start_y = (3508 - (target_h * 2 + vertical_gap)) // 2
             x_offset = (2480 - target_w) // 2
             
-            a4_canvas.paste(bg_front, (x_offset, start_y))
-            a4_canvas.paste(bg_back, (x_offset, start_y + target_h + vertical_gap))
+            a4_canvas.paste(front_pil, (x_offset, start_y))
+            a4_canvas.paste(back_pil, (x_offset, start_y + target_h + vertical_gap))
 
-            a4_canvas.save(os.path.join(output_dir, f"{person_id}{name}身份证（合并页）.jpg"), "JPEG", quality=90)
-            self.write_log(f"[{person_id} {name}] 合并成功", "info")
+            # 【强制命名规范：全加号，无空格】
+            save_name = f"{person_id}+{name}+身份证（合并页）.jpg"
+            a4_canvas.save(os.path.join(output_dir, save_name), "JPEG", quality=95)
+            self.write_log(f"[{person_id}+{name}] 合并成功", "info")
             return True
         except Exception as e:
-            self.write_log(f"[{person_id} {name}] 合并失败: {str(e)}", "error")
+            self.write_log(f"[{person_id}+{name}] 合并失败: {str(e)}", "error")
             return False
+
+    # ================= 业务线 B：执行拆分操作 =================
 
     def confirm_split(self):
         if not self.folder_path:
@@ -403,19 +431,19 @@ class IDCardProcessorApp:
                 front_pil, back_pil = self.extract_cards_from_image(img_array)
 
             if not front_pil or not back_pil:
-                raise ValueError("图像解析失败，未能提取出双面")
+                raise ValueError("图像解析失败，未能提取出主体")
 
-            # 提取出来的已经是严格尺寸，直接存即可
-            front_std = self.get_standard_card_canvas(front_pil)
-            back_std = self.get_standard_card_canvas(back_pil)
+            # 【强制命名规范：全加号，无空格】
+            front_name = f"{person_id}+{name}+身份证（人像面）.jpg"
+            back_name = f"{person_id}+{name}+身份证（国徽面）.jpg"
 
-            front_std.save(os.path.join(output_dir, f"{person_id}{name}身份证（人像面）.jpg"), "JPEG", quality=95)
-            back_std.save(os.path.join(output_dir, f"{person_id}{name}身份证（国徽面）.jpg"), "JPEG", quality=95)
+            front_pil.save(os.path.join(output_dir, front_name), "JPEG", quality=95)
+            back_pil.save(os.path.join(output_dir, back_name), "JPEG", quality=95)
 
-            self.write_log(f"[{person_id} {name}] 严格提取拆分成功", "info")
+            self.write_log(f"[{person_id}+{name}] 严格提取拆分成功", "info")
             return True
         except Exception as e:
-            self.write_log(f"[{person_id} {name}] 拆分失败: {str(e)}", "error")
+            self.write_log(f"[{person_id}+{name}] 拆分失败: {str(e)}", "error")
             return False
 
     def lock_ui(self):
@@ -455,7 +483,6 @@ class IDCardProcessorApp:
 
     def _run_task(self, ids, out_dir, task_type):
         success = 0
-        # 强制单线程
         with ThreadPoolExecutor(max_workers=1) as exe:
             target_func = self.process_merge_single_person if task_type == "合并" else self.process_split_single_person
             futures = {exe.submit(target_func, i, out_dir): i for i in ids}
