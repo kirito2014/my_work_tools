@@ -17,7 +17,7 @@ from datetime import datetime
 class IDCardProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("身份证图片智能处理中枢 (无损高精扣取版)")
+        self.root.title("身份证图片处理工具")
         self.root.geometry("950x700")
         self.root.minsize(900, 650)
 
@@ -369,7 +369,7 @@ class IDCardProcessorApp:
             a4_canvas.paste(bg_front, (x_offset, start_y))
             a4_canvas.paste(bg_back, (x_offset, start_y + target_h + vertical_gap))
 
-            a4_canvas.save(os.path.join(output_dir, f"{person_id} {name} 身份证（合并页）.jpg"), "JPEG", quality=90)
+            a4_canvas.save(os.path.join(output_dir, f"{person_id}{name}身份证（合并页）.jpg"), "JPEG", quality=90)
             self.write_log(f"[{person_id} {name}] 合并成功", "info")
             return True
         except Exception as e:
@@ -409,8 +409,8 @@ class IDCardProcessorApp:
             front_std = self.get_standard_card_canvas(front_pil)
             back_std = self.get_standard_card_canvas(back_pil)
 
-            front_std.save(os.path.join(output_dir, f"{person_id} {name} 身份证（人像面）.jpg"), "JPEG", quality=95)
-            back_std.save(os.path.join(output_dir, f"{person_id} {name} 身份证（国徽面）.jpg"), "JPEG", quality=95)
+            front_std.save(os.path.join(output_dir, f"{person_id}{name}身份证（人像面）.jpg"), "JPEG", quality=95)
+            back_std.save(os.path.join(output_dir, f"{person_id}{name}身份证（国徽面）.jpg"), "JPEG", quality=95)
 
             self.write_log(f"[{person_id} {name}] 严格提取拆分成功", "info")
             return True
