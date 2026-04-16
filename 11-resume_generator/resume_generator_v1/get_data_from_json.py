@@ -12,8 +12,8 @@ class JsonExtractorApp(ThemedTk):
     def __init__(self):
         super().__init__(theme="arc")
         
-        self.title("简历 JSON 数据提取工具")
-        self.geometry("900x650") 
+        self.title("简历信息数据提取工具")
+        self.geometry("950x750") 
         self.configure(padx=20, pady=20)
         
         if getattr(sys, 'frozen', False):
@@ -24,17 +24,19 @@ class JsonExtractorApp(ThemedTk):
         self.current_folder = os.path.join(self.base_dir, "output", "modify_json")
         self.json_files = []
         
-        # 界面显示的中文筛选结构
+        # 界面显示的中文筛选结构（按此顺序导出Excel）
         self.structure = {
             "基本信息": ["工作年限", "毕业时间", "毕业院校", "专业", "最高学历", "部门", "职位", "个人简介"],
             "工作能力": ["业务能力", "资质认证", "培训经历", "技能标签"],
             "附加信息": ["一级部门", "二级部门", "岗位", "职务类别", "专业职级", "公司邮箱", "在职状态", 
                          "入职时间", "首次入职时间", "司龄", "发薪公司", "常驻地", "性别", "出生日期", 
                          "年龄", "政治面貌", "身份证号", "联系电话", "合同法人"],
-            "特殊信息": ["学位", "参加工作时间", "教育经历"]
+            "特殊信息": ["学位", "参加工作时间", "教育_学历类型", "教育_毕业时间", "教育_毕业院校", "教育_专业", "教育_最高学历"],
+            "工作经历": ["工作_开始时间", "工作_结束时间", "工作_公司", "工作_职位", "工作_描述", "工作_时长"],
+            "项目经历": ["项目_开始时间", "项目_结束时间", "项目_名称", "项目_角色", "项目_描述", "项目_时长"]
         }
         
-        # 中文选项到 JSON 英文键的映射字典
+        # 标量字段映射
         self.key_mapping = {
             "工作年限": "WorkYears", "毕业时间": "GraduationTime", "毕业院校": "GraduationSchool", 
             "专业": "Major", "最高学历": "HighestEducation", "部门": "Department", 
@@ -47,27 +49,41 @@ class JsonExtractorApp(ThemedTk):
             "司龄": "CompanyYears", "发薪公司": "PaymentCompany", "常驻地": "BaseLocation", 
             "性别": "Gender", "出生日期": "BirthDate", "年龄": "Age", 
             "政治面貌": "PoliticalStatus", "身份证号": "IDNumber", "联系电话": "PhoneNumber", 
-            "合同法人": "ContractLegalPerson", "学位": "Degree", "参加工作时间": "StartWorkDate", 
-            "教育经历": "EducationList"
+            "合同法人": "ContractLegalPerson", "学位": "Degree", "参加工作时间": "StartWorkDate"
         }
         
-        # EducationList 内部字段的中文映射
-        self.edu_inner_mapping = {
-            "DegreeType": "学历类型", "GraduationTime": "毕业时间", 
-            "GraduationSchool": "毕业院校", "Major": "专业", "HighestEducation": "最高学历"
+        # 列表型字段映射
+        self.list_fields_map = {
+            "教育_学历类型": ("EducationList", "DegreeType"),
+            "教育_毕业时间": ("EducationList", "GraduationTime"),
+            "教育_毕业院校": ("EducationList", "GraduationSchool"),
+            "教育_专业": ("EducationList", "Major"),
+            "教育_最高学历": ("EducationList", "HighestEducation"),
+            
+            "工作_开始时间": ("WorkExperience", "StartTime"),
+            "工作_结束时间": ("WorkExperience", "EndTime"),
+            "工作_公司": ("WorkExperience", "CompanyName"),
+            "工作_职位": ("WorkExperience", "Position"),
+            "工作_描述": ("WorkExperience", "JobDescription"),
+            "工作_时长": ("WorkExperience", "Duration"),
+            
+            "项目_开始时间": ("ProjectExperience", "StartTime"),
+            "项目_结束时间": ("ProjectExperience", "EndTime"),
+            "项目_名称": ("ProjectExperience", "ProjectName"),
+            "项目_角色": ("ProjectExperience", "ProjectRole"),
+            "项目_描述": ("ProjectExperience", "JobDescription"),
+            "项目_时长": ("ProjectExperience", "Duration")
         }
         
         self.check_vars = {}
-        
         self.init_ui()
         self.update_folder(self.current_folder)
 
     def init_ui(self):
-        # --- 目录选择与状态显示区域 ---
         folder_frame = ttk.LabelFrame(self, text=" 目录选择与状态 ")
         folder_frame.pack(fill="x", pady=(0, 15), ipady=10)
         
-        self.path_label = ttk.Label(folder_frame, text="当前路径: 未选择", wraplength=550)
+        self.path_label = ttk.Label(folder_frame, text="当前路径: 未选择", wraplength=600)
         self.path_label.pack(side="left", padx=15, pady=5)
         
         self.count_label = ttk.Label(folder_frame, text="JSON数量: 0", font=("", 10, "bold"), foreground="#0052cc")
@@ -76,8 +92,7 @@ class JsonExtractorApp(ThemedTk):
         btn_select = ttk.Button(folder_frame, text="选择文件夹", command=self.select_folder)
         btn_select.pack(side="right", padx=15, pady=5)
 
-        # --- 数据筛选区域 ---
-        filter_frame = ttk.LabelFrame(self, text=" 数据字段筛选 (人员名称和员工号默认导出) ")
+        filter_frame = ttk.LabelFrame(self, text=" 数据字段筛选 (按分类顺序导出，人员名称和员工号默认居首) ")
         filter_frame.pack(fill="both", expand=True, pady=(0, 15), ipady=5)
         
         style = ttk.Style()
@@ -98,7 +113,6 @@ class JsonExtractorApp(ThemedTk):
         canvas.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         scrollbar.pack(side="right", fill="y")
 
-        # 构建二级筛选框
         for category, items in self.structure.items():
             cat_frame = ttk.Frame(scrollable_frame)
             cat_frame.pack(fill="x", padx=15, pady=8)
@@ -126,11 +140,10 @@ class JsonExtractorApp(ThemedTk):
                 )
                 cb_item.grid(row=row, column=col, sticky="w", padx=(0, 15), pady=3)
                 col += 1
-                if col > 4:
+                if col > 4: 
                     col = 0
                     row += 1
 
-        # --- 操作按钮区域 ---
         btn_frame = ttk.Frame(self)
         btn_frame.pack(fill="x", pady=10)
         
@@ -189,9 +202,24 @@ class JsonExtractorApp(ThemedTk):
             messagebox.showwarning("未选择数据", "请至少选择一个需要提取的数据字段。")
             return
 
+        # 确保列顺序与界面筛选顺序严格一致
+        ordered_fields = []
+        for category, items in self.structure.items():
+            for item in items:
+                if item in fields_to_extract:
+                    ordered_fields.append(item)
+
         parsed_data = []
         
         for file_path in self.json_files:
+            filename = os.path.basename(file_path)
+            
+            # --- 新增功能：从文件名提取姓名 (xxxxx_姓名_人员简历.json) ---
+            name_from_filename = ""
+            parts = filename.split('_')
+            if len(parts) >= 2:
+                name_from_filename = parts[1]
+            
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     raw_content = json.load(f)
@@ -206,58 +234,75 @@ class JsonExtractorApp(ThemedTk):
                 basic_info = person_data.get("BasicInfo", {})
                 add_info = person_data.get("AdditionInfo", {})
                 
-                raw_name = basic_info.get("Name", add_info.get("Name", root_key))
+                # 姓名获取逻辑优先级：文件名 > BasicInfo > AdditionInfo > 根键名
+                raw_name = name_from_filename if name_from_filename else basic_info.get("Name", add_info.get("Name", root_key))
                 raw_emp_no = basic_info.get("EmpNo", add_info.get("EmpNo", ""))
                 
-                # 默认固定字段
-                row_data = {
-                    "人员名称": raw_name,
-                    "员工号": raw_emp_no
-                }
+                # 获取各个经历列表
+                works = person_data.get("WorkExperience", [])
+                projs = person_data.get("ProjectExperience", [])
+                edus = person_data.get("SpecialInfo", {}).get("EducationList", [])
                 
-                for chinese_field in fields_to_extract:
-                    en_key = self.key_mapping.get(chinese_field, chinese_field)
-                    
-                    if en_key == "EducationList":
-                        edu_list = person_data.get("SpecialInfo", {}).get("EducationList", [])
-                        if isinstance(edu_list, list):
-                            for idx, edu_item in enumerate(edu_list, 1):
-                                if isinstance(edu_item, dict):
-                                    for k, val in edu_item.items():
-                                        cn_k = self.edu_inner_mapping.get(k, k)
-                                        row_data[f"教育经历{idx}_{cn_k}"] = val
-                    else:
+                # 计算总行数
+                max_rows = max(1, len(works) if isinstance(works, list) else 0, 
+                                 len(projs) if isinstance(projs, list) else 0, 
+                                 len(edus) if isinstance(edus, list) else 0)
+                
+                # 预提取标量数据
+                scalars = {}
+                for field in ordered_fields:
+                    if field not in self.list_fields_map:
+                        en_key = self.key_mapping.get(field, field)
                         val = self._find_value_in_dict(person_data, en_key)
-                        row_data[chinese_field] = val if val is not None else ""
-                        
-                parsed_data.append(row_data)
+                        scalars[field] = val if val is not None else ""
+
+                # 填充行数据
+                for i in range(max_rows):
+                    row_data = {}
+                    
+                    # 仅在首行显示人员和工号，方便观察多行关系
+                    row_data["人员名称"] = raw_name if i == 0 else ""
+                    row_data["员工号"] = raw_emp_no if i == 0 else ""
+                    
+                    for field in ordered_fields:
+                        if field in self.list_fields_map:
+                            list_type, en_key = self.list_fields_map[field]
+                            if list_type == "WorkExperience" and i < len(works):
+                                row_data[field] = works[i].get(en_key, "")
+                            elif list_type == "ProjectExperience" and i < len(projs):
+                                row_data[field] = projs[i].get(en_key, "")
+                            elif list_type == "EducationList" and i < len(edus):
+                                row_data[field] = edus[i].get(en_key, "")
+                            else:
+                                row_data[field] = ""
+                        else:
+                            row_data[field] = scalars[field] if i == 0 else ""
+                            
+                    parsed_data.append(row_data)
 
         if not parsed_data:
             messagebox.showwarning("提示", "未能成功提取到任何有效数据。")
             return
 
-        # 转换为 DataFrame，这时的列名本身就是用户选择的二级菜单键
         df = pd.DataFrame(parsed_data)
         
         save_dir = os.path.join(self.base_dir, "数据下载")
         os.makedirs(save_dir, exist_ok=True)
         
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        filename = f"已下载_{timestamp}.xlsx"
-        save_path = os.path.join(save_dir, filename)
+        filename_output = f"已下载_{timestamp}.xlsx"
+        save_path = os.path.join(save_dir, filename_output)
 
         try:
-            # 去除多级表头的逻辑，恢复最基础的 to_excel 导出
-            # index=False 表示不写入最左侧的序号，直接写入表头(第1行)和数据(第2行起)
             with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
                 df.to_excel(writer, index=False)
             messagebox.showinfo("保存成功", f"数据已成功保存至:\n{save_path}")
         except Exception as e:
             messagebox.showerror("保存失败", f"导出 Excel 时发生错误:\n{e}")
+
     def _find_value_in_dict(self, data_dict, target_key):
         if target_key in data_dict:
             return data_dict[target_key]
-        
         for key, value in data_dict.items():
             if isinstance(value, dict):
                 result = self._find_value_in_dict(value, target_key)
