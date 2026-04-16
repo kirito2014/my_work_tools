@@ -17,7 +17,7 @@ from datetime import datetime
 class IDCardProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("身份证图片智能处理中枢 (精准命名版)")
+        self.root.title("身份证图片处理工具")
         self.root.geometry("950x700")
         self.root.minsize(900, 650)
 

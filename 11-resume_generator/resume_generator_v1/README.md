@@ -254,7 +254,7 @@ pyinstaller  --onefile --windowed  --console --name "简历生成器" --add-data
 
 
 
-pyinstaller --noconsole --onefile --name "简历数据保存工具"  --hidden-import ttkthemes  --icon "resources/icons/sunline.ico" --add-data "resources/icons/sunline.ico;resources/icons"  .\get_data_from_json.py
+pyinstaller --noconsole --onefile --name "简历数据保存工具"  --hidden-import ttkthemes  --icon "resources/icons/sunline.ico" --add-data "resources/icons/sunline.ico;resources/icons"  --version-file version_info.txt .\get_data_from_json.py
 
 
-pyinstaller --noconsole --onefile --name "身份证图片处理工具"  --hidden-import ttkthemes  --icon "resources/icons/sunline.ico" --add-data "resources/icons/sunline.ico;resources/icons"  .\id_card_merger.py
+pyinstaller --noconsole --onefile --name "身份证图片处理工具"  --hidden-import ttkthemes  --icon "resources/icons/sunline.ico" --add-data "resources/icons/sunline.ico;resources/icons"  --version-file version_info.txt .\id_card_merger.py
