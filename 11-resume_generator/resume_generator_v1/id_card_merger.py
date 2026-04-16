@@ -14,10 +14,16 @@ from PIL import Image, ImageOps
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
+# 尝试导入 Word 处理库
+try:
+    import docx
+except ImportError:
+    docx = None
+
 class IDCardProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("身份证图片处理工具")
+        self.root.title("身份证图片智能处理中枢 (抗干扰旗舰版)")
         self.root.geometry("950x700")
         self.root.minsize(900, 650)
 
@@ -51,7 +57,7 @@ class IDCardProcessorApp:
         main_frame = ttk.Frame(self.root, padding=20)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        folder_frame = ttk.LabelFrame(main_frame, text="第一步：选择包含身份证(图片/PDF)的文件夹", padding=15)
+        folder_frame = ttk.LabelFrame(main_frame, text="第一步：选择包含身份证(图片/PDF/Word)的文件夹", padding=15)
         folder_frame.pack(fill=tk.X, pady=(0, 15))
 
         self.btn_select_folder = ttk.Button(folder_frame, text="浏览文件夹...", command=self.select_folder)
@@ -118,14 +124,13 @@ class IDCardProcessorApp:
         self.all_persons.clear()
         if not os.path.exists(self.folder_path): return
 
-        # 兼容读取带空格或加号的输入文件
+        # 匹配逻辑兼容后缀，包括 docx
         pattern = re.compile(r'^(\d{5})[\s\+]*(.*?)[\s\+]*(?:身份证|合并).*?\.([a-zA-Z0-9]+)$', re.IGNORECASE)
 
         for filename in os.listdir(self.folder_path):
             match = pattern.match(filename)
             if match:
                 person_id = match.group(1)
-                # 【严格过滤】：提取名称时，去除左右两边和中间的所有空格、加号，确保名字本身纯净
                 name = match.group(2).strip().replace(" ", "").replace("+", "")
                 full_path = os.path.join(self.folder_path, filename)
 
@@ -158,7 +163,7 @@ class IDCardProcessorApp:
         except Exception as e:
             self.write_log(f"名单解析失败: {str(e)}", "error")
 
-    # ------------------- 二次深度矫正视觉中枢 -------------------
+    # ------------------- 视觉处理与智能识别中枢 -------------------
 
     def order_points(self, pts):
         rect = np.zeros((4, 2), dtype="float32")
@@ -196,7 +201,7 @@ class IDCardProcessorApp:
         return warped
 
     def perspective_correction(self, img):
-        """二次深度矫正引擎"""
+        """二次深度矫正引擎 (剥离杂乱拍摄背景)"""
         h, w = img.shape[:2]
         if h < 50 or w < 50: return img
 
@@ -239,24 +244,68 @@ class IDCardProcessorApp:
             
         return img 
 
+    def classify_front_back(self, img1, img2):
+        """
+        【抗干扰判定核心】：人脸面积绝对权重制 + 空间色相隔离法
+        """
+        if self.face_cascade.empty(): return img1, img2
+
+        def get_face_score(img):
+            """返回识别到的人脸最大面积，作为置信度打分"""
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            faces = self.face_cascade.detectMultiScale(gray, 1.1, 4, minSize=(30, 30))
+            if len(faces) > 0:
+                return max([w*h for (x, y, w, h) in faces])
+            # 激进扫描 (应对压缩模糊图)
+            faces = self.face_cascade.detectMultiScale(gray, 1.05, 2, minSize=(20, 20))
+            if len(faces) > 0:
+                # 降低激进扫描的得分权重
+                return max([w*h for (x, y, w, h) in faces]) * 0.5
+            return 0
+
+        def get_top_left_red_score(image):
+            """
+            空间色相法：【仅】扫描图片的左上角 (国徽固定位置)。
+            由于人物衣服都在中下部或右侧，此举完美隔离红衣服干扰。
+            """
+            h, w = image.shape[:2]
+            # 切割出左上角 1/4 区域
+            top_left_roi = image[0:h//2, 0:w//2]
+            hsv = cv2.cvtColor(top_left_roi, cv2.COLOR_BGR2HSV)
+            # 提取红色
+            mask1 = cv2.inRange(hsv, np.array([0, 50, 50]), np.array([10, 255, 255]))
+            mask2 = cv2.inRange(hsv, np.array([170, 50, 50]), np.array([180, 255, 255]))
+            return cv2.countNonZero(mask1 + mask2)
+
+        try:
+            face_score1 = get_face_score(img1)
+            face_score2 = get_face_score(img2)
+
+            # 权重1：人脸优先。哪怕有背景噪点误识别，真人脸的面积必定更大
+            if face_score1 > 0 or face_score2 > 0:
+                if face_score1 > face_score2:
+                    return img1, img2
+                else:
+                    return img2, img1
+
+            # 权重2：人脸彻底识别失败时，采用规避衣服的空间色相法
+            red1 = get_top_left_red_score(img1)
+            red2 = get_top_left_red_score(img2)
+
+            # 红色多的那张就是国徽面(放在后面)
+            if red2 > red1:
+                return img1, img2
+            elif red1 > red2:
+                return img2, img1
+                
+        except Exception: pass 
+        return img1, img2
+
     def _force_standard_image(self, img_cv):
         h, w = img_cv.shape[:2]
         if h > w: img_cv = cv2.rotate(img_cv, cv2.ROTATE_90_CLOCKWISE)
         img_cv = cv2.resize(img_cv, (1011, 638), interpolation=cv2.INTER_CUBIC)
         return Image.fromarray(cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB))
-
-    def classify_front_back(self, img1, img2):
-        if self.face_cascade.empty(): return img1, img2
-        try:
-            gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
-            faces1 = self.face_cascade.detectMultiScale(gray1, 1.1, 3, minSize=(30, 30))
-            if len(faces1) > 0: return img1, img2
-            
-            gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
-            faces2 = self.face_cascade.detectMultiScale(gray2, 1.1, 3, minSize=(30, 30))
-            if len(faces2) > 0: return img2, img1
-        except Exception: pass 
-        return img1, img2
 
     def extract_cards_from_image(self, img_array):
         img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
@@ -358,6 +407,42 @@ class IDCardProcessorApp:
             front_cv, back_cv = self.classify_front_back(img1_corrected, img2_corrected)
             return (self._force_standard_image(front_cv), self._force_standard_image(back_cv))
 
+    def process_docx_to_images(self, docx_path):
+        """处理 Word (.docx) 文件，无损提取内部图片"""
+        if docx is None:
+            raise ImportError("系统中未安装 python-docx 库，请先在终端运行：pip install python-docx")
+            
+        try:
+            doc = docx.Document(docx_path)
+        except Exception as e:
+            raise ValueError(f"Word文件读取失败: {str(e)}")
+
+        images = []
+        for rel in doc.part.rels.values():
+            if "image" in rel.target_ref:
+                image_data = rel.target_part.blob
+                img_array = np.frombuffer(image_data, dtype=np.uint8)
+                
+                temp_img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                if temp_img is not None and temp_img.shape[0] > 100 and temp_img.shape[1] > 100:
+                    images.append(img_array)
+
+        if len(images) == 0:
+            return None, None
+        elif len(images) == 1:
+            return self.extract_cards_from_image(images[0])
+        else:
+            img1 = cv2.imdecode(images[0], cv2.IMREAD_COLOR)
+            img2 = cv2.imdecode(images[1], cv2.IMREAD_COLOR)
+            if img1 is None or img2 is None: return None, None
+            
+            img1_corrected = self.perspective_correction(img1)
+            img2_corrected = self.perspective_correction(img2)
+            
+            front_cv, back_cv = self.classify_front_back(img1_corrected, img2_corrected)
+            return (self._force_standard_image(front_cv), self._force_standard_image(back_cv))
+
+
     # ================= 业务线 A：执行合并操作 =================
 
     def load_and_correct_single_file(self, file_path):
@@ -393,13 +478,12 @@ class IDCardProcessorApp:
             a4_canvas.paste(front_pil, (x_offset, start_y))
             a4_canvas.paste(back_pil, (x_offset, start_y + target_h + vertical_gap))
 
-            # 【强制命名规范：全加号，无空格】
             save_name = f"{person_id}+{name}+身份证（合并页）.jpg"
             a4_canvas.save(os.path.join(output_dir, save_name), "JPEG", quality=95)
             self.write_log(f"[{person_id}+{name}] 合并成功", "info")
             return True
         except Exception as e:
-            self.write_log(f"[{person_id}+{name}] 合并失败: {str(e)}", "error")
+            self.write_log(f"[{person_id}+{name}] 合合并失败: {str(e)}", "error")
             return False
 
     # ================= 业务线 B：执行拆分操作 =================
@@ -425,15 +509,16 @@ class IDCardProcessorApp:
 
             if mixed_path.lower().endswith('.pdf'):
                 front_pil, back_pil = self.process_pdf_to_images(mixed_path)
+            elif mixed_path.lower().endswith('.docx'):
+                front_pil, back_pil = self.process_docx_to_images(mixed_path)
             else:
                 with open(mixed_path, 'rb') as f:
                     img_array = np.frombuffer(f.read(), dtype=np.uint8)
                 front_pil, back_pil = self.extract_cards_from_image(img_array)
 
             if not front_pil or not back_pil:
-                raise ValueError("图像解析失败，未能提取出主体")
+                raise ValueError("图像解析失败，未能提取出主体或不支持的文件格式")
 
-            # 【强制命名规范：全加号，无空格】
             front_name = f"{person_id}+{name}+身份证（人像面）.jpg"
             back_name = f"{person_id}+{name}+身份证（国徽面）.jpg"
 
