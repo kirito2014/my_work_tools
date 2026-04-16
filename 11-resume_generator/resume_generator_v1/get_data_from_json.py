@@ -7,12 +7,13 @@ from tkinter import ttk, filedialog, messagebox
 from ttkthemes import ThemedTk
 import pandas as pd
 from datetime import datetime
+from openpyxl.styles import PatternFill, Font  # 新增：用于处理 Excel 单元格样式
 
 class JsonExtractorApp(ThemedTk):
     def __init__(self):
         super().__init__(theme="arc")
         
-        self.title("简历信息数据提取工具")
+        self.title("简历 JSON 数据提取工具")
         self.geometry("950x750") 
         self.configure(padx=20, pady=20)
         
@@ -34,6 +35,17 @@ class JsonExtractorApp(ThemedTk):
             "特殊信息": ["学位", "参加工作时间", "教育_学历类型", "教育_毕业时间", "教育_毕业院校", "教育_专业", "教育_最高学历"],
             "工作经历": ["工作_开始时间", "工作_结束时间", "工作_公司", "工作_职位", "工作_描述", "工作_时长"],
             "项目经历": ["项目_开始时间", "项目_结束时间", "项目_名称", "项目_角色", "项目_描述", "项目_时长"]
+        }
+        
+        # 分类对应的表头颜色映射 (HEX 颜色码)
+        self.category_colors = {
+            "主键": "607D8B",      # 蓝灰色 (人员名称、员工号)
+            "基本信息": "4CAF50",  # 绿色
+            "工作能力": "2196F3",  # 蓝色
+            "附加信息": "9C27B0",  # 紫色
+            "特殊信息": "FF9800",  # 橙色
+            "工作经历": "009688",  # 蓝绿色 (Teal)
+            "项目经历": "E91E63"   # 玫红色 (Pink)
         }
         
         # 标量字段映射
@@ -202,19 +214,25 @@ class JsonExtractorApp(ThemedTk):
             messagebox.showwarning("未选择数据", "请至少选择一个需要提取的数据字段。")
             return
 
-        # 确保列顺序与界面筛选顺序严格一致
         ordered_fields = []
+        # 构建字段到分类的反向映射字典，用于后续渲染表头颜色
+        field_to_category = {"人员名称": "主键", "员工号": "主键"}
+        
         for category, items in self.structure.items():
             for item in items:
+                field_to_category[item] = category
                 if item in fields_to_extract:
                     ordered_fields.append(item)
+
+        need_work = any(field.startswith("工作_") for field in ordered_fields)
+        need_proj = any(field.startswith("项目_") for field in ordered_fields)
+        need_edu = any(field.startswith("教育_") for field in ordered_fields)
 
         parsed_data = []
         
         for file_path in self.json_files:
             filename = os.path.basename(file_path)
             
-            # --- 新增功能：从文件名提取姓名 (xxxxx_姓名_人员简历.json) ---
             name_from_filename = ""
             parts = filename.split('_')
             if len(parts) >= 2:
@@ -234,21 +252,17 @@ class JsonExtractorApp(ThemedTk):
                 basic_info = person_data.get("BasicInfo", {})
                 add_info = person_data.get("AdditionInfo", {})
                 
-                # 姓名获取逻辑优先级：文件名 > BasicInfo > AdditionInfo > 根键名
                 raw_name = name_from_filename if name_from_filename else basic_info.get("Name", add_info.get("Name", root_key))
                 raw_emp_no = basic_info.get("EmpNo", add_info.get("EmpNo", ""))
                 
-                # 获取各个经历列表
-                works = person_data.get("WorkExperience", [])
-                projs = person_data.get("ProjectExperience", [])
-                edus = person_data.get("SpecialInfo", {}).get("EducationList", [])
+                works = person_data.get("WorkExperience", []) if need_work else []
+                projs = person_data.get("ProjectExperience", []) if need_proj else []
+                edus = person_data.get("SpecialInfo", {}).get("EducationList", []) if need_edu else []
                 
-                # 计算总行数
                 max_rows = max(1, len(works) if isinstance(works, list) else 0, 
                                  len(projs) if isinstance(projs, list) else 0, 
                                  len(edus) if isinstance(edus, list) else 0)
                 
-                # 预提取标量数据
                 scalars = {}
                 for field in ordered_fields:
                     if field not in self.list_fields_map:
@@ -256,11 +270,8 @@ class JsonExtractorApp(ThemedTk):
                         val = self._find_value_in_dict(person_data, en_key)
                         scalars[field] = val if val is not None else ""
 
-                # 填充行数据
                 for i in range(max_rows):
                     row_data = {}
-                    
-                    # 仅在首行显示人员和工号，方便观察多行关系
                     row_data["人员名称"] = raw_name if i == 0 else ""
                     row_data["员工号"] = raw_emp_no if i == 0 else ""
                     
@@ -295,8 +306,32 @@ class JsonExtractorApp(ThemedTk):
 
         try:
             with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
+                # 1. 写入数据
                 df.to_excel(writer, index=False)
-            messagebox.showinfo("保存成功", f"数据已成功保存至:\n{save_path}")
+                
+                # 2. 获取当前 Worksheet
+                worksheet = writer.sheets['Sheet1']
+                
+                # 定义统一的白色加粗字体
+                white_bold_font = Font(color="FFFFFF", bold=True)
+                
+                # 3. 遍历第一行（表头），根据分类涂上对应的颜色
+                # openpyxl 的列索引是从 1 开始的
+                for col_idx, col_name in enumerate(df.columns, 1):
+                    # 获取该字段所属的分类
+                    category = field_to_category.get(col_name, "主键")
+                    # 获取分类对应的 Hex 颜色码
+                    hex_color = self.category_colors.get(category, "000000")
+                    
+                    # 生成填充样式
+                    fill = PatternFill(start_color=hex_color, end_color=hex_color, fill_type="solid")
+                    
+                    # 赋予单元格样式
+                    cell = worksheet.cell(row=1, column=col_idx)
+                    cell.fill = fill
+                    cell.font = white_bold_font
+                    
+            messagebox.showinfo("保存成功", f"数据已成功保存且已应用多彩表头至:\n{save_path}")
         except Exception as e:
             messagebox.showerror("保存失败", f"导出 Excel 时发生错误:\n{e}")
 
