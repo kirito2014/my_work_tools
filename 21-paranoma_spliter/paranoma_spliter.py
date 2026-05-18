@@ -12,19 +12,72 @@ except ImportError:
     ThemedTk = None
 
 
+class ScrollableFrame(ttk.Frame):
+    def __init__(self, parent, width=340):
+        super().__init__(parent)
+
+        self.canvas = tk.Canvas(
+            self,
+            borderwidth=0,
+            highlightthickness=0,
+            width=width,
+            bg="#f5f6f7",
+        )
+        self.scrollbar = ttk.Scrollbar(
+            self,
+            orient="vertical",
+            command=self.canvas.yview,
+        )
+
+        self.inner = ttk.Frame(self.canvas)
+        self.inner_id = self.canvas.create_window(
+            (0, 0),
+            window=self.inner,
+            anchor="nw",
+        )
+
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.inner.bind("<Configure>", self._on_inner_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
+
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel_windows)
+        self.canvas.bind_all("<Button-4>", self._on_mousewheel_linux)
+        self.canvas.bind_all("<Button-5>", self._on_mousewheel_linux)
+
+    def _on_inner_configure(self, event=None):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event):
+        self.canvas.itemconfigure(self.inner_id, width=event.width)
+
+    def _on_mousewheel_windows(self, event):
+        if self.winfo_containing(event.x_root, event.y_root) is None:
+            return
+        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def _on_mousewheel_linux(self, event):
+        if self.winfo_containing(event.x_root, event.y_root) is None:
+            return
+        if event.num == 4:
+            self.canvas.yview_scroll(-1, "units")
+        elif event.num == 5:
+            self.canvas.yview_scroll(1, "units")
+
+
 class PanoramaSplitterApp:
     def __init__(self, root):
         self.root = root
         self.root.title("全景图片无损切分工具")
-        self.root.geometry("1200x780")
-        self.root.minsize(1000, 680)
 
         self.font_family = "Microsoft YaHei"
         self.round_radius = 18
 
         self.image_path = None
         self.original_image = None
-        self.preview_image = None
         self.preview_tk = None
 
         self.canvas_image_id = None
@@ -36,6 +89,7 @@ class PanoramaSplitterApp:
 
         self.ratio_presets = {
             "9:16": (9, 16),
+            "1:2": (1, 2),
             "3:4": (3, 4),
             "2:3": (2, 3),
             "1:1": (1, 1),
@@ -55,10 +109,28 @@ class PanoramaSplitterApp:
 
         self.status_var = tk.StringVar(value="请选择一张全景图片")
         self.info_var = tk.StringVar(value="")
+        self.loading_var = tk.StringVar(value="")
 
+        self._setup_window_size()
         self._setup_style()
         self._build_ui()
         self._bind_events()
+
+    def _setup_window_size(self):
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+
+        win_w = int(screen_w * 0.82)
+        win_h = int(screen_h * 0.82)
+
+        win_w = max(1040, min(win_w, 1480))
+        win_h = max(680, min(win_h, 920))
+
+        x = max(0, (screen_w - win_w) // 2)
+        y = max(0, (screen_h - win_h) // 2)
+
+        self.root.geometry(f"{win_w}x{win_h}+{x}+{y}")
+        self.root.minsize(960, 620)
 
     def _setup_style(self):
         self.root.option_add("*Font", f"{{{self.font_family}}} 10")
@@ -80,6 +152,9 @@ class PanoramaSplitterApp:
         style.configure("TLabelframe.Label", font=(self.font_family, 10, "bold"))
         style.configure("Header.TLabel", font=(self.font_family, 12, "bold"))
         style.configure("Hint.TLabel", font=(self.font_family, 9), foreground="#666666")
+        style.configure("Tip.TLabel", font=(self.font_family, 9), foreground="#4d6f91")
+        style.configure("Warning.TLabel", font=(self.font_family, 9), foreground="#a05a2c")
+        style.configure("Loading.TLabel", font=(self.font_family, 11, "bold"), foreground="#3f6ea5")
         style.configure("Primary.TButton", font=(self.font_family, 11, "bold"), padding=(10, 8))
 
     def _build_ui(self):
@@ -89,9 +164,10 @@ class PanoramaSplitterApp:
         left = ttk.Frame(main)
         left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        right = ttk.Frame(main, width=330)
-        right.pack(side=tk.RIGHT, fill=tk.Y, padx=(14, 0))
-        right.pack_propagate(False)
+        right_scroll = ScrollableFrame(main, width=350)
+        right_scroll.pack(side=tk.RIGHT, fill=tk.Y, padx=(14, 0))
+
+        right = right_scroll.inner
 
         preview_frame = ttk.LabelFrame(left, text="图片预览", padding=10)
         preview_frame.pack(fill=tk.BOTH, expand=True)
@@ -112,23 +188,33 @@ class PanoramaSplitterApp:
         ttk.Label(bottom_bar, textvariable=self.info_var).pack(side=tk.RIGHT, anchor=tk.E)
 
         title = ttk.Label(right, text="全景图片切分", style="Header.TLabel")
-        title.pack(anchor=tk.W, pady=(0, 10))
+        title.pack(anchor=tk.W, pady=(0, 10), padx=(2, 10))
 
-        ttk.Button(right, text="选择全景图片", command=self.open_image, style="Primary.TButton").pack(
-            fill=tk.X, pady=(0, 12)
+        ttk.Button(
+            right,
+            text="选择全景图片",
+            command=self.open_image,
+            style="Primary.TButton",
+        ).pack(fill=tk.X, pady=(0, 10), padx=(2, 10))
+
+        self.loading_label = ttk.Label(
+            right,
+            textvariable=self.loading_var,
+            style="Loading.TLabel",
         )
+        self.loading_label.pack(anchor=tk.W, pady=(0, 8), padx=(2, 10))
 
         file_box = ttk.LabelFrame(right, text="图片信息", padding=10)
-        file_box.pack(fill=tk.X, pady=(0, 12))
+        file_box.pack(fill=tk.X, pady=(0, 12), padx=(2, 10))
 
-        self.file_label = ttk.Label(file_box, text="未选择图片", wraplength=290)
+        self.file_label = ttk.Label(file_box, text="未选择图片", wraplength=300)
         self.file_label.pack(anchor=tk.W)
 
         self.size_label = ttk.Label(file_box, text="")
         self.size_label.pack(anchor=tk.W, pady=(6, 0))
 
         ratio_box = ttk.LabelFrame(right, text="切分比例", padding=10)
-        ratio_box.pack(fill=tk.X, pady=(0, 12))
+        ratio_box.pack(fill=tk.X, pady=(0, 12), padx=(2, 10))
 
         self.ratio_combo = ttk.Combobox(
             ratio_box,
@@ -138,6 +224,17 @@ class PanoramaSplitterApp:
             font=(self.font_family, 10),
         )
         self.ratio_combo.pack(fill=tk.X)
+
+        tip_text = (
+            "平台建议：小红书推荐 9:16；抖音推荐 1:2。\n"
+            "轮播图常用 3:4、4:5；横图展示可用 16:9。"
+        )
+        ttk.Label(
+            ratio_box,
+            text=tip_text,
+            style="Tip.TLabel",
+            wraplength=300,
+        ).pack(anchor=tk.W, pady=(8, 0))
 
         custom_frame = ttk.Frame(ratio_box)
         custom_frame.pack(fill=tk.X, pady=(8, 0))
@@ -169,7 +266,7 @@ class PanoramaSplitterApp:
         self.custom_h_spin.pack(side=tk.LEFT)
 
         count_box = ttk.LabelFrame(right, text="切分数量", padding=10)
-        count_box.pack(fill=tk.X, pady=(0, 12))
+        count_box.pack(fill=tk.X, pady=(0, 12), padx=(2, 10))
 
         count_row = ttk.Frame(count_box)
         count_row.pack(fill=tk.X)
@@ -195,7 +292,7 @@ class PanoramaSplitterApp:
         self.count_hint_label.pack(anchor=tk.W, pady=(8, 0))
 
         mode_box = ttk.LabelFrame(right, text="裁切模式", padding=10)
-        mode_box.pack(fill=tk.X, pady=(0, 12))
+        mode_box.pack(fill=tk.X, pady=(0, 12), padx=(2, 10))
 
         ttk.Radiobutton(
             mode_box,
@@ -213,8 +310,15 @@ class PanoramaSplitterApp:
             command=self.on_setting_changed,
         ).pack(anchor=tk.W, pady=(6, 0))
 
+        ttk.Label(
+            mode_box,
+            text="固定高度适合完整保留上下内容；智能铺满适合尽量保留横向全景。",
+            style="Hint.TLabel",
+            wraplength=300,
+        ).pack(anchor=tk.W, pady=(8, 0))
+
         output_box = ttk.LabelFrame(right, text="输出设置", padding=10)
-        output_box.pack(fill=tk.X, pady=(0, 12))
+        output_box.pack(fill=tk.X, pady=(0, 12), padx=(2, 10))
 
         ttk.Label(output_box, text="输出格式：").pack(anchor=tk.W)
 
@@ -247,12 +351,12 @@ class PanoramaSplitterApp:
             "PNG 输出不会产生 JPEG 二次压缩损失。\n"
             "JPEG 原图若继续保存为 JPEG，会重新编码。"
         )
-        ttk.Label(output_box, text=note, style="Hint.TLabel", wraplength=290).pack(
+        ttk.Label(output_box, text=note, style="Hint.TLabel", wraplength=300).pack(
             anchor=tk.W, pady=(8, 0)
         )
 
-        action_box = ttk.Frame(right)
-        action_box.pack(fill=tk.X, pady=(4, 0))
+        action_box = ttk.LabelFrame(right, text="操作", padding=10)
+        action_box.pack(fill=tk.X, pady=(0, 14), padx=(2, 10))
 
         ttk.Button(
             action_box,
@@ -267,12 +371,30 @@ class PanoramaSplitterApp:
             command=self.open_output_folder,
         ).pack(fill=tk.X, pady=(8, 0))
 
+        ttk.Label(
+            action_box,
+            text="窗口较小时，右侧面板可滚动查看全部选项。",
+            style="Warning.TLabel",
+            wraplength=300,
+        ).pack(anchor=tk.W, pady=(8, 0))
+
     def _bind_events(self):
         self.canvas.bind("<Configure>", lambda event: self.refresh_preview())
         self.ratio_combo.bind("<<ComboboxSelected>>", lambda event: self.on_setting_changed())
         self.custom_w_spin.bind("<KeyRelease>", lambda event: self.on_setting_changed())
         self.custom_h_spin.bind("<KeyRelease>", lambda event: self.on_setting_changed())
         self.count_spin.bind("<KeyRelease>", lambda event: self.on_count_changed())
+
+    def set_loading(self, is_loading, text=""):
+        if is_loading:
+            self.loading_var.set(text or "图片加载中，请稍候...")
+            self.status_var.set(text or "图片加载中，请稍候...")
+            self.root.configure(cursor="watch")
+            self.root.update_idletasks()
+        else:
+            self.loading_var.set("")
+            self.root.configure(cursor="")
+            self.root.update_idletasks()
 
     def open_image(self):
         path = filedialog.askopenfilename(
@@ -286,9 +408,14 @@ class PanoramaSplitterApp:
         if not path:
             return
 
+        self.set_loading(True, "图片加载中，请稍候...")
+        self.root.after(120, lambda: self.load_image_from_path(path))
+
+    def load_image_from_path(self, path):
         try:
             img = Image.open(path)
             img = ImageOps.exif_transpose(img)
+            img.load()
 
             if img.mode not in ("RGB", "RGBA"):
                 img = img.convert("RGB")
@@ -306,6 +433,9 @@ class PanoramaSplitterApp:
 
         except Exception as exc:
             messagebox.showerror("打开失败", f"无法打开图片：\n{exc}")
+            self.status_var.set("图片加载失败")
+        finally:
+            self.set_loading(False)
 
     def get_ratio(self):
         key = self.ratio_var.get()
@@ -513,17 +643,24 @@ class PanoramaSplitterApp:
 
             self.canvas.create_text(
                 w // 2,
-                h // 2 - 16,
+                h // 2 - 38,
                 text="请选择一张全景图片",
                 fill="#6f7c86",
                 font=(self.font_family, 18, "bold"),
             )
             self.canvas.create_text(
                 w // 2,
-                h // 2 + 18,
+                h // 2,
                 text="支持 JPG / PNG / WEBP / BMP / TIFF",
                 fill="#8a969f",
                 font=(self.font_family, 10),
+            )
+            self.canvas.create_text(
+                w // 2,
+                h // 2 + 30,
+                text="小红书推荐 9:16 ｜ 抖音推荐 1:2",
+                fill="#5f7f52",
+                font=(self.font_family, 10, "bold"),
             )
             return
 
@@ -612,26 +749,16 @@ class PanoramaSplitterApp:
             y1,
             x2 - radius,
             y1,
-            x2 - radius,
-            y1,
             x2,
             y1,
             x2,
             y1 + radius,
-            x2,
-            y1 + radius,
-            x2,
-            y2 - radius,
             x2,
             y2 - radius,
             x2,
             y2,
             x2 - radius,
             y2,
-            x2 - radius,
-            y2,
-            x1 + radius,
-            y2,
             x1 + radius,
             y2,
             x1,
@@ -639,14 +766,8 @@ class PanoramaSplitterApp:
             x1,
             y2 - radius,
             x1,
-            y2 - radius,
-            x1,
             y1 + radius,
             x1,
-            y1 + radius,
-            x1,
-            y1,
-            x1 + radius,
             y1,
         ]
 
@@ -757,6 +878,8 @@ class PanoramaSplitterApp:
         output_dir = self.get_output_dir()
 
         try:
+            self.set_loading(True, "正在切分并保存图片...")
+
             output_dir.mkdir(parents=True, exist_ok=True)
 
             fmt, ext = self.get_output_format()
@@ -798,6 +921,9 @@ class PanoramaSplitterApp:
 
         except Exception as exc:
             messagebox.showerror("保存失败", f"切分保存时发生错误：\n{exc}")
+            self.status_var.set("切分保存失败")
+        finally:
+            self.set_loading(False)
 
     def open_output_folder(self):
         output_dir = self.get_output_dir()
