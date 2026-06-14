@@ -43,6 +43,27 @@
 | 证书 | Certification | {{WorkAbility.Certification}} | 员工获得的证书 |
 | 培训经历 | Training | {{WorkAbility.Training}} | 员工培训经历 |
 | 技能标签 | SkillTag | {{WorkAbility.SkillTag}} | 员工技能标签 |
+| 籍贯 | NativePlace | {{AdditionInfo.NativePlace}} | 员工籍贯信息 |相关附件信息 |
+
+## 使用说明
+
+### 1. 环境准备
+
+确保安装了以下Python库：
+
+- `python-docx`
+- `openpyxl`
+- `pandas`
+- `tkinter`
+- `PyMuPDF`
+
+### 2. 运行
+
+#### 2.1 图形用户界面
+
+运行 `resume_gui.py` 脚本，启动图形用户界面。
+
+#### 2.2 命令行界面
 
 ## 主要脚本说明
 

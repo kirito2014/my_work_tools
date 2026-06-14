@@ -81,6 +81,7 @@
 | PoliticalStatus | pol | 政治面貌 |
 | IDNumber | id | 身份证号 |
 | PhoneNumber | phone | 电话号码 |
+| NativePlace | plc | 籍贯 |
 | GraduationTime | grad | 毕业时间 |
 | GraduationSchool | school | 毕业学校 |
 | HighestEducation | edu | 最高学历 |

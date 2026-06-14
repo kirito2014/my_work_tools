@@ -123,6 +123,7 @@
 | FirstEntryDate | first | 首次入职日期 | `{{ AdditionInfo.FirstEntryDate }}` | `{{ ai.first }}` | - |
 | EmploymentStatus | status | 在职状态 | `{{ AdditionInfo.EmploymentStatus }}` | `{{ ai.status }}` | - |
 | Position | pos | 职位 | `{{ AdditionInfo.Position }}` | `{{ ai.pos }}` | - |
+| NativePlace | plc | 籍贯 | `{{ AdditionInfo.NativePlace }}` | `{{ ai.plc }}` | - |
 
 ---
 

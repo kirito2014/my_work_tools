@@ -67,6 +67,7 @@ KEY_MAPPINGS = {
     'Age': 'age',
     'PoliticalStatus': 'pol',
     'IDNumber': 'id',
+    'NativePlace': 'plc',
     'PhoneNumber': 'phone',
     'GraduationTime': 'grad',
     'GraduationSchool': 'school',
