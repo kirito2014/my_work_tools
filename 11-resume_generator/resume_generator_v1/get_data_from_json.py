@@ -7,7 +7,7 @@ from tkinter import ttk, filedialog, messagebox
 from ttkthemes import ThemedTk
 import pandas as pd
 from datetime import datetime
-from openpyxl.styles import PatternFill, Font  # 新增：用于处理 Excel 单元格样式
+from openpyxl.styles import PatternFill, Font, Alignment  # 新增：用于处理 Excel 单元格样式
 
 class JsonExtractorApp(ThemedTk):
     def __init__(self):
@@ -229,6 +229,15 @@ class JsonExtractorApp(ThemedTk):
         need_proj = any(field.startswith("项目_") for field in ordered_fields)
         need_edu = any(field.startswith("教育_") for field in ordered_fields)
 
+        # 只要勾选了工作经历/项目经历中的任意字段，就自动生成对应的"完整记录汇总列"，
+        # 汇总列固定包含 开始-结束时间/公司(或项目名)/职位(或角色)/描述 四项内容，不受具体勾选字段影响
+        WORK_SUMMARY_COL = "工作经历汇总"
+        PROJ_SUMMARY_COL = "项目经历汇总"
+        if need_work:
+            field_to_category[WORK_SUMMARY_COL] = "工作经历"
+        if need_proj:
+            field_to_category[PROJ_SUMMARY_COL] = "项目经历"
+
         parsed_data = []
         
         for file_path in self.json_files:
@@ -271,6 +280,18 @@ class JsonExtractorApp(ThemedTk):
                         val = self._find_value_in_dict(person_data, en_key)
                         scalars[field] = val if val is not None else ""
 
+                # 生成工作经历/项目经历的完整拼接汇总文本（固定格式，与具体勾选字段无关）
+                work_summary_text = ""
+                if need_work and isinstance(works, list) and works:
+                    work_summary_text = self._build_summary_text(
+                        works, "StartTime", "EndTime", "CompanyName", "Position", "JobDescription"
+                    )
+                proj_summary_text = ""
+                if need_proj and isinstance(projs, list) and projs:
+                    proj_summary_text = self._build_summary_text(
+                        projs, "StartTime", "EndTime", "ProjectName", "ProjectRole", "JobDescription"
+                    )
+
                 for i in range(max_rows):
                     row_data = {}
                     row_data["人员名称"] = raw_name if i == 0 else ""
@@ -289,7 +310,12 @@ class JsonExtractorApp(ThemedTk):
                                 row_data[field] = ""
                         else:
                             row_data[field] = scalars[field] if i == 0 else ""
-                            
+
+                    if need_work:
+                        row_data[WORK_SUMMARY_COL] = work_summary_text if i == 0 else ""
+                    if need_proj:
+                        row_data[PROJ_SUMMARY_COL] = proj_summary_text if i == 0 else ""
+
                     parsed_data.append(row_data)
 
         if not parsed_data:
@@ -331,10 +357,42 @@ class JsonExtractorApp(ThemedTk):
                     cell = worksheet.cell(row=1, column=col_idx)
                     cell.fill = fill
                     cell.font = white_bold_font
-                    
+
+                    # 4. 汇总列（工作经历汇总 / 项目经历汇总）内容含多行文本，设置自动换行与较宽列宽
+                    if col_name in (WORK_SUMMARY_COL, PROJ_SUMMARY_COL):
+                        col_letter = worksheet.cell(row=1, column=col_idx).column_letter
+                        worksheet.column_dimensions[col_letter].width = 60
+                        for r in range(1, worksheet.max_row + 1):
+                            worksheet.cell(row=r, column=col_idx).alignment = Alignment(
+                                wrap_text=True, vertical="top"
+                            )
+
             messagebox.showinfo("保存成功", f"数据已成功保存且已应用多彩表头至:\n{save_path}")
         except Exception as e:
             messagebox.showerror("保存失败", f"导出 Excel 时发生错误:\n{e}")
+
+    def _build_summary_text(self, items, start_key, end_key, name_key, role_key, desc_key):
+        """
+        将工作经历/项目经历列表拼接为一列完整文本，格式如下：
+        1. 开始时间-结束时间 公司/项目名 职位/角色 描述
+        2. 开始时间-结束时间 公司/项目名 职位/角色 描述
+        ...
+        每条记录一行，条目之间用换行符分隔
+        """
+        lines = []
+        for idx, item in enumerate(items, 1):
+            if not isinstance(item, dict):
+                continue
+            start = item.get(start_key, "") or ""
+            end = item.get(end_key, "") or ""
+            name = item.get(name_key, "") or ""
+            role = item.get(role_key, "") or ""
+            desc = item.get(desc_key, "") or ""
+            period = f"{start}-{end}" if (start or end) else ""
+            parts = [p for p in [period, name, role, desc] if p]
+            line = f"{idx}. " + " ".join(parts)
+            lines.append(line)
+        return "\n".join(lines)
 
     def _find_value_in_dict(self, data_dict, target_key):
         if target_key in data_dict:
