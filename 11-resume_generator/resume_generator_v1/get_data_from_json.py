@@ -365,19 +365,21 @@ class JsonExtractorApp(ThemedTk):
 
         # 根据人员名单筛选待处理的 json 文件：未上传或未点击确定选择时，默认处理全部文件
         files_to_process = self.json_files
+        unmatched_emp_ids = []  # 已确认名单中，未能在当前文件夹找到对应 json 的员工号
         if self.emp_list_confirmed and self.confirmed_emp_ids:
             filtered_files = []
+            matched_emp_ids = set()
             for fp in self.json_files:
                 fname = os.path.basename(fp)
                 name_parts = fname.split('_')
                 emp_no_in_filename = name_parts[0] if name_parts else ""
-                if self._normalize_emp_id(emp_no_in_filename) in self.confirmed_emp_ids:
+                norm_emp_id = self._normalize_emp_id(emp_no_in_filename)
+                if norm_emp_id in self.confirmed_emp_ids:
                     filtered_files.append(fp)
+                    matched_emp_ids.add(norm_emp_id)
             files_to_process = filtered_files
-
-            if not files_to_process:
-                messagebox.showwarning("无匹配数据", "当前文件夹中没有与已选人员名单匹配的 JSON 文件。")
-                return
+            # 名单中没有对应上 json 文件的员工号，记录下来，不中断流程，继续处理已匹配的部分
+            unmatched_emp_ids = sorted(self.confirmed_emp_ids - matched_emp_ids)
 
         for file_path in files_to_process:
             filename = os.path.basename(file_path)
@@ -458,6 +460,7 @@ class JsonExtractorApp(ThemedTk):
                     parsed_data.append(row_data)
 
         if not parsed_data:
+            self._show_unmatched_emp_warning(unmatched_emp_ids)
             messagebox.showwarning("提示", "未能成功提取到任何有效数据。")
             return
 
@@ -514,8 +517,20 @@ class JsonExtractorApp(ThemedTk):
                         worksheet.cell(row=r, column=col_idx).alignment = cell_alignment
 
             messagebox.showinfo("保存成功", f"数据已成功保存且已应用多彩表头至:\n{save_path}")
+            self._show_unmatched_emp_warning(unmatched_emp_ids)
         except Exception as e:
             messagebox.showerror("保存失败", f"导出 Excel 时发生错误:\n{e}")
+
+    def _show_unmatched_emp_warning(self, unmatched_emp_ids):
+        """若已确认的人员名单中存在未能匹配到任何 json 文件的员工号，弹窗提示清单"""
+        if not unmatched_emp_ids:
+            return
+        emp_list_str = ",".join(unmatched_emp_ids)
+        n = len(unmatched_emp_ids)
+        messagebox.showwarning(
+            "存在未匹配员工",
+            f"本次共有{n}名员工没有匹配到，以下为清单:\n{emp_list_str}\n请检查员工编号或重新生成简历json重新尝试"
+        )
 
     def _build_summary_text(self, items, start_key, end_key, name_key, role_key, desc_key):
         """
