@@ -94,6 +94,13 @@ class JsonExtractorApp(ThemedTk):
         }
         
         self.check_vars = {}
+
+        # 人员名单筛选相关状态
+        self.emp_list_file_path = None      # 已上传的名单文件路径
+        self.pending_emp_ids = set()        # 从已上传文件中解析出的员工号（尚未点击"确定选择"）
+        self.confirmed_emp_ids = set()      # 点击"确定选择"后生效的员工号集合
+        self.emp_list_confirmed = False     # 是否已点击"确定选择"
+
         self.init_ui()
         self.update_folder(self.current_folder)
 
@@ -109,6 +116,28 @@ class JsonExtractorApp(ThemedTk):
         
         btn_select = ttk.Button(folder_frame, text="选择文件夹", command=self.select_folder)
         btn_select.pack(side="right", padx=15, pady=5)
+
+        # ---- 人员名单筛选区块 ----
+        emp_frame = ttk.LabelFrame(self, text=" 人员名单筛选（可选，支持 xlsx/txt，不上传或未确定则默认导出全部人员） ")
+        emp_frame.pack(fill="x", pady=(0, 15), ipady=8)
+
+        emp_row1 = ttk.Frame(emp_frame)
+        emp_row1.pack(fill="x", padx=15, pady=(5, 3))
+
+        btn_upload_emp = ttk.Button(emp_row1, text="上传人员名单", command=self.upload_emp_list)
+        btn_upload_emp.pack(side="left")
+
+        btn_confirm_emp = ttk.Button(emp_row1, text="确定选择", command=self.confirm_emp_list)
+        btn_confirm_emp.pack(side="left", padx=(10, 0))
+
+        btn_cancel_emp = ttk.Button(emp_row1, text="取消选择", command=self.cancel_emp_list)
+        btn_cancel_emp.pack(side="left", padx=(10, 0))
+
+        self.emp_file_label = ttk.Label(emp_row1, text="未上传文件", foreground="#666666")
+        self.emp_file_label.pack(side="left", padx=(15, 0))
+
+        self.emp_status_label = ttk.Label(emp_frame, text="", font=("", 10, "bold"), foreground="#0052cc")
+        self.emp_status_label.pack(anchor="w", padx=15, pady=(0, 5))
 
         filter_frame = ttk.LabelFrame(self, text=" 数据字段筛选 (按分类顺序导出，人员名称和员工号默认居首) ")
         filter_frame.pack(fill="both", expand=True, pady=(0, 15), ipady=5)
@@ -181,6 +210,94 @@ class JsonExtractorApp(ThemedTk):
         else:
             self.check_vars[category]["var"].set(False)
 
+    def _normalize_emp_id(self, raw):
+        """将任意形式的员工号统一规范为 5 位数字字符串（不足前面补0），非数字内容返回 None"""
+        if raw is None:
+            return None
+        s = str(raw).strip()
+        if not s:
+            return None
+        # 处理 Excel 数值列被 pandas 读成浮点数的情况，例如 "1234.0"
+        if s.endswith(".0"):
+            s = s[:-2]
+        if not s.isdigit():
+            return None
+        return s.zfill(5)
+
+    def _parse_emp_list_file(self, file_path):
+        """解析上传的人员名单文件（xlsx 或 txt），返回规范化后的员工号集合"""
+        ext = os.path.splitext(file_path)[1].lower()
+        emp_ids = set()
+
+        if ext == ".xlsx":
+            df = pd.read_excel(file_path, header=None, dtype=str)
+            for col in df.columns:
+                for raw_val in df[col].dropna().tolist():
+                    emp_id = self._normalize_emp_id(raw_val)
+                    if emp_id:
+                        emp_ids.add(emp_id)
+        elif ext == ".txt":
+            with open(file_path, 'r', encoding='utf-8-sig') as f:
+                content = f.read()
+            # 支持每行一个 或 逗号分隔（中英文逗号）两种格式
+            content = content.replace('，', ',').replace('\r\n', '\n').replace('\r', '\n')
+            raw_parts = content.replace('\n', ',').split(',')
+            for raw_val in raw_parts:
+                emp_id = self._normalize_emp_id(raw_val)
+                if emp_id:
+                    emp_ids.add(emp_id)
+        else:
+            raise ValueError("仅支持 .xlsx 或 .txt 格式的人员名单文件")
+
+        return emp_ids
+
+    def upload_emp_list(self):
+        file_path = filedialog.askopenfilename(
+            title="选择人员名单文件",
+            filetypes=[("支持的名单文件", "*.xlsx *.txt"), ("Excel 文件", "*.xlsx"), ("文本文件", "*.txt")]
+        )
+        if not file_path:
+            return
+
+        try:
+            emp_ids = self._parse_emp_list_file(file_path)
+        except Exception as e:
+            messagebox.showerror("解析失败", f"读取人员名单文件时发生错误:\n{e}")
+            return
+
+        if not emp_ids:
+            messagebox.showwarning("未识别到员工号", "未能从该文件中解析出任何有效的员工号，请检查文件内容。")
+            return
+
+        self.emp_list_file_path = file_path
+        self.pending_emp_ids = emp_ids
+        self.emp_list_confirmed = False
+        self.confirmed_emp_ids = set()
+
+        self.emp_file_label.config(text=os.path.basename(file_path))
+        self.emp_status_label.config(text="已上传文件，未点击确定按钮", foreground="#0052cc")
+
+    def confirm_emp_list(self):
+        if not self.emp_list_file_path:
+            messagebox.showwarning("未上传文件", "请先点击「上传人员名单」选择文件。")
+            return
+        if not self.pending_emp_ids:
+            messagebox.showwarning("无有效员工号", "当前上传的文件中未解析到有效员工号，请重新上传。")
+            return
+
+        self.confirmed_emp_ids = self.pending_emp_ids
+        self.emp_list_confirmed = True
+        self.emp_status_label.config(text=f"已选择 {len(self.confirmed_emp_ids)} 位员工", foreground="#0052cc")
+
+    def cancel_emp_list(self):
+        self.emp_list_file_path = None
+        self.pending_emp_ids = set()
+        self.confirmed_emp_ids = set()
+        self.emp_list_confirmed = False
+
+        self.emp_file_label.config(text="未上传文件")
+        self.emp_status_label.config(text="已清除所选名单", foreground="#0052cc")
+
     def select_folder(self):
         folder = filedialog.askdirectory(initialdir=self.current_folder, title="选择包含 JSON 的文件夹")
         if folder:
@@ -245,8 +362,24 @@ class JsonExtractorApp(ThemedTk):
         need_edu = any(field.startswith("教育_") for field in ordered_fields)
 
         parsed_data = []
-        
-        for file_path in self.json_files:
+
+        # 根据人员名单筛选待处理的 json 文件：未上传或未点击确定选择时，默认处理全部文件
+        files_to_process = self.json_files
+        if self.emp_list_confirmed and self.confirmed_emp_ids:
+            filtered_files = []
+            for fp in self.json_files:
+                fname = os.path.basename(fp)
+                name_parts = fname.split('_')
+                emp_no_in_filename = name_parts[0] if name_parts else ""
+                if self._normalize_emp_id(emp_no_in_filename) in self.confirmed_emp_ids:
+                    filtered_files.append(fp)
+            files_to_process = filtered_files
+
+            if not files_to_process:
+                messagebox.showwarning("无匹配数据", "当前文件夹中没有与已选人员名单匹配的 JSON 文件。")
+                return
+
+        for file_path in files_to_process:
             filename = os.path.basename(file_path)
             
             name_from_filename = ""
