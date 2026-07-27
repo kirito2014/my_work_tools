@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import glob
+import time
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from ttkthemes import ThemedTk
@@ -101,6 +102,10 @@ class JsonExtractorApp(ThemedTk):
         self.confirmed_emp_ids = set()      # 点击"确定选择"后生效的员工号集合
         self.emp_list_confirmed = False     # 是否已点击"确定选择"
 
+        # 彩蛋：连续点击 "JSON数量" 标签相关状态
+        self.egg_click_count = 0
+        self.egg_last_click_time = 0.0
+
         self.init_ui()
         self.update_folder(self.current_folder)
 
@@ -111,8 +116,9 @@ class JsonExtractorApp(ThemedTk):
         self.path_label = ttk.Label(folder_frame, text="当前路径: 未选择", wraplength=600)
         self.path_label.pack(side="left", padx=15, pady=5)
         
-        self.count_label = ttk.Label(folder_frame, text="JSON数量: 0", font=("", 10, "bold"), foreground="#0052cc")
+        self.count_label = ttk.Label(folder_frame, text="JSON数量: 0", font=("", 10, "bold"), foreground="#0052cc", cursor="hand2")
         self.count_label.pack(side="left", padx=20, pady=5)
+        self.count_label.bind("<Button-1>", self.on_count_label_click)
         
         btn_select = ttk.Button(folder_frame, text="选择文件夹", command=self.select_folder)
         btn_select.pack(side="right", padx=15, pady=5)
@@ -274,7 +280,7 @@ class JsonExtractorApp(ThemedTk):
         self.emp_list_confirmed = False
         self.confirmed_emp_ids = set()
 
-        self.emp_file_label.config(text=os.path.basename(file_path))
+        self.emp_file_label.config(text=os.path.basename(file_path), foreground="#FF6600")
         self.emp_status_label.config(text="已上传文件，未点击确定按钮", foreground="#0052cc")
 
     def confirm_emp_list(self):
@@ -295,7 +301,7 @@ class JsonExtractorApp(ThemedTk):
         self.confirmed_emp_ids = set()
         self.emp_list_confirmed = False
 
-        self.emp_file_label.config(text="未上传文件")
+        self.emp_file_label.config(text="未上传文件", foreground="#666666")
         self.emp_status_label.config(text="已清除所选名单", foreground="#0052cc")
 
     def select_folder(self):
@@ -314,6 +320,76 @@ class JsonExtractorApp(ThemedTk):
             self.json_files = []
             
         self.count_label.config(text=f"JSON数量: {len(self.json_files)}")
+
+    def on_count_label_click(self, event):
+        """彩蛋：连续点击「JSON数量」标签 5 次，弹出信息展示页面。
+        若两次点击间隔超过 1.5 秒，视为重新计数（避免误触发）。"""
+        now = time.time()
+        if now - self.egg_last_click_time > 1.5:
+            self.egg_click_count = 0
+        self.egg_click_count += 1
+        self.egg_last_click_time = now
+
+        if self.egg_click_count >= 5:
+            self.egg_click_count = 0
+            self.show_easter_egg()
+
+    def show_easter_egg(self):
+        """展示信息页面：作者/版权信息、使用方法等，内容可自行修改 EASTER_EGG_TEXT。"""
+        EASTER_EGG_TEXT = """简历 JSON 数据提取工具
+
+——————————————————
+作者信息
+——————————————————
+作者：[Sunline@王穆军]
+联系方式：[18279092736]
+版本：v1.3
+
+——————————————————
+版权声明
+——————————————————
+本工具仅供内部使用，禁止未经授权对外分发、传播或用于商业用途。
+如有问题或建议，请联系作者。
+
+——————————————————
+使用方法
+——————————————————
+1. 点击「选择文件夹」，选取包含简历 JSON 文件的目录。
+2. （可选）在「人员名单筛选」区域上传 xlsx / txt 名单文件，
+   点击「确定选择」后仅导出名单内员工，不上传则默认导出全部人员。
+3. 在「数据字段筛选」区域勾选需要导出的字段
+   （勾选"工作_汇总" / "项目_汇总"可额外导出拼接后的完整经历文本列）。
+4. 点击「保存提取数据」，生成的 Excel 文件会保存在
+   程序所在目录下的「数据下载」文件夹中。
+
+——————————————————
+恭喜你发现了我的彩蛋
+——————————————————
+连续点击 5 次左上角的「JSON数量」文字，即可再次打开本页面 :)
+"""
+        win = tk.Toplevel(self)
+        win.title("关于本工具")
+        win.geometry("560x480")
+        win.transient(self)
+
+        text_frame = ttk.Frame(win)
+        text_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        scrollbar = ttk.Scrollbar(text_frame, orient="vertical")
+        scrollbar.pack(side="right", fill="y")
+
+        text_widget = tk.Text(
+            text_frame, wrap="word", padx=10, pady=10,
+            yscrollcommand=scrollbar.set, font=("", 10)
+        )
+        text_widget.pack(side="left", fill="both", expand=True)
+        scrollbar.config(command=text_widget.yview)
+
+        text_widget.insert("1.0", EASTER_EGG_TEXT)
+        text_widget.config(state="disabled")
+
+        btn_close = ttk.Button(win, text="关闭", command=win.destroy)
+        btn_close.pack(pady=(0, 10))
 
     def get_selected_fields(self):
         selected = []
