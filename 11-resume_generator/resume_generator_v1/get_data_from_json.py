@@ -33,9 +33,14 @@ class JsonExtractorApp(ThemedTk):
                          "入职时间", "首次入职时间", "司龄", "发薪公司", "常驻地", "性别", "出生日期", 
                          "年龄", "政治面貌", "身份证号", "联系电话", "合同法人","籍贯"],
             "特殊信息": ["学位", "参加工作时间", "教育_学历类型", "教育_毕业时间", "教育_毕业院校", "教育_专业", "教育_最高学历"],
-            "工作经历": ["工作_开始时间", "工作_结束时间", "工作_公司", "工作_职位", "工作_描述", "工作_时长"],
-            "项目经历": ["项目_开始时间", "项目_结束时间", "项目_名称", "项目_角色", "项目_描述", "项目_时长"]
+            "工作经历": ["工作_开始时间", "工作_结束时间", "工作_公司", "工作_职位", "工作_描述", "工作_时长", "工作_汇总"],
+            "项目经历": ["项目_开始时间", "项目_结束时间", "项目_名称", "项目_角色", "项目_描述", "项目_时长", "项目_汇总"]
         }
+
+        # 汇总字段：单独勾选后，将该人员对应的多条经历拼接为一列完整文本（编号+换行分隔），
+        # 不属于 list_fields_map（不是逐条展开字段），需要单独处理
+        self.WORK_SUMMARY_FIELD = "工作_汇总"
+        self.PROJ_SUMMARY_FIELD = "项目_汇总"
         
         # 分类对应的表头颜色映射 (HEX 颜色码)
         self.category_colors = {
@@ -225,18 +230,19 @@ class JsonExtractorApp(ThemedTk):
                 if item in fields_to_extract:
                     ordered_fields.append(item)
 
-        need_work = any(field.startswith("工作_") for field in ordered_fields)
-        need_proj = any(field.startswith("项目_") for field in ordered_fields)
-        need_edu = any(field.startswith("教育_") for field in ordered_fields)
+        WORK_SUMMARY_FIELD = self.WORK_SUMMARY_FIELD
+        PROJ_SUMMARY_FIELD = self.PROJ_SUMMARY_FIELD
 
-        # 只要勾选了工作经历/项目经历中的任意字段，就自动生成对应的"完整记录汇总列"，
-        # 汇总列固定包含 开始-结束时间/公司(或项目名)/职位(或角色)/描述 四项内容，不受具体勾选字段影响
-        WORK_SUMMARY_COL = "工作经历汇总"
-        PROJ_SUMMARY_COL = "项目经历汇总"
-        if need_work:
-            field_to_category[WORK_SUMMARY_COL] = "工作经历"
-        if need_proj:
-            field_to_category[PROJ_SUMMARY_COL] = "项目经历"
+        # 逐条明细字段：勾选了这些字段才需要按条目数展开多行
+        need_work_detail = any(field.startswith("工作_") and field != WORK_SUMMARY_FIELD for field in ordered_fields)
+        need_proj_detail = any(field.startswith("项目_") and field != PROJ_SUMMARY_FIELD for field in ordered_fields)
+        # 汇总字段：单独勾选后只生成一列拼接文本，不需要按条目展开行
+        need_work_summary = WORK_SUMMARY_FIELD in ordered_fields
+        need_proj_summary = PROJ_SUMMARY_FIELD in ordered_fields
+        # 只要明细或汇总任意一个被勾选，就需要从 JSON 中取出原始列表数据
+        need_work = need_work_detail or need_work_summary
+        need_proj = need_proj_detail or need_proj_summary
+        need_edu = any(field.startswith("教育_") for field in ordered_fields)
 
         parsed_data = []
         
@@ -269,27 +275,32 @@ class JsonExtractorApp(ThemedTk):
                 projs = person_data.get("ProjectExperience", []) if need_proj else []
                 edus = person_data.get("SpecialInfo", {}).get("EducationList", []) if need_edu else []
                 
-                max_rows = max(1, len(works) if isinstance(works, list) else 0, 
-                                 len(projs) if isinstance(projs, list) else 0, 
+                # 只有勾选了逐条明细字段（开始时间/公司/职位/描述等）才需要按条目数展开多行；
+                # 若只勾选了"汇总"字段，则该人员仅导出一行
+                max_rows = max(1, len(works) if (need_work_detail and isinstance(works, list)) else 0,
+                                 len(projs) if (need_proj_detail and isinstance(projs, list)) else 0,
                                  len(edus) if isinstance(edus, list) else 0)
-                
+
                 scalars = {}
                 for field in ordered_fields:
-                    if field not in self.list_fields_map:
-                        en_key = self.key_mapping.get(field, field)
-                        val = self._find_value_in_dict(person_data, en_key)
-                        scalars[field] = val if val is not None else ""
+                    if field in self.list_fields_map:
+                        continue
+                    if field in (WORK_SUMMARY_FIELD, PROJ_SUMMARY_FIELD):
+                        continue  # 汇总字段单独处理，见下方
+                    en_key = self.key_mapping.get(field, field)
+                    val = self._find_value_in_dict(person_data, en_key)
+                    scalars[field] = val if val is not None else ""
 
-                # 生成工作经历/项目经历的完整拼接汇总文本（固定格式，与具体勾选字段无关）
-                work_summary_text = ""
-                if need_work and isinstance(works, list) and works:
-                    work_summary_text = self._build_summary_text(
-                        works, "StartTime", "EndTime", "CompanyName", "Position", "JobDescription"
+                # 生成工作经历/项目经历的完整拼接汇总文本（固定格式：开始-结束时间 公司/项目名 职位/角色 描述）
+                if need_work_summary:
+                    scalars[WORK_SUMMARY_FIELD] = (
+                        self._build_summary_text(works, "StartTime", "EndTime", "CompanyName", "Position", "JobDescription")
+                        if isinstance(works, list) and works else ""
                     )
-                proj_summary_text = ""
-                if need_proj and isinstance(projs, list) and projs:
-                    proj_summary_text = self._build_summary_text(
-                        projs, "StartTime", "EndTime", "ProjectName", "ProjectRole", "JobDescription"
+                if need_proj_summary:
+                    scalars[PROJ_SUMMARY_FIELD] = (
+                        self._build_summary_text(projs, "StartTime", "EndTime", "ProjectName", "ProjectRole", "JobDescription")
+                        if isinstance(projs, list) and projs else ""
                     )
 
                 for i in range(max_rows):
@@ -310,11 +321,6 @@ class JsonExtractorApp(ThemedTk):
                                 row_data[field] = ""
                         else:
                             row_data[field] = scalars[field] if i == 0 else ""
-
-                    if need_work:
-                        row_data[WORK_SUMMARY_COL] = work_summary_text if i == 0 else ""
-                    if need_proj:
-                        row_data[PROJ_SUMMARY_COL] = proj_summary_text if i == 0 else ""
 
                     parsed_data.append(row_data)
 
@@ -341,6 +347,10 @@ class JsonExtractorApp(ThemedTk):
                 
                 # 定义统一的白色加粗字体
                 white_bold_font = Font(color="FFFFFF", bold=True)
+                # 通用对齐样式：垂直居中 + 水平左对齐（不自动换行）
+                default_alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
+                # 汇总列专用对齐样式：垂直居中 + 水平左对齐 + 自动换行（内容含多行文本）
+                summary_alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
                 
                 # 3. 遍历第一行（表头），根据分类涂上对应的颜色
                 # openpyxl 的列索引是从 1 开始的
@@ -353,19 +363,22 @@ class JsonExtractorApp(ThemedTk):
                     # 生成填充样式
                     fill = PatternFill(start_color=hex_color, end_color=hex_color, fill_type="solid")
                     
-                    # 赋予单元格样式
-                    cell = worksheet.cell(row=1, column=col_idx)
-                    cell.fill = fill
-                    cell.font = white_bold_font
+                    # 赋予表头单元格样式
+                    header_cell = worksheet.cell(row=1, column=col_idx)
+                    header_cell.fill = fill
+                    header_cell.font = white_bold_font
+                    header_cell.alignment = default_alignment
 
-                    # 4. 汇总列（工作经历汇总 / 项目经历汇总）内容含多行文本，设置自动换行与较宽列宽
-                    if col_name in (WORK_SUMMARY_COL, PROJ_SUMMARY_COL):
-                        col_letter = worksheet.cell(row=1, column=col_idx).column_letter
+                    # 判断该列是否为汇总列（内容含多行文本，需要自动换行）
+                    is_summary_col = col_name in (self.WORK_SUMMARY_FIELD, self.PROJ_SUMMARY_FIELD)
+                    if is_summary_col:
+                        col_letter = header_cell.column_letter
                         worksheet.column_dimensions[col_letter].width = 60
-                        for r in range(1, worksheet.max_row + 1):
-                            worksheet.cell(row=r, column=col_idx).alignment = Alignment(
-                                wrap_text=True, vertical="top"
-                            )
+
+                    # 4. 所有数据行（不含表头）统一设置为垂直居中、水平左对齐
+                    cell_alignment = summary_alignment if is_summary_col else default_alignment
+                    for r in range(2, worksheet.max_row + 1):
+                        worksheet.cell(row=r, column=col_idx).alignment = cell_alignment
 
             messagebox.showinfo("保存成功", f"数据已成功保存且已应用多彩表头至:\n{save_path}")
         except Exception as e:
