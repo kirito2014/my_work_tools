@@ -34,14 +34,23 @@ class JsonExtractorApp(ThemedTk):
                          "入职时间", "首次入职时间", "司龄", "发薪公司", "常驻地", "性别", "出生日期", 
                          "年龄", "政治面貌", "身份证号", "联系电话", "合同法人","籍贯"],
             "特殊信息": ["学位", "参加工作时间", "教育_学历类型", "教育_毕业时间", "教育_毕业院校", "教育_专业", "教育_最高学历"],
-            "工作经历": ["工作_开始时间", "工作_结束时间", "工作_公司", "工作_职位", "工作_描述", "工作_时长", "工作_汇总"],
-            "项目经历": ["项目_开始时间", "项目_结束时间", "项目_名称", "项目_角色", "项目_描述", "项目_时长", "项目_汇总"]
+            "工作经历": ["工作_开始时间", "工作_结束时间", "工作_公司", "工作_职位", "工作_描述", "工作_时长"],
+            "项目经历": ["项目_开始时间", "项目_结束时间", "项目_名称", "项目_角色", "项目_描述", "项目_时长"]
         }
 
-        # 汇总字段：单独勾选后，将该人员对应的多条经历拼接为一列完整文本（编号+换行分隔），
-        # 不属于 list_fields_map（不是逐条展开字段），需要单独处理
+        # 汇总/自定义合并列字段名（固定输出列名，不属于常规勾选字段）
         self.WORK_SUMMARY_FIELD = "工作_汇总"
         self.PROJ_SUMMARY_FIELD = "项目_汇总"
+
+        # 工作经历/项目经历 合并列的自定义可选字段（中文标签 -> JSON 字段名），
+        # 开始时间/结束时间/公司名称(项目名称) 为固定默认列，不在此列出
+        self.merge_custom_options = {
+            "工作经历": [("职位", "Position"), ("描述", "JobDescription"), ("时长", "Duration")],
+            "项目经历": [("角色", "ProjectRole"), ("描述", "JobDescription"), ("时长", "Duration")],
+        }
+        self.merge_mode_vars = {}      # category -> tk.StringVar("off"/"full"/"custom")
+        self.merge_custom_vars = {}    # category -> {json_key: tk.BooleanVar}
+        self.merge_custom_widgets = {} # category -> [Checkbutton, ...]，用于根据模式启用/禁用
         
         # 分类对应的表头颜色映射 (HEX 颜色码)
         self.category_colors = {
@@ -197,6 +206,9 @@ class JsonExtractorApp(ThemedTk):
                     col = 0
                     row += 1
 
+            if category in ("工作经历", "项目经历"):
+                self._build_merge_section(cat_frame, category)
+
         btn_frame = ttk.Frame(self)
         btn_frame.pack(fill="x", pady=10)
         
@@ -215,6 +227,59 @@ class JsonExtractorApp(ThemedTk):
             self.check_vars[category]["var"].set(True)
         else:
             self.check_vars[category]["var"].set(False)
+
+    def _build_merge_section(self, parent_frame, category):
+        """在指定分类（工作经历/项目经历）下方构建"汇总 / 自定义合并"二选一的设置区块"""
+        is_work = category == "工作经历"
+        default_desc = (
+            "默认包含：开始时间、结束时间、公司名称（自动包含，无需勾选）" if is_work
+            else "默认包含：开始时间、结束时间、项目名称（自动包含，无需勾选）"
+        )
+        options = self.merge_custom_options[category]
+
+        mode_var = tk.StringVar(value="off")
+        self.merge_mode_vars[category] = mode_var
+        self.merge_custom_vars[category] = {}
+        self.merge_custom_widgets[category] = []
+
+        merge_frame = ttk.LabelFrame(parent_frame, text=f" {category}合并列（汇总 / 自定义合并 二选一，导出为单独一列） ")
+        merge_frame.pack(fill="x", padx=35, pady=(0, 8))
+
+        radio_row = ttk.Frame(merge_frame)
+        radio_row.pack(fill="x", padx=10, pady=(5, 3))
+        ttk.Radiobutton(
+            radio_row, text="不导出", value="off", variable=mode_var,
+            command=lambda c=category: self.on_merge_mode_change(c)
+        ).pack(side="left")
+        ttk.Radiobutton(
+            radio_row, text="完整汇总(全部字段)", value="full", variable=mode_var,
+            command=lambda c=category: self.on_merge_mode_change(c)
+        ).pack(side="left", padx=(10, 0))
+        ttk.Radiobutton(
+            radio_row, text="自定义合并", value="custom", variable=mode_var,
+            command=lambda c=category: self.on_merge_mode_change(c)
+        ).pack(side="left", padx=(10, 0))
+
+        ttk.Label(merge_frame, text=default_desc, foreground="#666666").pack(anchor="w", padx=10)
+
+        custom_row = ttk.Frame(merge_frame)
+        custom_row.pack(fill="x", padx=10, pady=(3, 5))
+        ttk.Label(custom_row, text="补充列：").pack(side="left")
+        for label, json_key in options:
+            var = tk.BooleanVar(value=False)
+            self.merge_custom_vars[category][json_key] = var
+            cb = ttk.Checkbutton(custom_row, text=label, variable=var)
+            cb.pack(side="left", padx=(5, 15))
+            self.merge_custom_widgets[category].append(cb)
+
+        self.on_merge_mode_change(category)  # 初始化补充列的启用/禁用状态
+
+    def on_merge_mode_change(self, category):
+        """根据当前模式（不导出/完整汇总/自定义合并）启用或禁用对应的补充列勾选框"""
+        mode = self.merge_mode_vars[category].get()
+        state = "normal" if mode == "custom" else "disabled"
+        for cb in self.merge_custom_widgets.get(category, []):
+            cb.config(state=state)
 
     def _normalize_emp_id(self, raw):
         """将任意形式的员工号统一规范为 5 位数字字符串（不足前面补0），非数字内容返回 None"""
@@ -341,9 +406,9 @@ class JsonExtractorApp(ThemedTk):
 ——————————————————
 作者信息
 ——————————————————
-作者：[Sunline@王穆军]
-联系方式：[18279092736]
-版本：v1.3
+作者：Sunline@wangmujun
+联系方式：18279092736
+版本：v2.0
 
 ——————————————————
 版权声明
@@ -363,7 +428,8 @@ class JsonExtractorApp(ThemedTk):
    程序所在目录下的「数据下载」文件夹中。
 
 ——————————————————
-恭喜你发现了我的彩蛋
+版本描述：
+V2.1 新增支持自定义列的勾选合并导出
 ——————————————————
 连续点击 5 次左上角的「JSON数量」文字，即可再次打开本页面 :)
 """
@@ -409,7 +475,12 @@ class JsonExtractorApp(ThemedTk):
             return
             
         fields_to_extract = self.get_selected_fields()
-        if not fields_to_extract:
+        work_merge_mode = self.merge_mode_vars["工作经历"].get()
+        proj_merge_mode = self.merge_mode_vars["项目经历"].get()
+        need_work_summary = work_merge_mode in ("full", "custom")
+        need_proj_summary = proj_merge_mode in ("full", "custom")
+
+        if not fields_to_extract and not need_work_summary and not need_proj_summary:
             messagebox.showwarning("未选择数据", "请至少选择一个需要提取的数据字段。")
             return
 
@@ -426,16 +497,21 @@ class JsonExtractorApp(ThemedTk):
         WORK_SUMMARY_FIELD = self.WORK_SUMMARY_FIELD
         PROJ_SUMMARY_FIELD = self.PROJ_SUMMARY_FIELD
 
-        # 逐条明细字段：勾选了这些字段才需要按条目数展开多行
-        need_work_detail = any(field.startswith("工作_") and field != WORK_SUMMARY_FIELD for field in ordered_fields)
-        need_proj_detail = any(field.startswith("项目_") and field != PROJ_SUMMARY_FIELD for field in ordered_fields)
-        # 汇总字段：单独勾选后只生成一列拼接文本，不需要按条目展开行
-        need_work_summary = WORK_SUMMARY_FIELD in ordered_fields
-        need_proj_summary = PROJ_SUMMARY_FIELD in ordered_fields
-        # 只要明细或汇总任意一个被勾选，就需要从 JSON 中取出原始列表数据
+        # 逐条明细字段：勾选了工作经历/项目经历下的具体字段才需要按条目数展开多行
+        need_work_detail = any(field.startswith("工作_") for field in ordered_fields)
+        need_proj_detail = any(field.startswith("项目_") for field in ordered_fields)
+        need_edu = any(field.startswith("教育_") for field in ordered_fields)
+
+        # 汇总/自定义合并列由专门的切换按钮控制，与逐条明细字段是否勾选无关
         need_work = need_work_detail or need_work_summary
         need_proj = need_proj_detail or need_proj_summary
-        need_edu = any(field.startswith("教育_") for field in ordered_fields)
+
+        if need_work_summary:
+            ordered_fields.append(WORK_SUMMARY_FIELD)
+            field_to_category[WORK_SUMMARY_FIELD] = "工作经历"
+        if need_proj_summary:
+            ordered_fields.append(PROJ_SUMMARY_FIELD)
+            field_to_category[PROJ_SUMMARY_FIELD] = "项目经历"
 
         parsed_data = []
 
@@ -502,15 +578,30 @@ class JsonExtractorApp(ThemedTk):
                     val = self._find_value_in_dict(person_data, en_key)
                     scalars[field] = val if val is not None else ""
 
-                # 生成工作经历/项目经历的完整拼接汇总文本（固定格式：开始-结束时间 公司/项目名 职位/角色 描述）
+                # 生成工作经历/项目经历的完整拼接汇总文本
+                # 完整汇总：固定包含 职位/角色 + 描述；自定义合并：按用户勾选的补充列动态拼接
                 if need_work_summary:
+                    if work_merge_mode == "full":
+                        work_extra_keys = ["Position", "JobDescription"]
+                    else:  # custom
+                        work_extra_keys = [
+                            json_key for _, json_key in self.merge_custom_options["工作经历"]
+                            if self.merge_custom_vars["工作经历"][json_key].get()
+                        ]
                     scalars[WORK_SUMMARY_FIELD] = (
-                        self._build_summary_text(works, "StartTime", "EndTime", "CompanyName", "Position", "JobDescription")
+                        self._build_summary_text(works, "StartTime", "EndTime", "CompanyName", work_extra_keys)
                         if isinstance(works, list) and works else ""
                     )
                 if need_proj_summary:
+                    if proj_merge_mode == "full":
+                        proj_extra_keys = ["ProjectRole", "JobDescription"]
+                    else:  # custom
+                        proj_extra_keys = [
+                            json_key for _, json_key in self.merge_custom_options["项目经历"]
+                            if self.merge_custom_vars["项目经历"][json_key].get()
+                        ]
                     scalars[PROJ_SUMMARY_FIELD] = (
-                        self._build_summary_text(projs, "StartTime", "EndTime", "ProjectName", "ProjectRole", "JobDescription")
+                        self._build_summary_text(projs, "StartTime", "EndTime", "ProjectName", proj_extra_keys)
                         if isinstance(projs, list) and projs else ""
                     )
 
@@ -608,14 +699,17 @@ class JsonExtractorApp(ThemedTk):
             f"本次共有{n}名员工没有匹配到，以下为清单:\n{emp_list_str}\n请检查员工编号或重新生成简历json重新尝试"
         )
 
-    def _build_summary_text(self, items, start_key, end_key, name_key, role_key, desc_key):
+    def _build_summary_text(self, items, start_key, end_key, name_key, extra_keys=None):
         """
         将工作经历/项目经历列表拼接为一列完整文本，格式如下：
-        1. 开始时间-结束时间 公司/项目名 职位/角色 描述
-        2. 开始时间-结束时间 公司/项目名 职位/角色 描述
+        1. 开始时间-结束时间 公司/项目名 [附加字段1] [附加字段2] ...
+        2. 开始时间-结束时间 公司/项目名 [附加字段1] [附加字段2] ...
         ...
-        每条记录一行，条目之间用换行符分隔
+        每条记录一行，条目之间用换行符分隔。
+        extra_keys: 按顺序排列的附加字段 JSON key 列表（如 ["Position","JobDescription"]），
+                    完整汇总模式下固定传全部字段，自定义合并模式下只传用户勾选的字段。
         """
+        extra_keys = extra_keys or []
         lines = []
         for idx, item in enumerate(items, 1):
             if not isinstance(item, dict):
@@ -623,10 +717,12 @@ class JsonExtractorApp(ThemedTk):
             start = item.get(start_key, "") or ""
             end = item.get(end_key, "") or ""
             name = item.get(name_key, "") or ""
-            role = item.get(role_key, "") or ""
-            desc = item.get(desc_key, "") or ""
             period = f"{start}-{end}" if (start or end) else ""
-            parts = [p for p in [period, name, role, desc] if p]
+            parts = [p for p in [period, name] if p]
+            for key in extra_keys:
+                val = item.get(key, "") or ""
+                if val:
+                    parts.append(val)
             line = f"{idx}. " + " ".join(parts)
             lines.append(line)
         return "\n".join(lines)
