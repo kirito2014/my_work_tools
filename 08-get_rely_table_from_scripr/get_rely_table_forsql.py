@@ -72,15 +72,18 @@ def determine_target_info(content):
 
 def extract_source_tables(content):
     """
-    提取 FROM / JOIN 后面的 schema.table。
+    提取 FROM / JOIN 后面的表（schema.table 或裸表名）。
     注意：
       1. DELETE FROM <目标表> 里的表是被清空的目标表本身，不是来源表，因此显式排除。
       2. 部分手写脚本里会直接写 $GDMDB.表名 这种不带花括号的变量格式，
          这种格式不会被 substitute_db_vars 统一替换（只处理 ${VAR} 格式），
          所以这里的正则允许 schema 前面带一个可选的 "$" 符号，
          从而能把 $GDMDB.表名 原样识别并输出，方便人工核查这类手写写法。
+      3. 部分脚本里 FROM / JOIN 后面只写了裸表名，没有带 schema 前缀
+         （如 FROM F_EXT_QCC_MGMT_RISK_COUNT A），这种也需要识别出表名，
+         schema 部分留空，后续会标记为"未匹配到来源库"方便人工核查。
     """
-    pattern = r'(DELETE\s+FROM|FROM|JOIN)\s+(\$?\w+\.\w+)'
+    pattern = r'(DELETE\s+FROM|FROM|JOIN)\s+(\$?\w+(?:\.\w+)?)'
     results = []
     for keyword, table in re.findall(pattern, content, flags=re.IGNORECASE):
         if keyword.strip().upper().startswith('DELETE'):
@@ -89,22 +92,30 @@ def extract_source_tables(content):
     return results
 
 
-def filter_source_tables(table_names, target_schema, target_table):
+def filter_source_tables(table_names, target_table):
     """
     过滤来源表：
-      - 去掉与目标表（schema+table）完全相同的自引用
       - 去掉 VT_{目标表名} 开头的临时表（脚本内部的临时表，不作为真实来源表）
       - 按 (schema,table) 大小写不敏感去重，保留第一次出现的写法
+      - 如果来源表没有写 schema（裸表名），来源库标记为"未匹配到来源库"，方便人工核查，
+        但不影响来源表名本身的输出
+
+    注意：这里不再排除"与目标表同名"的来源表。
+    很多增量派生类脚本会用 SELECT ... FROM 目标表本身 来读取已有数据再计算新结果
+    （例如按不同 INDEX_CODE 过滤后做差值计算），这属于真实的数据依赖，不是自引用噪音，
+    真正需要排除的自引用只有 DELETE FROM 目标表 这种情况，已经在 extract_source_tables 里处理。
     """
     exclude_prefix = f"VT_{target_table.upper()}"
     seen = set()
     filtered = []
     for table_name in table_names:
-        schema, _, table_only = table_name.partition('.')
-        schema_upper = schema.upper()
+        if '.' in table_name:
+            schema, _, table_only = table_name.partition('.')
+            schema_upper = schema.upper()
+        else:
+            schema_upper = '未匹配到来源库'
+            table_only = table_name
         table_only_upper = table_only.upper()
-        if schema_upper == target_schema.upper() and table_only_upper == target_table.upper():
-            continue
         if table_only_upper.startswith(exclude_prefix):
             continue
         dedup_key = (schema_upper, table_only_upper)
@@ -125,7 +136,7 @@ def process_file(file_path, file_name):
     target_schema, target_table = determine_target_info(content)
 
     source_tables_raw = extract_source_tables(content)
-    source_tables = filter_source_tables(source_tables_raw, target_schema, target_table)
+    source_tables = filter_source_tables(source_tables_raw, target_table)
 
     rows = []
     if source_tables:
