@@ -752,7 +752,7 @@ def extract_resume_alt(file_path):
             name = parts[1]
             json_filename = f"{emp_no}_{name}_人员简历.json"
         else:
-            json_filename = f"{base_name}.json"
+            json_filename = f"{original_filename}.json"
             emp_no = "unknown"
         # 保存原始提取结果（文件名格式：工号_姓名_人员简历.json）
         # raw_output_filename = os.path.join(original_dir, f"{emp_no}_{person_name}_人员简历.json")
@@ -782,17 +782,14 @@ def main():
     parser = argparse.ArgumentParser(description='备用简历数据提取工具')
     parser.add_argument('file_path', help='简历文件路径')
     parser.add_argument('--verbose', '-v', action='store_true', help='显示详细日志信息')
-    parser.add_argument('--test', action='store_true', help='运行测试函数')
+
     args = parser.parse_args()
     
     # 如果启用详细日志，设置日志级别为DEBUG
     if args.verbose:
         logger.setLevel(logging.DEBUG)
     
-    # 如果是测试模式，运行测试函数
-    if args.test:
-        test_functions()
-        sys.exit(0)
+ 
     
     # 执行提取
     success = extract_resume_alt(args.file_path)
