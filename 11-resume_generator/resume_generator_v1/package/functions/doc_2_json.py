@@ -384,7 +384,7 @@ def convert_to_template_format(raw_data: Dict, emp_no: str = "") -> Dict:
             "EndTime": work.get("结束时间", work.get("截止时间", "至今")),
             "CompanyName": work.get("公司名称", work.get("公司", "")),
             "Position": work.get("担任职务", work.get("职位", work.get("职务", ""))),
-            "JobDescription": work.get("工作职责说明", work.get("工作内容", work.get("职责", ""))),
+            "JobDescription": work.get("工作职责说明", work.get("工作内容", work.get("工作职责说明（稍微详细一点）", ""))),
             "Duration": calculate_months(work.get("开始时间", work.get("起始时间", "")), work.get("结束时间", work.get("截止时间", "至今")))            
         })
     
@@ -396,7 +396,7 @@ def convert_to_template_format(raw_data: Dict, emp_no: str = "") -> Dict:
             "EndTime": project.get("结束时间", project.get("截止时间", "")),
             "ProjectName": project.get("项目名称", project.get("项目", "")),
             "ProjectRole": project.get("项目角色", project.get("角色", project.get("职位", ""))),
-            "JobDescription": project.get("项目职责说明", project.get("项目描述", project.get("职责", project.get("项目职责", "")))),
+            "JobDescription": project.get("项目职责说明", project.get("项目描述", project.get("项目职责说明（稍微详细一点）", project.get("项目职责", "")))),
             "Duration": calculate_months(project.get("开始时间", project.get("起始时间", "")), project.get("结束时间", project.get("截止时间", "至今")))
         })
     

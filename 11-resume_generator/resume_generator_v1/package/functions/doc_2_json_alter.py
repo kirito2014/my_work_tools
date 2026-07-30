@@ -515,7 +515,7 @@ def extract_work_experience(doc):
                         col_mapping['CompanyName'] = c
                     elif '担任职务' in cell_text or '岗位' in cell_text:
                         col_mapping['Position'] = c
-                    elif '工作职责说明' in cell_text or '工作职责说明（稍微详细一点）' in cell_text or '职责' in cell_text:
+                    elif '工作职责说明' in cell_text or '工作职责说明（稍微详细一点）' in cell_text or '职责' in cell_text or cell_text.startswith('工作职责说明'):
                         col_mapping['JobDescription'] = c
                 
                 # 提取数据行，只提取到项目经历之前
@@ -615,7 +615,7 @@ def extract_project_experience(doc):
                         col_mapping['ProjectName'] = c
                     elif '项目角色' in cell_text:
                         col_mapping['ProjectRole'] = c
-                    elif '项目职责说明' in cell_text or '项目职责说明（稍微详细一点）' in cell_text or '项目描述' in cell_text:
+                    elif '项目职责说明' in cell_text or '项目职责说明（稍微详细一点）' in cell_text or '项目描述' in cell_text or cell_text.startswith('项目职责说明'):
                         col_mapping['JobDescription'] = c
                 
                 # 提取数据行，只提取到"能力与资质"之前

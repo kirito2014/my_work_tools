@@ -161,23 +161,41 @@ class ResumeGeneratorGUI:
         
         # 检查基本信息关键字段
         basic_info = person_data.get('BasicInfo', {})
-        required_basic_fields = ['Name', 'EmpNo', 'WorkYears',"GraduationTime","GraduationSchool","Major","HighestEducation","Department","PersonalProfile","Title"]
-        if not all(basic_info.get(field) for field in required_basic_fields if field in basic_info):
-            return False
+        required_basic_fields = [
+                'Name', 'EmpNo', 'WorkYears', "GraduationTime",
+                "GraduationSchool", "Major", "HighestEducation",
+                "Department", "PersonalProfile", "Title"
+            ]
+        # 要求：所有字段必须存在，且去除首尾空格后不能是空字符串
+        for field in required_basic_fields:
+            val = basic_info.get(field, "")
+            # 去除首尾空白字符，彻底拦截空、全空格内容
+            val_strip = str(val).strip()
+            if not val_strip:
+                return False
         
         # 检查工作经历和项目经历是否有有效条目
         work_experience = person_data.get('WorkExperience', [])
         project_experience = person_data.get('ProjectExperience', [])
+
+        def is_valid_work_item(exp):
+            cpn = str(exp.get("CompanyName", "")).strip()
+            pos = str(exp.get("Position", "")).strip()
+            job_desc = str(exp.get("JobDescription", "")).strip()
+            # 公司、岗位、工作描述 全部都要有内容
+            return cpn and pos and job_desc
         
-        # 检查工作经历是否有非空条目
-        valid_work_exp = any(exp.get('CompanyName') or exp.get('Position') or exp.get('JobDescription')
-                          for exp in work_experience)
-        
-        # 检查项目经历是否有有效条目
-        valid_project_exp = any(proj.get('ProjectName') or proj.get('ProjectRole') or proj.get('JobDescription')
-                            for proj in project_experience)
-        
-        # 至少需要有工作经历或项目经历的有效条目
+        valid_work_exp = any(is_valid_work_item(exp) for exp in work_experience)
+
+        def is_valid_project_item(proj):
+            proj_name = str(proj.get("ProjectName", "")).strip()
+            role = str(proj.get("ProjectRole", "")).strip()
+            job_desc = str(proj.get("JobDescription", "")).strip()
+            # 按需调整and/or逻辑
+            return proj_name and role and job_desc
+        valid_project_exp = any(is_valid_project_item(proj) for proj in project_experience)
+
+        # 至少一类经历存在有效条目
         return valid_work_exp or valid_project_exp
         
     def __init__(self, root):
