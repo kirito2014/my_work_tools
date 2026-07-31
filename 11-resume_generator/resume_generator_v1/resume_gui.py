@@ -13,13 +13,13 @@ import socket  # 用于进程锁检查
 try:
     from PIL import Image, ImageTk
 except ImportError:
-    print("警告: 未找到PIL模块，请先安装: pip install pillow")
+    print("警告: 未找到PIL模块,请先安装: pip install pillow")
 
 # 导入ttkthemes以使用arc主题
 try:
     from ttkthemes import ThemedTk
 except ImportError:
-    print("警告: 未找到ttkthemes模块，请先安装: pip install ttkthemes")
+    print("警告: 未找到ttkthemes模块,请先安装: pip install ttkthemes")
     # 如果没有ttkthemes，将ThemedTk设置为普通的tk.Tk作为备用
     ThemedTk = tk.Tk
 
@@ -86,7 +86,7 @@ try:
     except ImportError:
         try:
             # 尝试直接导入（兼容旧版本和打包环境）
-            import check_resume_valid as check_module
+            import package.functions.check_resume_valid as check_module
             print("成功直接导入check_resume_valid模块")
         except ImportError:
             # 尝试动态导入
@@ -117,7 +117,7 @@ try:
     except ImportError:
         try:
             # 尝试直接导入（兼容旧版本和打包环境）
-            import batch_render_from_docx as batch_render_module
+            import package.functions.batch_render_from_docx as batch_render_module
         except ImportError:
             # 使用base_dir构建完整路径以兼容各种环境
             batch_render_path = os.path.join(base_dir, 'package', 'functions', 'batch_render_from_docx.py')
@@ -1358,7 +1358,7 @@ class ResumeGeneratorGUI:
                 except ImportError:
                     try:
                         # 其次尝试直接导入
-                        import get_emp_list as get_emp_module
+                        import package.functions.get_emp_list as get_emp_module
                     except ImportError:
                         # 最后通过文件路径加载
                         self._log("尝试使用importlib从文件路径加载get_emp_list模块...")
@@ -2224,7 +2224,7 @@ class ResumeGeneratorGUI:
                 except ImportError:
                     try:
                         # 其次尝试直接导入
-                        import get_emp_list as get_emp_module
+                        import package.functions.get_emp_list as get_emp_module
                     except ImportError:
                         # 最后通过文件路径加载
                         get_emp_path = os.path.join(base_dir, 'package', 'functions', "get_emp_list.py")
