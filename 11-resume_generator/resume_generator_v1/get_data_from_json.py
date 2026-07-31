@@ -3,6 +3,9 @@ import sys
 import json
 import glob
 import time
+import threading
+import queue
+import subprocess
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from ttkthemes import ThemedTk
@@ -107,16 +110,29 @@ class JsonExtractorApp(ThemedTk):
 
         # 人员名单筛选相关状态
         self.emp_list_file_path = None      # 已上传的名单文件路径
-        self.pending_emp_ids = set()        # 从已上传文件中解析出的员工号（尚未点击"确定选择"）
-        self.confirmed_emp_ids = set()      # 点击"确定选择"后生效的员工号集合
-        self.emp_list_confirmed = False     # 是否已点击"确定选择"
+        self.pending_emp_ids = set()        # 从已上传文件中解析出的员工号（与 confirmed_emp_ids 一致，上传后立即生效）
+        self.confirmed_emp_ids = set()      # 当前生效的员工号集合
+        self.emp_list_confirmed = False     # 是否已上传并生效名单
 
         # 彩蛋：连续点击 "JSON数量" 标签相关状态
         self.egg_click_count = 0
         self.egg_last_click_time = 0.0
 
+        # 导出格式（xlsx / csv）
+        self.export_format = tk.StringVar(value="xlsx")
+
+        # 记住上次选择：配置文件路径
+        self.settings_path = os.path.join(self.base_dir, "app_settings.json")
+
+        # 后台导出线程 / 进度条相关状态
+        self.export_queue = queue.Queue()
+        self.export_thread = None
+        self.last_export_dir = None
+
         self.init_ui()
+        self._load_settings()
         self.update_folder(self.current_folder)
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def init_ui(self):
         folder_frame = ttk.LabelFrame(self, text=" 目录选择与状态 ")
@@ -133,7 +149,7 @@ class JsonExtractorApp(ThemedTk):
         btn_select.pack(side="right", padx=15, pady=5)
 
         # ---- 人员名单筛选区块 ----
-        emp_frame = ttk.LabelFrame(self, text=" 人员名单筛选（可选，支持 xlsx/txt，不上传或未确定则默认导出全部人员） ")
+        emp_frame = ttk.LabelFrame(self, text=" 人员名单筛选（可选，支持 xlsx/txt，上传后自动识别员工号；不上传则默认导出全部人员） ")
         emp_frame.pack(fill="x", pady=(0, 15), ipady=8)
 
         emp_row1 = ttk.Frame(emp_frame)
@@ -141,9 +157,6 @@ class JsonExtractorApp(ThemedTk):
 
         btn_upload_emp = ttk.Button(emp_row1, text="上传人员名单", command=self.upload_emp_list)
         btn_upload_emp.pack(side="left")
-
-        btn_confirm_emp = ttk.Button(emp_row1, text="确定选择", command=self.confirm_emp_list)
-        btn_confirm_emp.pack(side="left", padx=(10, 0))
 
         btn_cancel_emp = ttk.Button(emp_row1, text="取消选择", command=self.cancel_emp_list)
         btn_cancel_emp.pack(side="left", padx=(10, 0))
@@ -211,10 +224,45 @@ class JsonExtractorApp(ThemedTk):
 
         btn_frame = ttk.Frame(self)
         btn_frame.pack(fill="x", pady=10)
-        
+
         style.configure("Accent.TButton", font=("", 11, "bold"))
-        btn_save = ttk.Button(btn_frame, text="保存提取数据", style="Accent.TButton", command=self.save_data)
-        btn_save.pack(side="bottom", ipadx=30, ipady=5)
+
+        # 导出格式选择
+        format_row = ttk.Frame(btn_frame)
+        format_row.pack(side="top", pady=(0, 8))
+        ttk.Label(format_row, text="导出格式：").pack(side="left")
+        ttk.Radiobutton(format_row, text="Excel (.xlsx)", value="xlsx", variable=self.export_format).pack(side="left", padx=(5, 15))
+        ttk.Radiobutton(format_row, text="CSV (.csv)", value="csv", variable=self.export_format).pack(side="left")
+
+        # 保存 + 打开文件夹 按钮
+        action_row = ttk.Frame(btn_frame)
+        action_row.pack(side="top")
+        self.btn_save = ttk.Button(action_row, text="保存提取数据", style="Accent.TButton", command=self.save_data)
+        self.btn_save.pack(side="left", ipadx=30, ipady=5, padx=(0, 10))
+        self.btn_open_folder = ttk.Button(action_row, text="打开文件夹", command=self.open_export_folder, state="disabled")
+        self.btn_open_folder.pack(side="left", ipady=5)
+
+        # 进度条 + 状态提示
+        progress_row = ttk.Frame(btn_frame)
+        progress_row.pack(side="top", fill="x", padx=40, pady=(8, 0))
+        self.progress_bar = ttk.Progressbar(progress_row, orient="horizontal", mode="determinate")
+        self.progress_bar.pack(fill="x")
+        self.progress_label = ttk.Label(btn_frame, text="", foreground="#666666")
+        self.progress_label.pack(side="top", pady=(3, 0))
+
+    def open_export_folder(self):
+        if not self.last_export_dir or not os.path.exists(self.last_export_dir):
+            messagebox.showinfo("提示", "还没有可打开的导出文件夹，请先完成一次导出。")
+            return
+        try:
+            if sys.platform == "win32":
+                os.startfile(self.last_export_dir)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", self.last_export_dir])
+            else:
+                subprocess.Popen(["xdg-open", self.last_export_dir])
+        except Exception as e:
+            messagebox.showerror("打开失败", f"无法打开文件夹:\n{e}")
 
     def on_category_toggle(self, category):
         cat_state = self.check_vars[category]["var"].get()
@@ -334,22 +382,11 @@ class JsonExtractorApp(ThemedTk):
 
         self.emp_list_file_path = file_path
         self.pending_emp_ids = emp_ids
-        self.emp_list_confirmed = False
-        self.confirmed_emp_ids = set()
+        # 上传成功后自动识别并直接生效，无需再点击"确定"按钮
+        self.confirmed_emp_ids = emp_ids
+        self.emp_list_confirmed = True
 
         self.emp_file_label.config(text=os.path.basename(file_path), foreground="#FF6600")
-        self.emp_status_label.config(text="已上传文件，未点击确定按钮", foreground="#0052cc")
-
-    def confirm_emp_list(self):
-        if not self.emp_list_file_path:
-            messagebox.showwarning("未上传文件", "请先点击「上传人员名单」选择文件。")
-            return
-        if not self.pending_emp_ids:
-            messagebox.showwarning("无有效员工号", "当前上传的文件中未解析到有效员工号，请重新上传。")
-            return
-
-        self.confirmed_emp_ids = self.pending_emp_ids
-        self.emp_list_confirmed = True
         self.emp_status_label.config(text=f"已选择 {len(self.confirmed_emp_ids)} 位员工", foreground="#0052cc")
 
     def cancel_emp_list(self):
@@ -378,6 +415,75 @@ class JsonExtractorApp(ThemedTk):
             
         self.count_label.config(text=f"JSON数量: {len(self.json_files)}")
 
+    def _load_settings(self):
+        """启动时恢复上次的文件夹路径、字段勾选、合并列设置、导出格式"""
+        if not os.path.exists(self.settings_path):
+            return
+        try:
+            with open(self.settings_path, 'r', encoding='utf-8') as f:
+                settings = json.load(f)
+        except Exception:
+            return  # 配置文件损坏或无法读取，忽略，使用默认值
+
+        folder = settings.get("folder")
+        if folder and os.path.exists(folder):
+            self.current_folder = folder
+
+        fmt = settings.get("export_format")
+        if fmt in ("xlsx", "csv"):
+            self.export_format.set(fmt)
+
+        fields = settings.get("fields", {})
+        for category, items in fields.items():
+            if category not in self.check_vars:
+                continue
+            for item, checked in items.items():
+                item_var = self.check_vars[category]["children"].get(item)
+                if item_var is not None:
+                    item_var.set(bool(checked))
+            self.on_item_toggle(category)  # 同步分类总开关的勾选状态
+
+        merge_mode = settings.get("merge_mode", {})
+        for category, checked in merge_mode.items():
+            if category in self.merge_mode_vars:
+                self.merge_mode_vars[category].set(bool(checked))
+                self.on_merge_mode_change(category)
+
+        merge_custom = settings.get("merge_custom", {})
+        for category, keys in merge_custom.items():
+            if category in self.merge_custom_vars:
+                for json_key, checked in keys.items():
+                    if json_key in self.merge_custom_vars[category]:
+                        self.merge_custom_vars[category][json_key].set(bool(checked))
+
+    def _save_settings(self):
+        """将当前的文件夹路径、字段勾选、合并列设置、导出格式写入配置文件，供下次启动恢复"""
+        fields = {
+            category: {item: var.get() for item, var in data["children"].items()}
+            for category, data in self.check_vars.items()
+        }
+        merge_mode = {category: var.get() for category, var in self.merge_mode_vars.items()}
+        merge_custom = {
+            category: {key: var.get() for key, var in vars_dict.items()}
+            for category, vars_dict in self.merge_custom_vars.items()
+        }
+        settings = {
+            "folder": self.current_folder,
+            "export_format": self.export_format.get(),
+            "fields": fields,
+            "merge_mode": merge_mode,
+            "merge_custom": merge_custom,
+        }
+        try:
+            with open(self.settings_path, 'w', encoding='utf-8') as f:
+                json.dump(settings, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass  # 保存失败静默忽略，不影响关闭流程
+
+    def _on_close(self):
+        self._save_settings()
+        self.destroy()
+
     def on_count_label_click(self, event):
         """彩蛋：连续点击「JSON数量」标签 5 次，弹出信息展示页面。
         若两次点击间隔超过 1.5 秒，视为重新计数（避免误触发）。"""
@@ -398,9 +504,9 @@ class JsonExtractorApp(ThemedTk):
 ——————————————————
 作者信息
 ——————————————————
-作者：王穆军@Sunline
-联系方式：18279092736
-版本：v2.2
+作者：[请在此处填写作者姓名]
+联系方式：[请在此处填写联系方式]
+版本：v1.0
 
 ——————————————————
 版权声明
@@ -413,14 +519,15 @@ class JsonExtractorApp(ThemedTk):
 ——————————————————
 1. 点击「选择文件夹」，选取包含简历 JSON 文件的目录。
 2. （可选）在「人员名单筛选」区域上传 xlsx / txt 名单文件，
-   点击「确定选择」后仅导出名单内员工，不上传则默认导出全部人员。
+   上传成功后会自动识别并生效，仅导出名单内员工；不上传则默认导出全部人员。
 3. 在「数据字段筛选」区域勾选需要导出的字段
-   （勾选"工作_汇总" / "项目_汇总"可额外导出拼接后的完整经历文本列）。
-4. 点击「保存提取数据」，生成的 Excel 文件会保存在
-   程序所在目录下的「数据下载」文件夹中。
+   （工作经历/项目经历下方可勾选"启用自定义合并列"，额外导出拼接后的经历文本列）。
+4. 选择导出格式（xlsx / csv），点击「保存提取数据」，
+   生成的文件会保存在程序所在目录下的「数据下载」文件夹中，
+   导出完成后可点击「打开文件夹」直接查看。
 
 ——————————————————
-V2.2 修改选项的处理逻辑
+彩蛋
 ——————————————————
 连续点击 5 次左上角的「JSON数量」文字，即可再次打开本页面 :)
 """
@@ -502,9 +609,21 @@ V2.2 修改选项的处理逻辑
             ordered_fields.append(PROJ_SUMMARY_FIELD)
             field_to_category[PROJ_SUMMARY_FIELD] = "项目经历"
 
-        parsed_data = []
+        # Tkinter 变量只能在主线程读取，提前把自定义合并的补充字段取出，传给后台线程使用
+        work_extra_keys = []
+        if need_work_summary:
+            work_extra_keys = [
+                json_key for _, json_key in self.merge_custom_options["工作经历"]
+                if self.merge_custom_vars["工作经历"][json_key].get()
+            ]
+        proj_extra_keys = []
+        if need_proj_summary:
+            proj_extra_keys = [
+                json_key for _, json_key in self.merge_custom_options["项目经历"]
+                if self.merge_custom_vars["项目经历"][json_key].get()
+            ]
 
-        # 根据人员名单筛选待处理的 json 文件：未上传或未点击确定选择时，默认处理全部文件
+        # 根据人员名单筛选待处理的 json 文件：未上传名单时，默认处理全部文件
         files_to_process = self.json_files
         unmatched_emp_ids = []  # 已确认名单中，未能在当前文件夹找到对应 json 的员工号
         if self.emp_list_confirmed and self.confirmed_emp_ids:
@@ -522,154 +641,229 @@ V2.2 修改选项的处理逻辑
             # 名单中没有对应上 json 文件的员工号，记录下来，不中断流程，继续处理已匹配的部分
             unmatched_emp_ids = sorted(self.confirmed_emp_ids - matched_emp_ids)
 
-        for file_path in files_to_process:
+        export_format = self.export_format.get()  # "xlsx" 或 "csv"
+
+        # 进入后台线程处理前，先锁定界面相关按钮、重置进度条
+        self.btn_save.config(state="disabled")
+        self.btn_open_folder.config(state="disabled")
+        total = len(files_to_process)
+        self.progress_bar["value"] = 0
+        self.progress_bar["maximum"] = max(total, 1)
+        self.progress_label.config(text=f"正在处理... 0/{total}")
+
+        self.export_thread = threading.Thread(
+            target=self._export_worker,
+            kwargs=dict(
+                files_to_process=files_to_process,
+                ordered_fields=ordered_fields,
+                field_to_category=field_to_category,
+                need_work=need_work, need_proj=need_proj, need_edu=need_edu,
+                need_work_detail=need_work_detail, need_proj_detail=need_proj_detail,
+                need_work_summary=need_work_summary, need_proj_summary=need_proj_summary,
+                work_extra_keys=work_extra_keys, proj_extra_keys=proj_extra_keys,
+                unmatched_emp_ids=unmatched_emp_ids,
+                export_format=export_format,
+                WORK_SUMMARY_FIELD=WORK_SUMMARY_FIELD, PROJ_SUMMARY_FIELD=PROJ_SUMMARY_FIELD,
+            ),
+            daemon=True
+        )
+        self.export_thread.start()
+        self.after(100, self._poll_export_queue)
+
+    def _export_worker(self, files_to_process, ordered_fields, field_to_category,
+                        need_work, need_proj, need_edu, need_work_detail, need_proj_detail,
+                        need_work_summary, need_proj_summary, work_extra_keys, proj_extra_keys,
+                        unmatched_emp_ids, export_format, WORK_SUMMARY_FIELD, PROJ_SUMMARY_FIELD):
+        """后台线程：读取/解析每个 json 文件、拼装数据、写出 Excel/CSV。仅通过 self.export_queue 与主线程通信。"""
+        parsed_data = []
+        failed_files = []  # [(文件名, 错误信息), ...]，单个文件解析失败不影响其他文件继续处理
+        total = len(files_to_process)
+
+        for idx, file_path in enumerate(files_to_process, 1):
             filename = os.path.basename(file_path)
-            
-            name_from_filename = ""
-            parts = filename.split('_')
-            if len(parts) >= 2:
-                name_from_filename = parts[1]
-            
             try:
+                name_from_filename = ""
+                parts = filename.split('_')
+                if len(parts) >= 2:
+                    name_from_filename = parts[1]
+
                 with open(file_path, 'r', encoding='utf-8') as f:
                     raw_content = json.load(f)
-            except Exception as e:
-                print(f"读取文件失败 {file_path}: {e}")
-                continue
 
-            for root_key, person_data in raw_content.items():
-                if not isinstance(person_data, dict):
-                    continue
-
-                basic_info = person_data.get("BasicInfo", {})
-                add_info = person_data.get("AdditionInfo", {})
-                
-                raw_name = name_from_filename if name_from_filename else basic_info.get("Name", add_info.get("Name", root_key))
-                raw_emp_no = basic_info.get("EmpNo", add_info.get("EmpNo", ""))
-                
-                works = person_data.get("WorkExperience", []) if need_work else []
-                projs = person_data.get("ProjectExperience", []) if need_proj else []
-                edus = person_data.get("SpecialInfo", {}).get("EducationList", []) if need_edu else []
-                
-                # 只有勾选了逐条明细字段（开始时间/公司/职位/描述等）才需要按条目数展开多行；
-                # 若只勾选了"汇总"字段，则该人员仅导出一行
-                max_rows = max(1, len(works) if (need_work_detail and isinstance(works, list)) else 0,
-                                 len(projs) if (need_proj_detail and isinstance(projs, list)) else 0,
-                                 len(edus) if isinstance(edus, list) else 0)
-
-                scalars = {}
-                for field in ordered_fields:
-                    if field in self.list_fields_map:
+                for root_key, person_data in raw_content.items():
+                    if not isinstance(person_data, dict):
                         continue
-                    if field in (WORK_SUMMARY_FIELD, PROJ_SUMMARY_FIELD):
-                        continue  # 汇总字段单独处理，见下方
-                    en_key = self.key_mapping.get(field, field)
-                    val = self._find_value_in_dict(person_data, en_key)
-                    scalars[field] = val if val is not None else ""
 
-                # 生成工作经历/项目经历的自定义合并拼接文本：
-                # 固定包含 开始-结束时间 + 公司名称(项目名称)，再追加用户勾选的补充列
-                if need_work_summary:
-                    work_extra_keys = [
-                        json_key for _, json_key in self.merge_custom_options["工作经历"]
-                        if self.merge_custom_vars["工作经历"][json_key].get()
-                    ]
-                    scalars[WORK_SUMMARY_FIELD] = (
-                        self._build_summary_text(works, "StartTime", "EndTime", "CompanyName", work_extra_keys)
-                        if isinstance(works, list) and works else ""
-                    )
-                if need_proj_summary:
-                    proj_extra_keys = [
-                        json_key for _, json_key in self.merge_custom_options["项目经历"]
-                        if self.merge_custom_vars["项目经历"][json_key].get()
-                    ]
-                    scalars[PROJ_SUMMARY_FIELD] = (
-                        self._build_summary_text(projs, "StartTime", "EndTime", "ProjectName", proj_extra_keys)
-                        if isinstance(projs, list) and projs else ""
-                    )
+                    basic_info = person_data.get("BasicInfo", {})
+                    add_info = person_data.get("AdditionInfo", {})
 
-                for i in range(max_rows):
-                    row_data = {}
-                    row_data["人员名称"] = raw_name if i == 0 else ""
-                    row_data["员工号"] = raw_emp_no if i == 0 else ""
-                    
+                    raw_name = name_from_filename if name_from_filename else basic_info.get("Name", add_info.get("Name", root_key))
+                    raw_emp_no = basic_info.get("EmpNo", add_info.get("EmpNo", ""))
+
+                    works = person_data.get("WorkExperience", []) if need_work else []
+                    projs = person_data.get("ProjectExperience", []) if need_proj else []
+                    edus = person_data.get("SpecialInfo", {}).get("EducationList", []) if need_edu else []
+
+                    # 只有勾选了逐条明细字段才需要按条目数展开多行；只启用汇总/自定义合并时仅导出一行
+                    max_rows = max(1, len(works) if (need_work_detail and isinstance(works, list)) else 0,
+                                     len(projs) if (need_proj_detail and isinstance(projs, list)) else 0,
+                                     len(edus) if isinstance(edus, list) else 0)
+
+                    scalars = {}
                     for field in ordered_fields:
                         if field in self.list_fields_map:
-                            list_type, en_key = self.list_fields_map[field]
-                            if list_type == "WorkExperience" and i < len(works):
-                                row_data[field] = works[i].get(en_key, "")
-                            elif list_type == "ProjectExperience" and i < len(projs):
-                                row_data[field] = projs[i].get(en_key, "")
-                            elif list_type == "EducationList" and i < len(edus):
-                                row_data[field] = edus[i].get(en_key, "")
-                            else:
-                                row_data[field] = ""
-                        else:
-                            row_data[field] = scalars[field] if i == 0 else ""
+                            continue
+                        if field in (WORK_SUMMARY_FIELD, PROJ_SUMMARY_FIELD):
+                            continue  # 汇总字段单独处理，见下方
+                        en_key = self.key_mapping.get(field, field)
+                        val = self._find_value_in_dict(person_data, en_key)
+                        scalars[field] = val if val is not None else ""
 
-                    parsed_data.append(row_data)
+                    if need_work_summary:
+                        scalars[WORK_SUMMARY_FIELD] = (
+                            self._build_summary_text(works, "StartTime", "EndTime", "CompanyName", work_extra_keys)
+                            if isinstance(works, list) and works else ""
+                        )
+                    if need_proj_summary:
+                        scalars[PROJ_SUMMARY_FIELD] = (
+                            self._build_summary_text(projs, "StartTime", "EndTime", "ProjectName", proj_extra_keys)
+                            if isinstance(projs, list) and projs else ""
+                        )
+
+                    for i in range(max_rows):
+                        row_data = {}
+                        row_data["人员名称"] = raw_name if i == 0 else ""
+                        row_data["员工号"] = raw_emp_no if i == 0 else ""
+
+                        for field in ordered_fields:
+                            if field in self.list_fields_map:
+                                list_type, en_key = self.list_fields_map[field]
+                                if list_type == "WorkExperience" and i < len(works):
+                                    row_data[field] = works[i].get(en_key, "")
+                                elif list_type == "ProjectExperience" and i < len(projs):
+                                    row_data[field] = projs[i].get(en_key, "")
+                                elif list_type == "EducationList" and i < len(edus):
+                                    row_data[field] = edus[i].get(en_key, "")
+                                else:
+                                    row_data[field] = ""
+                            else:
+                                row_data[field] = scalars[field] if i == 0 else ""
+
+                        parsed_data.append(row_data)
+            except Exception as e:
+                # 单个文件解析失败：记录下来，不中断整体流程，继续处理下一个文件
+                failed_files.append((filename, str(e)))
+
+            self.export_queue.put(("progress", idx, total))
 
         if not parsed_data:
-            self._show_unmatched_emp_warning(unmatched_emp_ids)
-            messagebox.showwarning("提示", "未能成功提取到任何有效数据。")
+            self.export_queue.put(("empty", unmatched_emp_ids, failed_files))
             return
 
-        df = pd.DataFrame(parsed_data)
-        
-        save_dir = os.path.join(self.base_dir, "数据下载")
-        os.makedirs(save_dir, exist_ok=True)
-        
-        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        filename_output = f"已下载_{timestamp}.xlsx"
-        save_path = os.path.join(save_dir, filename_output)
-
         try:
-            with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
-                # 1. 写入数据
-                df.to_excel(writer, index=False)
-                
-                # 2. 获取当前 Worksheet
-                worksheet = writer.sheets['Sheet1']
-                
-                # 定义统一的白色加粗字体
-                white_bold_font = Font(color="FFFFFF", bold=True)
-                # 通用对齐样式：垂直居中 + 水平左对齐（不自动换行）
-                default_alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
-                # 汇总列专用对齐样式：垂直居中 + 水平左对齐 + 自动换行（内容含多行文本）
-                summary_alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
-                
-                # 3. 遍历第一行（表头），根据分类涂上对应的颜色
-                # openpyxl 的列索引是从 1 开始的
-                for col_idx, col_name in enumerate(df.columns, 1):
-                    # 获取该字段所属的分类
-                    category = field_to_category.get(col_name, "主键")
-                    # 获取分类对应的 Hex 颜色码
-                    hex_color = self.category_colors.get(category, "000000")
-                    
-                    # 生成填充样式
-                    fill = PatternFill(start_color=hex_color, end_color=hex_color, fill_type="solid")
-                    
-                    # 赋予表头单元格样式
-                    header_cell = worksheet.cell(row=1, column=col_idx)
-                    header_cell.fill = fill
-                    header_cell.font = white_bold_font
-                    header_cell.alignment = default_alignment
+            df = pd.DataFrame(parsed_data)
 
-                    # 判断该列是否为汇总列（内容含多行文本，需要自动换行）
-                    is_summary_col = col_name in (self.WORK_SUMMARY_FIELD, self.PROJ_SUMMARY_FIELD)
-                    if is_summary_col:
-                        col_letter = header_cell.column_letter
-                        worksheet.column_dimensions[col_letter].width = 60
+            save_dir = os.path.join(self.base_dir, "数据下载")
+            os.makedirs(save_dir, exist_ok=True)
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
 
-                    # 4. 所有数据行（不含表头）统一设置为垂直居中、水平左对齐
-                    cell_alignment = summary_alignment if is_summary_col else default_alignment
-                    for r in range(2, worksheet.max_row + 1):
-                        worksheet.cell(row=r, column=col_idx).alignment = cell_alignment
+            if export_format == "csv":
+                filename_output = f"已下载_{timestamp}.csv"
+                save_path = os.path.join(save_dir, filename_output)
+                # utf-8-sig 带 BOM，避免用 Excel 直接打开 csv 时中文乱码
+                df.to_csv(save_path, index=False, encoding="utf-8-sig")
+            else:
+                filename_output = f"已下载_{timestamp}.xlsx"
+                save_path = os.path.join(save_dir, filename_output)
+                with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
+                    df.to_excel(writer, index=False)
+                    worksheet = writer.sheets['Sheet1']
 
-            messagebox.showinfo("保存成功", f"数据已成功保存且已应用多彩表头至:\n{save_path}")
-            self._show_unmatched_emp_warning(unmatched_emp_ids)
+                    white_bold_font = Font(color="FFFFFF", bold=True)
+                    default_alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
+                    summary_alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+                    for col_idx, col_name in enumerate(df.columns, 1):
+                        category = field_to_category.get(col_name, "主键")
+                        hex_color = self.category_colors.get(category, "000000")
+                        fill = PatternFill(start_color=hex_color, end_color=hex_color, fill_type="solid")
+
+                        header_cell = worksheet.cell(row=1, column=col_idx)
+                        header_cell.fill = fill
+                        header_cell.font = white_bold_font
+                        header_cell.alignment = default_alignment
+
+                        is_summary_col = col_name in (WORK_SUMMARY_FIELD, PROJ_SUMMARY_FIELD)
+                        if is_summary_col:
+                            col_letter = header_cell.column_letter
+                            worksheet.column_dimensions[col_letter].width = 60
+
+                        cell_alignment = summary_alignment if is_summary_col else default_alignment
+                        for r in range(2, worksheet.max_row + 1):
+                            worksheet.cell(row=r, column=col_idx).alignment = cell_alignment
+
+            self.export_queue.put(("done", save_path, unmatched_emp_ids, failed_files))
         except Exception as e:
-            messagebox.showerror("保存失败", f"导出 Excel 时发生错误:\n{e}")
+            self.export_queue.put(("error", str(e)))
+
+    def _poll_export_queue(self):
+        """在主线程中周期性轮询后台线程的进度/结果消息，安全地更新界面"""
+        try:
+            while True:
+                msg = self.export_queue.get_nowait()
+                kind = msg[0]
+
+                if kind == "progress":
+                    _, done, total = msg
+                    self.progress_bar["value"] = done
+                    self.progress_label.config(text=f"正在处理... {done}/{total}")
+
+                elif kind == "empty":
+                    _, unmatched_emp_ids, failed_files = msg
+                    self._finish_export_ui()
+                    messagebox.showwarning("提示", "未能成功提取到任何有效数据。")
+                    self._show_unmatched_emp_warning(unmatched_emp_ids)
+                    self._show_failed_files_warning(failed_files)
+                    return
+
+                elif kind == "done":
+                    _, save_path, unmatched_emp_ids, failed_files = msg
+                    self._finish_export_ui()
+                    self.last_export_dir = os.path.dirname(save_path)
+                    self.btn_open_folder.config(state="normal")
+                    self.progress_label.config(text=f"导出完成：{os.path.basename(save_path)}")
+                    messagebox.showinfo("保存成功", f"数据已成功保存至:\n{save_path}")
+                    self._show_unmatched_emp_warning(unmatched_emp_ids)
+                    self._show_failed_files_warning(failed_files)
+                    return
+
+                elif kind == "error":
+                    _, err_msg = msg
+                    self._finish_export_ui()
+                    messagebox.showerror("保存失败", f"导出时发生错误:\n{err_msg}")
+                    return
+        except queue.Empty:
+            pass
+
+        # 队列暂时没有新消息，继续轮询
+        self.after(100, self._poll_export_queue)
+
+    def _finish_export_ui(self):
+        self.btn_save.config(state="normal")
+
+    def _show_failed_files_warning(self, failed_files):
+        """若有 json 文件解析失败（不影响其他文件的处理），弹窗提示清单"""
+        if not failed_files:
+            return
+        n = len(failed_files)
+        detail_lines = [f"{name}：{err}" for name, err in failed_files[:20]]
+        detail = "\n".join(detail_lines)
+        if n > 20:
+            detail += f"\n...（其余 {n - 20} 个省略）"
+        messagebox.showwarning(
+            "存在解析失败的文件",
+            f"本次共有{n}个 JSON 文件解析失败，已跳过并继续处理其余文件，以下为清单:\n{detail}\n请检查文件格式是否正确。"
+        )
 
     def _show_unmatched_emp_warning(self, unmatched_emp_ids):
         """若已确认的人员名单中存在未能匹配到任何 json 文件的员工号，弹窗提示清单"""
