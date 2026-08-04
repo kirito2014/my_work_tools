@@ -293,6 +293,20 @@ def extract_emp_no_from_filename(file_path: str) -> str:
     # 如果文件名格式不符合预期，返回空字符串或默认值
     return ""
 
+
+def extract_name_from_filename(file_path: str) -> str:
+    """
+    从文件名中提取姓名（假设格式为：工号+姓名+工作简历.docx）
+    按'+'分隔后取第二段作为姓名，用于JSON最外层键，与doc_2_json_alter.py保持一致
+    :param file_path: 文件路径
+    :return: 姓名字符串，提取失败返回空字符串
+    """
+    file_name = os.path.splitext(os.path.basename(file_path))[0]
+    parts = file_name.split('+')
+    if len(parts) >= 2 and parts[1].strip():
+        return parts[1].strip()
+    return ""
+
 def _parse_date(date_str: str) -> datetime:
     """尝试多种格式解析日期"""
     if date_str.lower() in ['至今', 'current', 'now', 'present']:
@@ -333,25 +347,31 @@ def calculate_months(start_str, end_str):
     except Exception as e:
         print(f"计算月份差时出错: {e}")
         return 0
-def convert_to_template_format(raw_data: Dict, emp_no: str = "") -> Dict:
+def convert_to_template_format(raw_data: Dict, emp_no: str = "", file_path: str = "") -> Dict:
     """
     将原始提取的数据转换为模板JSON格式
     :param raw_data: extract_resume_universal函数提取的原始数据
     :param emp_no: 工号（可选）
+    :param file_path: 文件路径（可选）。用于按'+'分隔文件名提取姓名，作为JSON最外层键
     :return: 符合模板格式的字典
     """
     # 提取基本信息
     basic_info = raw_data.get("基本情况", {})
     
-    # 自动提取人员姓名 去除特殊符号后的姓名
+    # 自动提取人员姓名 去除特殊符号后的姓名（用于内层Name字段，来源仍为docx文档内容，不做修改）
     person_name = extract_person_name(basic_info)
     
     # 提取能力与资质内容
     ability_data = raw_data.get("能力与资质", {})
     
+    # JSON最外层键：优先从文件名按'+'分隔取第二段；提取失败则回退为文档内姓名
+    outer_key_name = extract_name_from_filename(file_path) if file_path else ""
+    if not outer_key_name:
+        outer_key_name = basic_info.get("姓名") or person_name
+    
     # 构建符合模板格式的数据
     template_data = {
-        basic_info.get("姓名"): {
+        outer_key_name: {
             "BasicInfo": {
                 "EmpNo": emp_no,  # 工号字段，放在Name前面
                 "Name":  person_name,  # 使用处理过的姓名（去掉数字）
@@ -439,8 +459,8 @@ if __name__ == "__main__":
         # 从文件名中提取工号
         emp_no = extract_emp_no_from_filename(doc_path)
         
-        # 转换为模板格式（传入工号）
-        template_formatted_data = convert_to_template_format(raw_resume_data, emp_no)
+        # 转换为模板格式（传入工号和文件路径，用于按'+'分隔文件名提取最外层姓名键）
+        template_formatted_data = convert_to_template_format(raw_resume_data, emp_no, doc_path)
         
         # 获取人员姓名（用于文件名）
         person_name = list(template_formatted_data.keys())[0]
