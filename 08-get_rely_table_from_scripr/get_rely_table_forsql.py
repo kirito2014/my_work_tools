@@ -48,26 +48,82 @@ def substitute_db_vars(raw_content, var_map):
 
 def determine_target_info(content):
     """
-    确定"目标库"和"目标表"：
-      在脚本正文中查找 INSERT INTO <table> 或 INSERT OVERWRITE TABLE <table> 语句
-      （schema 前缀可选，即 schema.table 或只写 table 都能识别），
-      排除 VT_ 开头的临时表后，取第一个"真正落地"的目标表：
+    确定"目标库"、"目标表"、"目标语句类型"：
+      在脚本正文中查找下面几类"真正落地"的语句（schema 前缀可选，即 schema.table 或只写 table 都能识别）：
+        - INSERT INTO <table> / INSERT OVERWRITE TABLE <table>  → 目标语句类型记为 'INSERT'
+        - CREATE VIEW <table> / CREATE OR REPLACE VIEW <table>  → 目标语句类型记为 'VIEW'
+      排除 VT_ 开头的临时表后，取脚本中第一个命中的语句：
         - table 即为目标表；
         - 如果语句里写了 schema，则该 schema 即为目标库；
         - 如果语句里没写 schema（如 INSERT INTO some_table），目标库标记为"未匹配到目标库"，
           但目标表名依然能正确取到。
-      如果脚本里完全找不到这样的语句，则目标库、目标表都标记为对应的"未匹配到"提示，需要人工核查。
+      如果脚本里完全找不到这样的语句，则目标库、目标表都标记为对应的"未匹配到"提示，
+      目标语句类型记为 None，需要人工核查。
     """
-    pattern = r'INSERT\s+(?:INTO|OVERWRITE\s+TABLE)\s+(?:(\w+)\.)?(\w+)'
+    pattern = (r'(INSERT\s+(?:INTO|OVERWRITE\s+TABLE)|CREATE\s+(?:OR\s+REPLACE\s+)?VIEW)'
+               r'\s+(?:(\w+)\.)?(\w+)')
     matches = re.findall(pattern, content, flags=re.IGNORECASE)
 
-    for schema, table in matches:
+    for keyword, schema, table in matches:
         if table.upper().startswith('VT_'):
             continue
         schema_out = schema.upper() if schema else '未匹配到目标库'
-        return schema_out, table.upper()
+        target_type = 'VIEW' if keyword.strip().upper().startswith('CREATE') else 'INSERT'
+        return schema_out, table.upper(), target_type
 
-    return '未匹配到目标库', '未匹配到目标表'
+    return '未匹配到目标库', '未匹配到目标表', None
+
+
+def determine_process_type(content, target_type):
+    """
+    根据脚本内容判断目标表所属的"处理属性"，主要依据 determine_target_info 匹配到的语句类型，
+    并结合脚本里出现的其它典型语句做进一步细化：
+      - 视图处理           : 命中 CREATE VIEW / CREATE OR REPLACE VIEW
+      - 实体加工(先删后插)  : 命中 INSERT，且脚本里也有 DELETE FROM（先清理再插入的典型写法）
+      - 实体加工(先清空后插): 命中 INSERT，且脚本里有 TRUNCATE TABLE
+      - 实体加工(直接插入/追加) : 命中 INSERT，但没有配套的 DELETE/TRUNCATE
+      - 实体加工(仅更新)    : 没有 INSERT/CREATE VIEW，但有 UPDATE ... SET 语句
+      - 实体加工(仅删除)    : 没有 INSERT/CREATE VIEW，但有 DELETE FROM 语句
+      - 表结构维护(建表)    : 没有以上任何操作，但有 CREATE TABLE 语句
+      - 表结构维护(变更)    : 没有以上任何操作，但有 ALTER TABLE 语句
+      - 变量赋值/参数取值   : 只有 SELECT 语句，没有任何落地/变更类语句
+      - 未识别             : 以上都没有命中，需要人工核查
+    如果脚本里同时出现 GRANT 授权语句，会在分类结果后追加"+权限授予"标识。
+    """
+    has_delete = bool(re.search(r'DELETE\s+FROM\s+', content, flags=re.IGNORECASE))
+    has_truncate = bool(re.search(r'TRUNCATE\s+TABLE\s+', content, flags=re.IGNORECASE))
+    has_update = bool(re.search(r'UPDATE\s+\S+\s+SET\s+', content, flags=re.IGNORECASE))
+    has_create_table = bool(re.search(r'CREATE\s+TABLE\s+', content, flags=re.IGNORECASE))
+    has_alter_table = bool(re.search(r'ALTER\s+TABLE\s+', content, flags=re.IGNORECASE))
+    has_select = bool(re.search(r'\bSELECT\b', content, flags=re.IGNORECASE))
+    has_grant = bool(re.search(r'\bGRANT\b', content, flags=re.IGNORECASE))
+
+    if target_type == 'VIEW':
+        label = '视图处理'
+    elif target_type == 'INSERT':
+        if has_delete:
+            label = '实体加工(先删后插)'
+        elif has_truncate:
+            label = '实体加工(先清空后插)'
+        else:
+            label = '实体加工(直接插入/追加)'
+    else:
+        if has_update:
+            label = '实体加工(仅更新)'
+        elif has_delete:
+            label = '实体加工(仅删除)'
+        elif has_create_table:
+            label = '表结构维护(建表)'
+        elif has_alter_table:
+            label = '表结构维护(变更)'
+        elif has_select:
+            label = '变量赋值/参数取值'
+        else:
+            label = '未识别'
+
+    if has_grant:
+        label += '+权限授予'
+    return label
 
 
 def extract_source_tables(content):
@@ -133,7 +189,8 @@ def process_file(file_path, file_name):
     var_map = extract_db_var_map(raw_content)
     content = substitute_db_vars(raw_content, var_map)
 
-    target_schema, target_table = determine_target_info(content)
+    target_schema, target_table, target_type = determine_target_info(content)
+    process_type = determine_process_type(content, target_type)
 
     source_tables_raw = extract_source_tables(content)
     source_tables = filter_source_tables(source_tables_raw, target_table)
@@ -141,10 +198,10 @@ def process_file(file_path, file_name):
     rows = []
     if source_tables:
         for source_schema, source_table in source_tables:
-            rows.append((file_name, target_schema, target_table, source_schema, source_table))
+            rows.append((file_name, target_schema, target_table, source_schema, source_table, process_type))
     else:
         # 没有解析到来源表也保留一条记录，方便人工核查该脚本
-        rows.append((file_name, target_schema, target_table, '', ''))
+        rows.append((file_name, target_schema, target_table, '', '', process_type))
     return rows
 
 
@@ -171,7 +228,7 @@ def process_folder(folder_path):
 def write_to_excel(data, output_file):
     workbook = openpyxl.Workbook()
     sheet = workbook.active
-    headers = ['脚本文件名', '目标库', '目标表', '来源库', '来源表']
+    headers = ['脚本文件名', '目标库', '目标表', '来源库', '来源表', '处理类型']
     for col_idx, header in enumerate(headers, start=1):
         sheet.cell(row=1, column=col_idx, value=header)
 
@@ -179,7 +236,7 @@ def write_to_excel(data, output_file):
         for col_idx, value in enumerate(row, start=1):
             sheet.cell(row=row_idx, column=col_idx, value=value)
 
-    widths = [50, 14, 40, 14, 40]
+    widths = [50, 14, 40, 14, 40, 22]
     for i, width in enumerate(widths, start=1):
         sheet.column_dimensions[openpyxl.utils.get_column_letter(i)].width = width
 
