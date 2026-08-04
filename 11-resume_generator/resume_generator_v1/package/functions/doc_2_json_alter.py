@@ -172,6 +172,30 @@ def extract_emp_no_from_filename(doc_path):
         logger.error(f"从文件名提取工号失败: {str(e)}")
         return 'unknown'
 
+
+def extract_name_from_filename(doc_path):
+    """
+    从文件名中提取姓名（假设文件名格式为：工号+姓名+xxx.docx）
+    按'+'分隔后取第二段作为姓名，与doc_2_json.py保持一致的命名来源
+
+    Args:
+        doc_path: 文档路径
+
+    Returns:
+        str: 姓名，提取失败时返回空字符串
+    """
+    try:
+        # 获取文件名（不含路径和扩展名）
+        filename = os.path.splitext(os.path.basename(doc_path))[0]
+        parts = filename.split('+')
+        if len(parts) >= 2 and parts[1].strip():
+            return parts[1].strip()
+        return ''
+    except Exception as e:
+        logger.error(f"从文件名提取姓名失败: {str(e)}")
+        return ''
+
+
 def extract_basic_info(doc, filename):
     """
     提取基本信息
@@ -329,6 +353,24 @@ def extract_basic_info(doc, filename):
     # 按照要求不对学历进行处理
     return basic_info
 
+def extract_person_name(basic_info) -> str:
+    """
+    从基本信息中提取人员姓名
+    :param basic_info: 基本信息字典
+    :return: 人员姓名
+    """
+    # 尝试不同的键名来获取姓名
+    name_keys = ["姓    名", "姓名", "名字", "名称", "Name", "name", "姓    名"]
+    for key in name_keys:
+        if key in basic_info:
+            name = basic_info[key].strip()
+            # 清理姓名中的特殊字符
+            name = re.sub(r'[【】（）()]', '', name)
+            # 去掉姓名中的数字
+            name = re.sub(r'\d+', '', name)
+            return name
+    
+    return "未知人员"
 
 def _parse_date(date_str: str) -> datetime:
     """尝试多种格式解析日期"""
@@ -371,7 +413,7 @@ def calculate_months(start_str, end_str):
         logger.warning(f"计算月份差时出错: {e}")
         return 0
 
-def convert_to_template_format(raw_resume_data, emp_no):
+def convert_to_template_format(raw_resume_data, emp_no, file_path=None):
     """
     将原始简历数据转换为模板格式，符合参考文件结构
     以姓名为键，内部包含标准字段结构，使用驼峰命名法
@@ -380,6 +422,8 @@ def convert_to_template_format(raw_resume_data, emp_no):
     Args:
         raw_resume_data: 原始提取的简历数据
         emp_no: 员工工号
+        file_path: 简历文件路径（可选）。用于按'+'分隔文件名提取姓名作为最外层键，
+                   与doc_2_json.py保持一致，避免直接使用文档内提取的姓名（可能不干净）
         
     Returns:
         dict: 模板格式数据，以姓名为键，内部包含标准字段结构和正确的字段命名
@@ -387,8 +431,11 @@ def convert_to_template_format(raw_resume_data, emp_no):
     # 获取原始数据中的基本信息
     basic_info = raw_resume_data.get('BasicInfo', {})
     
-    # 提取姓名
-    person_name = basic_info.get('Name', '')
+    # 最外层键（姓名）优先从文件名中按'+'分隔提取第二段，与doc_2_json.py保持一致
+    person_name = extract_name_from_filename(file_path) if file_path else ''
+    if not person_name:
+        # 回退：使用文档中提取的Name字段
+        person_name = basic_info.get('Name', '')
     if not person_name or person_name.strip() == '':
         person_name = 'Unknown'
     
@@ -693,7 +740,7 @@ def extract_resume_alt(file_path):
         
         # 提取基本信息
         basic_info = extract_basic_info(doc, filename)
-        
+        in_person_name = extract_person_name(basic_info)  # 提取人员姓名（可选，主要用于日志输出）
         # 提取工作经历
         work_experience = extract_work_experience(doc)
         
@@ -704,7 +751,7 @@ def extract_resume_alt(file_path):
         raw_resume_data = {
             'BasicInfo': {
                 'EmpNo': emp_no,
-                'Name': basic_info['Name'],
+                'Name': in_person_name,
                 'WorkYears': basic_info['WorkYears'],
                 'GraduationTime': basic_info['GraduationTime'],
                 'GraduationSchool': basic_info['GraduationSchool'],
@@ -724,11 +771,11 @@ def extract_resume_alt(file_path):
             }
         }
         
-        # 转换为模板格式（传入工号）
-        template_formatted_data = convert_to_template_format(raw_resume_data, emp_no)
+        # 转换为模板格式（传入工号和文件路径，用于按'+'分隔文件名提取最外层姓名键）
+        template_formatted_data = convert_to_template_format(raw_resume_data, emp_no, file_path)
         
         # 获取人员姓名
-        person_name = basic_info['Name'] if basic_info['Name'] != '/' else 'Unknown'
+        person_name = list(template_formatted_data.keys())[0]
         
         # 输出结果
         print(f"【{person_name}的简历 - 原始提取数据】")
