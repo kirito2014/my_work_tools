@@ -9,6 +9,7 @@ import threading
 import logging
 from datetime import datetime, date
 import socket  # 用于进程锁检查
+import webbrowser  # 用于打开预览网页
 # 导入PIL用于图像处理
 try:
     from PIL import Image, ImageTk
@@ -147,6 +148,22 @@ try:
                 spec.loader.exec_module(doc_converter)
             else:
                 print(f"警告: 未找到 doc_converter.py 文件在路径: {doc_converter_path}")
+    # 动态导入preview_server模块（简历预览服务，独立模块）
+    preview_server = None
+    try:
+        from package.functions import preview_server
+    except ImportError:
+        try:
+            import package.functions.preview_server as preview_server
+        except ImportError:
+            preview_server_path = os.path.join(base_dir, 'package', 'functions', 'preview_server.py')
+            if os.path.exists(preview_server_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("preview_server", preview_server_path)
+                preview_server = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(preview_server)
+            else:
+                print(f"警告: 未找到 preview_server.py 文件在路径: {preview_server_path}")
 except Exception as e:
     print(f"导入模块时出错: {e}")
 
@@ -240,7 +257,32 @@ class ResumeGeneratorGUI:
         
         # 初始化时尝试加载员工信息
         self._load_employee_info()
-        
+
+        # 启动简历预览服务（后台守护线程，跟随主程序自动退出，不阻塞GUI）
+        self._start_preview_server()        
+    def _start_preview_server(self):
+        """在后台启动简历预览HTTP服务，仅启动一次"""
+        if preview_server is None:
+            self._log("预览功能不可用：未找到 preview_server 模块")
+            return
+        try:
+            port = preview_server.start_server_background(self.base_dir)
+            if port:
+                self._log(f"简历预览服务已启动: http://127.0.0.1:{port}/")
+            else:
+                self._log("简历预览服务启动失败（端口被占用），预览功能不可用")
+        except Exception as e:
+            self._log(f"启动预览服务出错: {str(e)}")
+
+    def _open_preview(self):
+        """打开预览网页，默认带上当前选中的银行模板"""
+        if preview_server is None or preview_server.get_server_port() is None:
+            messagebox.showwarning("提示", "预览服务未启动，请稍后重试或查看日志")
+            return
+        bank_name = self.bank_var.get()
+        url = preview_server.get_preview_url(bank_name)
+        webbrowser.open(url)   
+
     def _create_menu(self):
         """创建菜单栏"""
         # 创建菜单栏
@@ -1169,7 +1211,8 @@ class ResumeGeneratorGUI:
         
         # 生成简历按钮
         ttk.Button(bank_frame, text="生成简历", command=self._generate_resumes, width=10, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
-        
+        ttk.Button(bank_frame, text="预览效果", command=self._open_preview, width=10).pack(side=tk.LEFT, padx=5)  
+              
         # 新增按名单选择人员框架
         self.list_select_frame = ttk.LabelFrame(generate_frame, text="按名单选择人员", padding="10")
         self.list_select_frame.pack(fill=tk.X, pady=5)
