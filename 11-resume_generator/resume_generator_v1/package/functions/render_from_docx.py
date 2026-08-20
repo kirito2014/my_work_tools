@@ -437,6 +437,16 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
                 valid_names = [name for name in person_names if name in data]
                 print(f"[INFO] 指定处理 {len(valid_names)} 位人员，过滤无效名称 {len(person_names)-len(valid_names)} 个")
 
+            # 构建"数据key -> 导出文件用姓名"的映射：
+            # JSON最外层键有时会丢失姓名中的数字（例如来自docx文档内容提取时被清理过），
+            # 但按约定这类JSON是"一人一文件"，文件名里的姓名（name_part）才是准确、
+            # 和json文件保持一致的来源，因此单人文件时优先用文件名里的姓名导出；
+            # 若一个文件里有多个人员（无法从单一文件名区分），则回退用字典key，行为不变
+            if len(valid_names) == 1 and name_part:
+                export_name_map = {valid_names[0]: name_part}
+            else:
+                export_name_map = {name: name for name in valid_names}
+
             # 确保输出文件夹使用绝对路径
             if not os.path.isabs(output_folder):
                 output_folder = os.path.join(base_dir, output_folder)
@@ -496,11 +506,12 @@ def process_json_data(json_data, template_path, input_file, output_folder, perso
             else:
                 # Word模板或单个人员，使用原有逻辑
                 for person_name in valid_names:
+                    export_name = export_name_map.get(person_name, person_name)
                     output_path = generate_resume_from_json(
                         data[person_name],
                         template_path,
                         output_folder,
-                        person_name,
+                        export_name,
                         bankname,
                     )
                     if output_path: 
